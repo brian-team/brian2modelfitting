@@ -59,10 +59,8 @@ def setup_fit(model=None, dt=None, param_init=None, input_var=None,
         - metric instance
 
     Returns
-    -------g_kd : siemens (constant)
-gl   : siemens (constant)
-Cm   : farad (constant)
-    simulator : object ~brian2modelfitting.modelfitting.Simulator
+    -------
+    simulator : object ~brian2tools.modelfitting.Simulator
     """
     simulators = {
         'CPPStandaloneDevice': CPPStandaloneSimulation(),
@@ -108,14 +106,10 @@ def setup_neuron_group(model, n_neurons, method, threshold, reset, refractory,
         neurons.namespace[name] = namespace[name]
 
     if param_init:
-        print(neurons.get_states())
-
         neurons.set_states(param_init)
 
     return neurons
-g_kd : siemens (constant)
-gl   : siemens (constant)
-Cm   : farad (constant)
+
 
 def calc_errors_spikes(metric, simulator, n_traces, output):
     """
@@ -129,9 +123,7 @@ def calc_errors_spikes(metric, simulator, n_traces, output):
 
 
 def calc_errors_traces(metric, simulator, n_traces, output, output_var):
-    """g_kd : siemens (constant)
-gl   : siemens (constant)
-Cm   : farad (constant)
+    """
     Returns errors after simulation with StateMonitor.
     To be used inside optim_iter.
     """
@@ -143,9 +135,7 @@ Cm   : farad (constant)
 def optim_iter(simulator, optimizer, metric, parameter_names, n_samples,
                n_traces, duration, output, calc_errors, *args):
     """
-    Function performs all operatg_kd : siemens (constant)
-gl   : siemens (constant)
-Cm   : farad (constant)ions required for one iteration of optimization.
+    Function performs all operations required for one iteration of optimization.
     Drawing parameters, setting them to simulator and calulating the error.
 
     Returns
@@ -159,9 +149,7 @@ Cm   : farad (constant)ions required for one iteration of optimization.
     """
     parameters = optimizer.ask(n_samples=n_samples)
 
-    d_param = get_param_dic(parag_kd : siemens (constant)
-gl   : siemens (constant)
-Cm   : farad (constant)meters, parameter_names, n_traces,
+    d_param = get_param_dic(parameters, parameter_names, n_traces,
                             n_samples)
     simulator.run(duration, d_param, parameter_names)
     errors = calc_errors(metric, simulator, n_traces, output, *args)
@@ -191,7 +179,7 @@ def fit_traces(model=None,
     Creates an interface for model fitting of traces with parameters draw by
     gradient-free algorithms (through ask/tell interfaces).
     Input nad output have to have the same dimensions.
-https://github.com/alTeska/brian_dev/blob/master/real_data/deciliated_cell_all_currents_2607.ipynb
+
     Initiates n_neurons = num input traces * num samples, to which drawn
     parameters get assigned and evaluates them in parallel.
 
@@ -208,9 +196,9 @@ https://github.com/alTeska/brian_dev/blob/master/real_data/deciliated_cell_all_c
     dt : time step
     method: string, optional
         Integration method
-    optimizer: ~brian2modelfitting.modelfitting.Optimizer children
+    optimizer: ~brian2tools.modelfitting.Optimizer children
         Child of Optimizer class, specific for each library.
-    metric: ~brian2modelfitting.modelfitting.Metric children
+    metric: ~brian2tools.modelfitting.Metric children
         Child of Metric class, specifies optimization metric
     n_samples: int
         Number of parameter samples to be optimized over.
@@ -253,8 +241,8 @@ https://github.com/alTeska/brian_dev/blob/master/real_data/deciliated_cell_all_c
                               ' + "% s" % repr(input.dim))
 
     # Setup NeuronGroup
-    neurons =  (model, n_neurons, method, threshold, reset,
-                                 refrhttps://github.com/alTeska/brian_dev/blob/master/real_data/deciliated_cell_all_currents_2607.ipynbactory, param_init,
+    neurons = setup_neuron_group(model, n_neurons, method, threshold, reset,
+                                 refractory, param_init,
                                  input_var=input_traces,
                                  output_var=output_traces,
                                  Ntraces=Ntraces)
@@ -336,9 +324,9 @@ def fit_spikes(model=None,
     dt : time step
     method: string, optional
         Integration method
-    optimizer: ~brian2modelfitting.modelfitting.Optimizer children
+    optimizer: ~brian2tools.modelfitting.Optimizer children
         Child of Optimizer class, specific for each library.
-    metric: ~brian2modelfitting.modelfitting.Metric children
+    metric: ~brian2tools.modelfitting.Metric children
         Child of Metric class, specifies optimization metric
     n_samples: int
         Number of parameter samples to be optimized over.
