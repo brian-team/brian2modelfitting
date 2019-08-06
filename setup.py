@@ -11,21 +11,23 @@ if sys.version_info < (3, 6):
     raise RuntimeError('Only Python versions >= 3.6 are supported')
 
 def readme():
-    with open('README.rst') as f:
+    with open('README.md') as f:
         return f.read()
 
 # Note that this does not set a version number explicitly, but automatically
 # figures out a version based on git tags
 setup(name='brian2modelfitting',
       url='https://github.com/brian-team/brian2modelfitting',
-      version='0.2.1.1',
+      version='0.1',
       packages=find_packages(),
-      package_data={},
+      # package_data={},
       install_requires=['matplotlib>=1.3.1',
+                        'numpy',
                         'brian2>=2.0',
                         'setuptools',
                         'setuptools_scm',
-                        'nevergrad'
+                        'nevergrad',
+                        'scikit-optimize',
                         ],
       provides=['brian2modelfitting'],
       extras_require={'test': ['pytest'],
