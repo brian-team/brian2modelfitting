@@ -60,7 +60,25 @@ def test_initialize_simulation_standalone():
 
 
 def test_initialize_simulation_runtime():
-    start_scope()
+    start_scope()# def test_run_simulation_standalone():
+#     start_scope()
+#
+#     neurons = NeuronGroup(1, model, name='neurons')
+#     monitor = StateMonitor(neurons, 'I', record=True, name='monitor')
+#     net = Network(neurons, monitor)
+#
+#     device.has_been_run = False
+#     sas = CPPStandaloneSimulation()
+#     sas.initialize(net)
+#
+#     sas.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
+#     I = getattr(sas.network['monitor'], 'I')
+#     assert_equal(np.shape(I), (1, duration/dt))
+#
+#     # check the re-run
+#     sas.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
+#     I = getattr(sas.network['monitor'], 'I')
+#     assert_equal(np.shape(I), (1, 2 * duration/dt))
     rts = RuntimeSimulation()
     assert_raises(TypeError, rts.initialize)
 
@@ -70,37 +88,37 @@ def test_initialize_simulation_runtime():
     assert_raises(Exception, rts.initialize, wrong_net)
 
 
-def test_run_simulation_standalone():
-    start_scope()
+# def test_run_simulation_standalone():
+#     start_scope()
+#
+#     neurons = NeuronGroup(1, model, name='neurons')
+#     monitor = StateMonitor(neurons, 'I', record=True, name='monitor')
+#     net = Network(neurons, monitor)
+#
+#     device.has_been_run = False
+#     sas = CPPStandaloneSimulation()
+#     sas.initialize(net)
+#
+#     sas.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
+#     I = getattr(sas.network['monitor'], 'I')
+#     assert_equal(np.shape(I), (1, duration/dt))
+#
+#     # check the re-run
+#     sas.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
+#     I = getattr(sas.network['monitor'], 'I')
+#     assert_equal(np.shape(I), (1, 2 * duration/dt))
 
-    neurons = NeuronGroup(1, model, name='neurons')
-    monitor = StateMonitor(neurons, 'I', record=True, name='monitor')
-    net = Network(neurons, monitor)
 
-    device.has_been_run = False
-    sas = CPPStandaloneSimulation()
-    sas.initialize(net)
-
-    sas.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
-    I = getattr(sas.network['monitor'], 'I')
-    assert_equal(np.shape(I), (1, duration/dt))
-
-    # check the re-run
-    sas.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
-    I = getattr(sas.network['monitor'], 'I')
-    assert_equal(np.shape(I), (1, 2 * duration/dt))
-
-
-def test_run_simulation_runtime():
-    start_scope()
-
-    neurons = NeuronGroup(1, model, name='neurons')
-    monitor = StateMonitor(neurons, 'I', record=True, name='monitor')
-    net = Network(neurons, monitor)
-
-    rts = RuntimeSimulation()
-    rts.initialize(net)
-
-    rts.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
-    I = getattr(rts.network['monitor'], 'I')
-    assert_equal(np.shape(I), (1, duration/dt))
+# def test_run_simulation_runtime():
+#     start_scope()
+#
+#     neurons = NeuronGroup(1, model, name='neurons')
+#     monitor = StateMonitor(neurons, 'I', record=True, name='monitor')
+#     net = Network(neurons, monitor)
+#
+#     rts = RuntimeSimulation()
+#     rts.initialize(net)
+#
+#     rts.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
+#     I = getattr(rts.network['monitor'], 'I')
+#     assert_equal(np.shape(I), (1, duration/dt))
