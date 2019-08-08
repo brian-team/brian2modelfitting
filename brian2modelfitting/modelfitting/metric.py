@@ -66,8 +66,6 @@ class Metric(object):
     """
     Metic abstract class to define functions required for a custom metric
     To be used with modelfitting fit_traces.
-
-    TODO: metric.weights
     """
     __metaclass__ = abc.ABCMeta
 
