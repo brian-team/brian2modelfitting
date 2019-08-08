@@ -41,9 +41,9 @@ def generate_fits(model=None,
     """
     if get_device().__class__.__name__ == 'CPPStandaloneDevice':
         device.has_been_run = False
-        reinit_devices()
-        # device.reinint()
-        # device.activate()
+        # reinit_devices()
+        device.reinint()
+        device.activate()
 
     simulator = setup_fit(model, dt, param_init, input_var, None)
 
@@ -70,6 +70,11 @@ def generate_fits(model=None,
                                name='monitor')
 
     network = Network(neurons, monitor)
+    if param_init:
+        for k, v in param_init.items():
+            network['neurons'].__setattr__(k, v)
+
+
     simulator.initialize(network)
 
     simulator.run(duration, params, parameter_names)

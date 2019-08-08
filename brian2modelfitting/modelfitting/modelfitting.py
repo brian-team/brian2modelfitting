@@ -130,8 +130,9 @@ def setup_neuron_group(model, n_neurons, method, threshold, reset, refractory,
     for name in namespace:
         neurons.namespace[name] = namespace[name]
 
-    if param_init:
-        neurons.set_states(param_init)
+    # if param_init:
+    #     for k, v in param_init.items():
+    #         neurons.__setattr__(k, v)
 
     return neurons
 
@@ -158,7 +159,8 @@ def calc_errors_traces(metric, simulator, n_traces, output, output_var):
 
 
 def optim_iter(simulator, optimizer, metric, parameter_names, n_samples,
-               n_traces, duration, output, calc_errors, *args):
+               n_traces, duration, output, calc_errors, network, param_init,
+               *args):
     """
     Function performs all operations required for one iteration of optimization.
     Drawing parameters, setting them to simulator and calulating the error.
@@ -172,6 +174,11 @@ def optim_iter(simulator, optimizer, metric, parameter_names, n_samples,
     errors: list
         calculated errors
     """
+    if param_init:
+        for k, v in param_init.items():
+            network['neurons'].__setattr__(k, v)
+
+
     parameters = optimizer.ask(n_samples=n_samples)
 
     d_param = get_param_dic(parameters, parameter_names, n_traces,
@@ -306,7 +313,9 @@ def fit_traces(model=None,
         res, parameters, errors = optim_iter(simulator, optimizer, metric,
                                              parameter_names, n_samples,
                                              Ntraces, duration, output,
-                                             calc_errors, output_var)
+                                             calc_errors,
+                                             network,
+                                             param_init, output_var)
 
         # create output variables
         result_dict = make_dic(parameter_names, res)
@@ -405,7 +414,8 @@ def fit_spikes(model=None,
         res, parameters, errors = optim_iter(simulator, optimizer, metric,
                                              parameter_names, n_samples,
                                              Ntraces, duration, output,
-                                             calc_errors_spikes)
+                                             calc_errors_spikes, network,
+                                             param_init)
 
         # create output variables
         result_dict = make_dic(parameter_names, res)
