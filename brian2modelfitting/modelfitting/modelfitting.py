@@ -6,8 +6,33 @@ from brian2.input import TimedArray
 from brian2.equations.equations import Equations
 from .simulation import RuntimeSimulation, CPPStandaloneSimulation
 from .metric import Metric
+from tqdm import tqdm
 
 __all__ = ['fit_traces', 'fit_spikes']
+
+
+def callback_text(res, errors, parameters, k):
+    print("Round {}: fit {} with error: {}".format(k, res, min(errors)))
+
+
+class ProgressBar(object):
+    def __init__(self, toolbar_width=10):
+        self.toolbar_width = toolbar_width
+        self.t = tqdm(total=toolbar_width)
+
+    def __call__(self, res, errors, parameters, k):
+        self.t.update(1)
+
+
+def callback_setup(set_type, n_rounds):
+    if set_type == 'text':
+        callback = callback_text
+    elif set_type == 'progressbar':
+        callback = ProgressBar(n_rounds)
+    elif set_type is not None:
+        callback = set_type
+
+    return callback
 
 
 def make_dic(names, values):
@@ -226,6 +251,8 @@ def fit_traces(model=None,
 
     simulator = setup_fit(model, dt, param_init, input_var, metric)
 
+    callback = callback_setup(callback, n_rounds)
+
     parameter_names = model.parameter_names
     Ntraces, Nsteps = input.shape
     duration = Nsteps * dt
@@ -285,9 +312,8 @@ def fit_traces(model=None,
         result_dict = make_dic(parameter_names, res)
         error = min(errors)
 
-        if callback is not None:
-            if callback(res, errors, parameters, k) is True:
-                break
+        if callback(res, errors, parameters, k) is True:
+            break
 
     return result_dict, error
 
@@ -355,6 +381,7 @@ def fit_spikes(model=None,
     duration = Nsteps * dt
 
     n_neurons = Ntraces * n_samples
+    callback = callback_setup(callback, n_rounds)
 
     # Replace input variable by TimedArray
     input_traces = TimedArray(input.transpose(), dt=dt)
@@ -384,8 +411,7 @@ def fit_spikes(model=None,
         result_dict = make_dic(parameter_names, res)
         error = min(errors)
 
-        if callback is not None:
-            if callback(res, errors, parameters, k) is True:
-                break
+        if callback(res, errors, parameters, k) is True:
+            break
 
     return result_dict, error

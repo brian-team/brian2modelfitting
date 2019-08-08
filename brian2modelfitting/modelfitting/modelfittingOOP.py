@@ -50,9 +50,25 @@ class Fitter(object):
     """
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, **kwds):
+    def __init__(self,
+                 model=None,
+                 input_var=None, input=None,
+                 output_var=None, output=None,
+                 dt=None, method=None,
+                 reset=None, refractory=False, threshold=None,
+                 **params):
         """Initialize the fitter."""
-        pass
+        if output_var not in model.names:
+            raise Exception("%s is not a model variable" % output_var)
+        if output.shape != input.shape:
+            raise Exception("Input and output must have the same size")
+
+        # simulator = setup_fit(model, dt, param_init, input_var, metric)
+
+        parameter_names = model.parameter_names
+        Ntraces, Nsteps = input.shape
+        duration = Nsteps * dt
+        # n_neurons = Ntraces * n_samples
 
     def setup(self):
         pass
@@ -65,7 +81,13 @@ class Fitter(object):
         pass
 
     @abc.abstractmethod
-    def run(self):
+    def run(self,
+            optimizer=None,
+            metric=None,
+            n_samples=10,
+            n_rounds=1,
+            callback=None,
+            param_init=None):
         """
         Run the optimization algorithm for given amount of rounds with given
         number of samples drawn.

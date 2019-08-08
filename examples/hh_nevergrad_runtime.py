@@ -105,10 +105,10 @@ metric = MSEMetric()
 # pass parameters to the NeuronGroup
 res, error = fit_traces(model=eqs, input_var='I', output_var='v',
                         input=inp_trace * amp, output=out_trace*mV, dt=dt,
-                        n_rounds=1, n_samples=5, optimizer=n_opt, metric=metric,
+                        n_rounds=5, n_samples=5, optimizer=n_opt, metric=metric,
                         param_init={'v': -65*mV},
                         method='exponential_euler',
-                        callback=callback,
+                        callback='progressbar',
                         gl=[1e-8*siemens*cm**-2 * area, 1e-3*siemens*cm**-2 * area],
                         g_na=[1*msiemens*cm**-2 * area, 2000*msiemens*cm**-2 * area],
                         g_kd=[1*msiemens*cm**-2 * area, 1000*msiemens*cm**-2 * area],
