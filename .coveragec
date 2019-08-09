@@ -3,6 +3,8 @@
 [run]
 branch = True
 source = brian2modelfitting
+omit =
+    */brian2modelfitting/tests/*
 
 [report]
 # Regexes for lines to exclude from consideration
