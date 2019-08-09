@@ -4,7 +4,7 @@ Tools for use with the Brian 2 simulator.
 import os
 
 from .modelfitting import *
-from .tests import run as test
+from .tests import run as run_test
 
 try:
     # Use version written out by setuptools
