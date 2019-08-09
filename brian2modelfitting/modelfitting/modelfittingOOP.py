@@ -70,9 +70,6 @@ def get_spikes(monitor):
 
 
 ### temp functions
-
-
-# def setup_fit(model=None, dt=None, param_init=None, input_var=None, metric=None):
 def setup_fit(model=None, dt=None, input_var=None):
     """
     Function sets up simulator in one of the two availabel modes: runtime or
@@ -95,23 +92,6 @@ def setup_fit(model=None, dt=None, input_var=None):
     }
 
     simulator = simulators[get_device().__class__.__name__]
-
-    if dt is None:
-        raise Exception('dt (sampling frequency of the input) must be set')
-    defaultclock.dt = dt
-
-    if input_var not in model.identifiers:
-        raise Exception("%s is not an identifier in the model" % input_var)
-
-    # if not (isinstance(metric, Metric) or metric is None):
-    #     raise Exception("metric has to be a child of class Metric or None")
-
-    # if param_init:
-    #     for param, val in param_init.items():
-    #         if not (param in model.identifiers or param in model.names):
-    #             raise Exception("%s is not a model variable or an identifier \
-    #                             in the model")
-
     return simulator
 
 
@@ -146,84 +126,56 @@ def calc_errors_spikes(metric, simulator, n_traces, output):
     return errors
 
 
-def calc_errors_traces(metric, simulator, n_traces, output, output_var):
-    """
-    Returns errors after simulation with StateMonitor.
-    To be used inside optim_iter.
-    """
-    traces = getattr(simulator.network['monitor'], output_var)
-    errors = metric.calc(traces, output, n_traces)
-    return errors
-
-
-def optim_iter(simulator, optimizer, metric, parameter_names, n_samples,
-               n_traces, duration, output, calc_errors, network, param_init,
-               *args):
-    """
-    Function performs all operations required for one iteration of optimization.
-    Drawing parameters, setting them to simulator and calulating the error.
-
-    Returns
-    -------
-    results : list
-        recommended parameters
-    parameters: 2D list
-        drawn parameters
-    errors: list
-        calculated errors
-    """
-    if param_init:
-        for k, v in param_init.items():
-            network['neurons'].__setattr__(k, v)
-
-    parameters = optimizer.ask(n_samples=n_samples)
-
-    d_param = get_param_dic(parameters, parameter_names, n_traces,
-                            n_samples)
-    simulator.run(duration, d_param, parameter_names)
-    errors = calc_errors(metric, simulator, n_traces, output, *args)
-
-    optimizer.tell(parameters, errors)
-    results = optimizer.recommend()
-
-    return results, parameters, errors
-
-
-
 class Fitter(object):
     """
     Abstract Fitter class for model fitting applications.
     """
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self,
-                 model=None,
-                 input_var=None, input=None,
-                 output_var=None, output=None,
-                 dt=None, method=None,
-                 reset=None, refractory=False, threshold=None,
-                 **params):
+    def __init__():
         """Initialize the fitter."""
         pass
 
     def setup(self):
         pass
 
-    # @abc.abstractmethod
-    # def calc_errors(self):
-    #     pass
-
-    def optimization_iter(self):
+    @abc.abstractmethod
+    def calc_errors(self):
         pass
 
-    # @abc.abstractmethod
-    def run(self,
-            optimizer=None,
-            metric=None,
-            n_samples=10,
-            n_rounds=1,
-            callback=None,
-            param_init=None):
+    def optimization_iter(self, optimizer, metric, param_init, *args):
+        """
+        Function performs all operations required for one iteration of optimization.
+        Drawing parameters, setting them to simulator and calulating the error.
+
+        Returns
+        -------
+        results : list
+            recommended parameters
+        parameters: 2D list
+            drawn parameters
+        errors: list
+            calculated errors
+        """
+        if param_init:
+            for k, v in param_init.items():
+                self.network['neurons'].__setattr__(k, v)
+
+        parameters = optimizer.ask(n_samples=self.n_samples)
+
+        d_param = get_param_dic(parameters, self.parameter_names, self.n_traces,
+                                self.n_samples)
+        self.simulator.run(self.duration, d_param, self.parameter_names)
+        errors = self.calc_errors(metric)
+
+        optimizer.tell(parameters, errors)
+        results = optimizer.recommend()
+
+        return results, parameters, errors
+
+
+    @abc.abstractmethod
+    def run():
         """
         Run the optimization algorithm for given amount of rounds with given
         number of samples drawn.
@@ -245,6 +197,16 @@ class TraceFitter(Fitter):
                  reset=None, refractory=False, threshold=None,
                  callback=None, n_samples=None):
         """Initialize the fitter."""
+
+        if dt is None:
+            raise Exception('dt (sampling frequency of the input) must be set')
+        defaultclock.dt = dt
+
+        if input_var not in model.identifiers:
+            raise Exception("%s is not an identifier in the model" % input_var)
+
+
+
         if output_var not in model.names:
             raise Exception("%s is not a model variable" % output_var)
             if output.shape != input.shape:
@@ -253,15 +215,14 @@ class TraceFitter(Fitter):
         simulator = setup_fit(model, dt, input_var)
 
         parameter_names = model.parameter_names
-        Ntraces, Nsteps = input.shape
-        duration = Nsteps * dt
-        n_neurons = Ntraces * n_samples
-
+        n_traces, n_steps = input.shape
+        duration = n_steps * dt
+        n_neurons = n_traces * n_samples
 
         # Replace input variable by TimedArray
         output_traces = TimedArray(output.transpose(), dt=dt)
         input_traces = TimedArray(input.transpose(), dt=dt)
-        model = model + Equations(input_var + '= input_var(t, i % Ntraces) :\
+        model = model + Equations(input_var + '= input_var(t, i % n_traces) :\
                                   ' + "% s" % repr(input.dim))
 
         # Setup NeuronGroup
@@ -269,7 +230,7 @@ class TraceFitter(Fitter):
                                      refractory,
                                      input_var=input_traces,
                                      output_var=output_traces,
-                                     Ntraces=Ntraces)
+                                     n_traces=n_traces)
 
         # Set up Simulator and Optimizer
         monitor = StateMonitor(neurons, output_var, record=True, name='monitor')
@@ -279,12 +240,21 @@ class TraceFitter(Fitter):
         self.simulator = simulator
         self.parameter_names = parameter_names
         self.n_samples = n_samples
-        self.Ntraces = Ntraces
+        self.n_traces = n_traces
         self.duration = duration
         self.output = output
         self.network = network
         self.output_var = output_var
+        self.model = model
 
+    def calc_errors(self, metric):
+        """
+        Returns errors after simulation with StateMonitor.
+        To be used inside optim_iter.
+        """
+        traces = getattr(self.simulator.network['monitor'], self.output_var)
+        errors = metric.calc(traces, self.output, self.n_traces)
+        return errors
 
     def run(self, optimizer=None, metric=None,
             n_samples=10,
@@ -293,29 +263,26 @@ class TraceFitter(Fitter):
             param_init=None,
             **params):
 
+        if not (isinstance(metric, Metric) or metric is None):
+            raise Exception("metric has to be a child of class Metric or None")
+
+        if param_init:
+            for param, val in param_init.items():
+                if not (param in self.model.identifiers or param in self.model.names):
+                    raise Exception("%s is not a model variable or an identifier \
+                                    in the model")
+
+
         callback = callback_setup(callback, n_rounds)
-
-        simulator = self.simulator
-        parameter_names = self.parameter_names
-        n_samples = self.n_samples
-        Ntraces = self.Ntraces
-        duration = self.duration
-        output = self.output
-        network = self.network
-        output_var = self.output_var
-
-        optimizer.initialize(parameter_names, **params)
+        optimizer.initialize(self.parameter_names, **params)
 
         # Run Optimization Loop
         for k in range(n_rounds):
-            res, parameters, errors = optim_iter(simulator, optimizer, metric,
-                                                 parameter_names, n_samples,
-                                                 Ntraces, duration, output,
-                                                 calc_errors_traces, network,
-                                                 param_init, output_var)
+            res, parameters, errors = self.optimization_iter(optimizer, metric,
+                                                             param_init)
 
             # create output variables
-            result_dict = make_dic(parameter_names, res)
+            result_dict = make_dic(self.parameter_names, res)
             error = min(errors)
 
             if callback(res, errors, parameters, k) is True:

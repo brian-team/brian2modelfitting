@@ -104,14 +104,14 @@ metric = MSEMetric()
 
 # pass parameters to the NeuronGroup
 fitter = TraceFitter(model=eqs, input_var='I', output_var='v',
-                    input=inp_trace * amp, output=out_trace*mV, dt=dt,
-                    n_samples=5,
-                    method='exponential_euler',)
+                     input=inp_trace * amp, output=out_trace*mV, dt=dt,
+                     n_samples=5,
+                     method='exponential_euler',)
 
 res, error = fitter.run(n_rounds=5,
                         optimizer=n_opt, metric=metric,
-                        param_init={'v': -65*mV},
                         callback='progressbar',
+                        param_init={'v': -65*mV},
                         gl=[1e-8*siemens*cm**-2 * area, 1e-3*siemens*cm**-2 * area],
                         g_na=[1*msiemens*cm**-2 * area, 2000*msiemens*cm**-2 * area],
                         g_kd=[1*msiemens*cm**-2 * area, 1000*msiemens*cm**-2 * area],
