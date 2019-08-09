@@ -17,4 +17,6 @@ dev
 
 
 
-[![coveralls](https://img.shields.io/coveralls/brian-team/brian2/master.svg?style=flat-square)](https://coveralls.io/r/brian-team/brian2modelfitting?branch=master)
+[![coveralls](https://img.shields.io/coveralls/brian-team/brian2modelfitting/master.svg?style=flat-square)](https://coveralls.io/r/brian-team/brian2modelfitting?branch=master)
+
+[![coveralls](https://img.shields.io/coveralls/brian-team/brian2modelfitting/dev.svg?style=flat-square)](https://coveralls.io/r/brian-team/brian2modelfitting?branch=dev)
