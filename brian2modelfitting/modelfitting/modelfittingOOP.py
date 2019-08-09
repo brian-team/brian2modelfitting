@@ -8,6 +8,7 @@ from brian2.equations.equations import Equations
 from .simulation import RuntimeSimulation, CPPStandaloneSimulation
 from .metric import Metric
 from tqdm import tqdm
+# from tqdm.autonotebook import tqdm
 
 
 def callback_text(res, errors, parameters, k):
