@@ -11,5 +11,5 @@ install:
 
 # command to run tests
 script:
-  pytest --cov=brian2modelfitting
-  coveralls
+  - pytest --cov=brian2modelfitting
+  - coveralls
