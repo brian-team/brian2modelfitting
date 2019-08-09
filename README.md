@@ -15,8 +15,4 @@ master
 dev
 [![Build Status](https://travis-ci.org/brian-team/brian2modelfitting.svg?branch=dev)](https://travis-ci.org/brian-team/brian2modelfitting)
 
-
-
-[![coveralls](https://img.shields.io/coveralls/brian-team/brian2modelfitting/master.svg?style=flat-square)](https://coveralls.io/r/brian-team/brian2modelfitting?branch=master)
-
-[![coveralls](https://img.shields.io/coveralls/brian-team/brian2modelfitting/dev.svg?style=flat-square)](https://coveralls.io/r/brian-team/brian2modelfitting?branch=dev)
+[![Coverage Status](https://coveralls.io/repos/github/brian-team/brian2modelfitting/badge.svg?branch=dev)](https://coveralls.io/github/brian-team/brian2modelfitting?branch=dev)
