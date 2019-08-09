@@ -1,3 +1,6 @@
 nevergrad
 scikit-optimize
 tqdm
+
+pytest-coverage
+coveralls
