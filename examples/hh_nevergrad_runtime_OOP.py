@@ -108,7 +108,7 @@ fitter = TraceFitter(model=eqs, input_var='I', output_var='v',
                      n_samples=5,
                      method='exponential_euler',)
 
-res, error = fitter.run(n_rounds=5,
+res, error = fitter.fit(n_rounds=5,
                         optimizer=n_opt, metric=metric,
                         callback='progressbar',
                         param_init={'v': -65*mV},

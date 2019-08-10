@@ -175,7 +175,7 @@ class Fitter(object):
 
 
     @abc.abstractmethod
-    def run():
+    def fit():
         """
         Run the optimization algorithm for given amount of rounds with given
         number of samples drawn.
@@ -256,7 +256,7 @@ class TraceFitter(Fitter):
         errors = metric.calc(traces, self.output, self.n_traces)
         return errors
 
-    def run(self, optimizer=None, metric=None,
+    def fit(self, optimizer=None, metric=None,
             n_samples=10,
             n_rounds=1,
             callback='progressbar',
