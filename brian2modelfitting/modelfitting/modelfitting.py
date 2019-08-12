@@ -130,10 +130,6 @@ def setup_neuron_group(model, n_neurons, method, threshold, reset, refractory,
     for name in namespace:
         neurons.namespace[name] = namespace[name]
 
-    # if param_init:
-    #     for k, v in param_init.items():
-    #         neurons.__setattr__(k, v)
-
     return neurons
 
 

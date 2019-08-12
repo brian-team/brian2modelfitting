@@ -70,51 +70,6 @@ def get_spikes(monitor):
 
 
 ### temp functions
-def setup_fit(model=None, dt=None, input_var=None):
-    """
-    Function sets up simulator in one of the two availabel modes: runtime or
-    standalone (set in the script calling fit_traces/fit spikes) and checks
-    the variables.
-
-    Verifyies:
-        - if dt is set
-        - if input variables belong to the model
-        - if initialized parameters exsists in the model
-        - metric instance
-
-    Returns
-    -------
-    simulator : object ~brian2tools.modelfitting.Simulator
-    """
-    simulators = {
-        'CPPStandaloneDevice': CPPStandaloneSimulation(),
-        'RuntimeDevice': RuntimeSimulation()
-    }
-
-    simulator = simulators[get_device().__class__.__name__]
-    return simulator
-
-
-def setup_neuron_group(model, n_neurons, method, threshold, reset, refractory,
-                       **namespace):
-    """
-    Setup neuron group, initialize required number of neurons, create namespace
-    and initite the parameters.
-
-    Returns
-    -------
-    neurons : object ~brian2.groups.neurongroup.NeuronGroup
-        group of neurons
-
-    """
-    neurons = NeuronGroup(n_neurons, model, method=method, threshold=threshold,
-                          reset=reset, refractory=refractory, name='neurons')
-    for name in namespace:
-        neurons.namespace[name] = namespace[name]
-
-    return neurons
-
-
 def calc_errors_spikes(metric, simulator, n_traces, output):
     """
     Returns errors after simulation with SpikeMonitor.
@@ -132,12 +87,33 @@ class Fitter(object):
     """
     __metaclass__ = abc.ABCMeta
 
-    def __init__():
+    def __init__(dt=None):
         """Initialize the fitter."""
+        if dt is None:
+            raise Exception('dt (sampling frequency of the input) must be set')
+        defaultclock.dt = dt
         pass
 
     def setup(self):
         pass
+
+    def setup_fit(self):
+        simulators = {
+            'CPPStandaloneDevice': CPPStandaloneSimulation(),
+            'RuntimeDevice': RuntimeSimulation()
+        }
+
+        simulator = simulators[get_device().__class__.__name__]
+        return simulator
+
+    def setup_neuron_group(self, n_neurons, **namespace):
+        neurons = NeuronGroup(n_neurons, self.model, method=self.method,
+                              threshold=self.threshold, reset=self.reset,
+                              refractory=self.refractory, name='neurons')
+        for name in namespace:
+            neurons.namespace[name] = namespace[name]
+
+        return neurons
 
     @abc.abstractmethod
     def calc_errors(self):
@@ -198,21 +174,15 @@ class TraceFitter(Fitter):
                  callback=None, n_samples=None):
         """Initialize the fitter."""
 
-        if dt is None:
-            raise Exception('dt (sampling frequency of the input) must be set')
-        defaultclock.dt = dt
-
         if input_var not in model.identifiers:
             raise Exception("%s is not an identifier in the model" % input_var)
-
-
 
         if output_var not in model.names:
             raise Exception("%s is not a model variable" % output_var)
             if output.shape != input.shape:
                 raise Exception("Input and output must have the same size")
 
-        simulator = setup_fit(model, dt, input_var)
+        simulator = self.setup_fit()
 
         parameter_names = model.parameter_names
         n_traces, n_steps = input.shape
@@ -225,12 +195,17 @@ class TraceFitter(Fitter):
         model = model + Equations(input_var + '= input_var(t, i % n_traces) :\
                                   ' + "% s" % repr(input.dim))
 
+        self.threshold = threshold
+        self.reset = reset
+        self.refractory = refractory
+        self.model = model
+        self.method = method
+
         # Setup NeuronGroup
-        neurons = setup_neuron_group(model, n_neurons, method, threshold, reset,
-                                     refractory,
-                                     input_var=input_traces,
-                                     output_var=output_traces,
-                                     n_traces=n_traces)
+        neurons = self.setup_neuron_group(n_neurons,
+                                          input_var=input_traces,
+                                          output_var=output_traces,
+                                          n_traces=n_traces)
 
         # Set up Simulator and Optimizer
         monitor = StateMonitor(neurons, output_var, record=True, name='monitor')
@@ -245,7 +220,6 @@ class TraceFitter(Fitter):
         self.output = output
         self.network = network
         self.output_var = output_var
-        self.model = model
 
     def calc_errors(self, metric):
         """
