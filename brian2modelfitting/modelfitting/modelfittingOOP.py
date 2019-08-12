@@ -2,7 +2,7 @@ import abc
 from types import FunctionType
 from numpy import mean, ones, array, arange
 from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
-                    StateMonitor, SpikeMonitor, ms, second)
+                    StateMonitor, SpikeMonitor, ms, second, device)
 from brian2.input import TimedArray
 from brian2.equations.equations import Equations
 from .simulation import RuntimeSimulation, CPPStandaloneSimulation
@@ -116,6 +116,8 @@ class Fitter(object):
         self.n_traces = n_traces
         self.output = output
         self.output_var = output_var
+        self.input_traces = input_traces
+        self.input = input
 
         # Setup NeuronGroup
         self.neurons = self.setup_neuron_group(n_neurons,
@@ -207,21 +209,62 @@ class Fitter(object):
                                                              param_init)
 
             # create output variables
-            result_dict = make_dic(self.parameter_names, res)
+            self.results = make_dic(self.parameter_names, res)
             error = min(errors)
 
             if callback(res, errors, parameters, k) is True:
                 break
 
-        return result_dict, error
+        return self.results, error
 
     def results(self):
-        """Returns all of the so far gathered results"""
+        """
+        Returns all of the so far gathered results
+        In one of the 3 formats: dataframe, list, dict.
+        """
         pass
 
-    def generate(self):
-        """Generates traces for best fit of parameters and all inputs"""
-        pass
+    def generate(self, params=None, output_var=None, param_init=None):
+        """
+        Generates traces for best fit of parameters and all inputs.
+        If provided with other parameters provides those.
+        """
+        if params is None:
+            params = self.results
+
+        if get_device().__class__.__name__ == 'CPPStandaloneDevice':
+            device.has_been_run = False
+            # reinit_devices()
+            device.reinint()
+            device.activate()
+
+        Ntraces, Nsteps = self.input.shape
+        self.neurons = self.setup_neuron_group(Ntraces,
+                                               input_var=self.input_traces,
+                                               output_var=output_var,
+                                               n_traces=Ntraces)
+
+        if output_var == 'spikes':
+            monitor = SpikeMonitor(self.neurons, record=True, name='monitor')
+        else:
+            monitor = StateMonitor(self.neurons, output_var, record=True,
+                                   name='monitor')
+        network = Network(self.neurons, monitor)
+        self.simulator.initialize(self.network)
+
+        if param_init:
+            for k, v in param_init.items():
+                network['neurons'].__setattr__(k, v)
+
+        self.simulator.initialize(network)
+        self.simulator.run(self.duration, params, self.parameter_names)
+
+        if output_var == 'spikes':
+            fits = get_spikes(self.simulator.network['monitor'])
+        else:
+            fits = getattr(self.simulator.network['monitor'], output_var)
+
+        return fits
 
 
 class TraceFitter(Fitter):

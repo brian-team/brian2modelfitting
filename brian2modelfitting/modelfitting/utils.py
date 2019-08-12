@@ -1,6 +1,5 @@
 from brian2 import (NeuronGroup, TimedArray, Equations, get_device, Network,
                     StateMonitor, SpikeMonitor, device)
-from brian2.devices import reinit_devices
 from .modelfitting import setup_fit, setup_neuron_group, get_spikes
 
 

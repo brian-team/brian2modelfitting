@@ -108,7 +108,7 @@ fitter = TraceFitter(model=eqs, input_var='I', output_var='v',
                      n_samples=5,
                      method='exponential_euler',)
 
-res, error = fitter.fit(n_rounds=5,
+res, error = fitter.fit(n_rounds=2,
                         optimizer=n_opt, metric=metric,
                         callback='progressbar',
                         param_init={'v': -65*mV},
@@ -121,11 +121,13 @@ res, error = fitter.fit(n_rounds=5,
 print('correct:', params_correct, '\n output:', res)
 print('error', error)
 
+
 # visualization of the results
 start_scope()
-fits = generate_fits(model=eqs, method='exponential_euler', params=res,
-                     input=inp_trace * amp, input_var='I', output_var='v',
-                     dt=dt, param_init={'v': -65*mV})
+fits = fitter.generate(params=None, output_var='v', param_init={'v': -65*mV})
+# fits = generate_fits(model=eqs, method='exponential_euler', params=res,
+#                      input=inp_trace * amp, input_var='I', output_var='v',
+#                      dt=dt, param_init={'v': -65*mV})
 
 
 fig, ax = plt.subplots(nrows=2)
