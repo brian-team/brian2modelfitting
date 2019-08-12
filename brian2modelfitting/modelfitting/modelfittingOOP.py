@@ -299,9 +299,10 @@ class TraceFitter(Fitter):
         errors = metric.calc(traces, self.output, self.n_traces)
         return errors
 
-    def generate_traces(self):
+    def generate_traces(self, params=None, param_init=None):
         """Generates traces for best fit of parameters and all inputs"""
-        pass
+        fits = self.generate(self, params=None, output_var=self.output_var, param_init=None)
+        return fits
 
 
 class SpikeFitter(Fitter):
