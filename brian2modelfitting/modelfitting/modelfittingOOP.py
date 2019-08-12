@@ -150,14 +150,45 @@ class Fitter(object):
         return results, parameters, errors
 
 
-    @abc.abstractmethod
-    def fit():
+    def fit(self, optimizer=None, metric=None,
+            n_samples=10,
+            n_rounds=1,
+            callback='progressbar',
+            param_init=None,
+            **params):
         """
         Run the optimization algorithm for given amount of rounds with given
         number of samples drawn.
         Return best result and it's error.
         """
-        pass
+
+        if not (isinstance(metric, Metric) or metric is None):
+            raise Exception("metric has to be a child of class Metric or None")
+
+        if param_init:
+            for param, val in param_init.items():
+                if not (param in self.model.identifiers or param in self.model.names):
+                    raise Exception("%s is not a model variable or an identifier \
+                                    in the model")
+
+
+        callback = callback_setup(callback, n_rounds)
+        optimizer.initialize(self.parameter_names, **params)
+
+        # Run Optimization Loop
+        for k in range(n_rounds):
+            res, parameters, errors = self.optimization_iter(optimizer, metric,
+                                                             param_init)
+
+            # create output variables
+            result_dict = make_dic(self.parameter_names, res)
+            error = min(errors)
+
+            if callback(res, errors, parameters, k) is True:
+                break
+
+        return result_dict, error
+
 
     def results(self):
         """Returns all of the so far gathered results"""
@@ -230,39 +261,6 @@ class TraceFitter(Fitter):
         errors = metric.calc(traces, self.output, self.n_traces)
         return errors
 
-    def fit(self, optimizer=None, metric=None,
-            n_samples=10,
-            n_rounds=1,
-            callback='progressbar',
-            param_init=None,
-            **params):
-
-        if not (isinstance(metric, Metric) or metric is None):
-            raise Exception("metric has to be a child of class Metric or None")
-
-        if param_init:
-            for param, val in param_init.items():
-                if not (param in self.model.identifiers or param in self.model.names):
-                    raise Exception("%s is not a model variable or an identifier \
-                                    in the model")
-
-
-        callback = callback_setup(callback, n_rounds)
-        optimizer.initialize(self.parameter_names, **params)
-
-        # Run Optimization Loop
-        for k in range(n_rounds):
-            res, parameters, errors = self.optimization_iter(optimizer, metric,
-                                                             param_init)
-
-            # create output variables
-            result_dict = make_dic(self.parameter_names, res)
-            error = min(errors)
-
-            if callback(res, errors, parameters, k) is True:
-                break
-
-        return result_dict, error
 
 
 class SpikeFitter(Fitter):
