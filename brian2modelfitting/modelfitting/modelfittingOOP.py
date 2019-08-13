@@ -15,6 +15,7 @@ def callback_text(res, errors, parameters, k):
 
 
 class ProgressBar(object):
+    """Setup for tqdm progress bar in Fitter"""
     def __init__(self, toolbar_width=10):
         self.toolbar_width = toolbar_width
         self.t = tqdm(total=toolbar_width)
@@ -24,6 +25,10 @@ class ProgressBar(object):
 
 
 def callback_setup(set_type, n_rounds):
+    """
+    Helper function for callback setup in Fitter, loads option:
+    'text', 'progressbar' or custion FunctionType
+    """
     if set_type == 'text':
         callback = callback_text
     elif set_type == 'progressbar':
@@ -71,7 +76,30 @@ def get_spikes(monitor):
 
 class Fitter(object):
     """
-    Abstract Fitter class for model fitting applications.
+    Base Fitter class for model fitting applications.
+
+    Creates an interface for model fitting of traces with parameters draw by
+    gradient-free algorithms (through ask/tell interfaces).
+
+    Initiates n_neurons = num input traces * num samples, to which drawn
+    parameters get assigned and evaluates them in parallel.
+
+    Parameters
+    ----------
+    model : `~brian2.equations.Equations` or string
+        The equations describing the model.
+    input_var : string
+        Input variable name.
+    input : input data as a 2D array
+    output_var : string
+        Output variable name.
+    output : output data as a 2D array
+    dt : time step
+    method: string, optional
+        Integration method
+    n_samples: int
+        Number of parameter samples to be optimized over.
+
     """
     __metaclass__ = abc.ABCMeta
 
@@ -102,15 +130,32 @@ class Fitter(object):
         self.output_var = output_var
 
     def setup_fit(self):
+        """
+        Function sets up simulator in one of the two availabel modes: runtime or
+        standalone (set in the script calling fit_traces/fit spikes).
+
+        Returns
+        -------
+        simulator : object ~brian2tools.modelfitting.Simulator
+        """
         simulators = {
             'CPPStandaloneDevice': CPPStandaloneSimulation(),
             'RuntimeDevice': RuntimeSimulation()
         }
 
-        simulator = simulators[get_device().__class__.__name__]
-        return simulator
+        return simulators[get_device().__class__.__name__]
 
     def setup_neuron_group(self, n_neurons, **namespace):
+        """
+        Setup neuron group, initialize required number of neurons, create namespace
+        and initite the parameters.
+
+        Returns
+        -------
+        neurons : object ~brian2.groups.neurongroup.NeuronGroup
+            group of neurons
+
+        """
         neurons = NeuronGroup(n_neurons, self.model, method=self.method,
                               threshold=self.threshold, reset=self.reset,
                               refractory=self.refractory, name='neurons')
@@ -121,6 +166,7 @@ class Fitter(object):
 
     @abc.abstractmethod
     def calc_errors(self):
+        """Abstract method required in all Fitter classes"""
         pass
 
     def optimization_iter(self, optimizer, metric, param_init, *args):
@@ -165,8 +211,31 @@ class Fitter(object):
             **params):
         """
         Run the optimization algorithm for given amount of rounds with given
-        number of samples drawn.
-        Return best result and it's error.
+        number of samples drawn. Return best set of parameters and corresponging
+        error.
+
+        Parameters
+        ----------
+        optimizer: ~brian2tools.modelfitting.Optimizer children
+            Child of Optimizer class, specific for each library.
+        metric: ~brian2tools.modelfitting.Metric children
+            Child of Metric class, specifies optimization metric
+        n_rounds: int
+            Number of rounds to optimize over. (feedback provided over each round)
+        callback: callable
+            Provide custom feedback function func(results, errors, parameters, index)
+            If callback returns True the fitting execution is interrupted.
+        param_init: dict
+            Dictionary of variables to be initialized with respective value
+        **params:
+            bounds for each parameter
+
+        Returns
+        -------
+        best_res : dict
+            dictionary with best parameter set
+        error: float
+            error value for best parameter set
         """
 
         if not (isinstance(metric, Metric) or metric is None):
@@ -197,8 +266,13 @@ class Fitter(object):
 
     def results(self, format='list'):
         """
-        Returns all of the so far gathered results
-        In one of the 3 formats: dataframe, list, dict.
+        Returns all of the gathered results (parameters and errors).
+        In one of the 3 formats: 'dataframe', 'list', 'dict'.
+
+        Parameters
+        ----------
+        format: string ('list')
+            string with output format ('dataframe', 'list', 'dict')
         """
         names = list(self.parameter_names)
         names.append('errors')
@@ -277,6 +351,7 @@ class Fitter(object):
 
 
 class TraceFitter(Fitter):
+    """Input nad output have to have the same dimensions."""
     def __init__(self, model=None, input_var=None, input=None,
                  output_var=None, output=None, dt=None, method=None,
                  reset=None, refractory=False, threshold=None,
