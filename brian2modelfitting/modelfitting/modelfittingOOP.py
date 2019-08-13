@@ -1,6 +1,6 @@
 import abc
 from types import FunctionType
-from numpy import ones, array, arange
+from numpy import ones, array, arange, concatenate
 from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
                     StateMonitor, SpikeMonitor, ms, device)
 from brian2.input import TimedArray
@@ -195,13 +195,43 @@ class Fitter(object):
 
         return self.best_res, error
 
-    def results(self):
+    def results(self, format='list'):
         """
         Returns all of the so far gathered results
         In one of the 3 formats: dataframe, list, dict.
         """
+        names = list(self.parameter_names)
+        names.append('errors')
 
-        return self.results_, self.errors
+        params = array(self.results_)
+        params = params.reshape(-1, params.shape[-1])
+
+        errors = array([array(self.errors).flatten()])
+        data = concatenate((params, errors.transpose()), axis=1)
+
+        if format == 'list':
+            res_list = []
+            for j in arange(0, len(params)):
+                temp_data = data[j]
+                res_dict = dict()
+
+                for i, n in enumerate(names):
+                    res_dict[n] = temp_data[i]
+                res_list.append(res_dict)
+
+            return res_list
+
+        elif format == 'dict':
+            res_dict = dict()
+            for i, n in enumerate(names):
+                res_dict[n] = data[:, i]
+
+            return res_dict
+
+        elif format == 'dataframe':
+            from pandas import DataFrame
+
+            return DataFrame(data=data, columns=names)
 
     def generate(self, params=None, output_var=None, param_init=None):
         """
