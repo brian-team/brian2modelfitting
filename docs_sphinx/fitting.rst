@@ -1,7 +1,7 @@
 Model fitting
 =============
 
-The `brian2tools` offers model fitting package, that allows for data driven optimization of custom
+The `brian2modelfitting` offers model fitting package, that allows for data driven optimization of custom
 models.
 
 The toolbox allows the user to find the best fit of the parameters for recorded traces and
@@ -22,11 +22,11 @@ at the same time.
     :local:
 
 
-In following documentation we assume that ``brian2tools`` has been imported like this:
+In following documentation we assume that ``brian2modelfitting`` has been imported like this:
 
 .. code:: python
 
-    from brian2tools import *
+    from brian2modelfitting import *
 
 
 How it works
@@ -103,7 +103,7 @@ Optimizer
 ---------
 Optimizer class is responsible for maximizing a fitness function. Our approach
 uses gradient free global optimization methods (evolutionary algorithms, genetic algorithms,
- Bayesian optimization). We provided access to two libraries.
+Bayesian optimization). We provided access to two libraries.
 
 
 Follows `ask()/tell()` interface
@@ -262,7 +262,7 @@ Callback function
 The 'callback' input provides custom feedback function option. User can provide
 a callable (function), that will provide an output or printout. If callback returns
 `True` the fitting execution is interrupted.
- User gets four arguments to customize over:
+User gets four arguments to customize over:
 
 ``results, errors, parameters, index``
 

@@ -85,7 +85,7 @@ def setup_fit(model=None, dt=None, param_init=None, input_var=None,
 
     Returns
     -------
-    simulator : object ~brian2tools.modelfitting.Simulator
+    simulator : object ~brian2modelfitting.modelfitting.Simulator
     """
     simulators = {
         'CPPStandaloneDevice': CPPStandaloneSimulation(),
@@ -224,9 +224,9 @@ def fit_traces(model=None,
     dt : time step
     method: string, optional
         Integration method
-    optimizer: ~brian2tools.modelfitting.Optimizer children
+    optimizer: ~brian2modelfitting.modelfitting.Optimizer children
         Child of Optimizer class, specific for each library.
-    metric: ~brian2tools.modelfitting.Metric children
+    metric: ~brian2modelfitting.modelfitting.Metric children
         Child of Metric class, specifies optimization metric
     n_samples: int
         Number of parameter samples to be optimized over.
@@ -355,9 +355,9 @@ def fit_spikes(model=None,
     dt : time step
     method: string, optional
         Integration method
-    optimizer: ~brian2tools.modelfitting.Optimizer children
+    optimizer: ~brian2modelfitting.modelfitting.Optimizer children
         Child of Optimizer class, specific for each library.
-    metric: ~brian2tools.modelfitting.Metric children
+    metric: ~brian2modelfitting.modelfitting.Metric children
         Child of Metric class, specifies optimization metric
     n_samples: int
         Number of parameter samples to be optimized over.

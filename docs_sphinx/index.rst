@@ -29,8 +29,7 @@ API reference
    :maxdepth: 5
    :titlesonly:
 
-   reference/brian2modelfitting
-
+   brian2modelfitting.modelfitting.rst
 
 Indices and tables
 ------------------

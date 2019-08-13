@@ -136,7 +136,7 @@ class Fitter(object):
 
         Returns
         -------
-        simulator : object ~brian2tools.modelfitting.Simulator
+        simulator : object ~brian2modelfitting.modelfitting.Simulator
         """
         simulators = {
             'CPPStandaloneDevice': CPPStandaloneSimulation(),
@@ -216,9 +216,9 @@ class Fitter(object):
 
         Parameters
         ----------
-        optimizer: ~brian2tools.modelfitting.Optimizer children
+        optimizer: ~brian2modelfitting.modelfitting.Optimizer children
             Child of Optimizer class, specific for each library.
-        metric: ~brian2tools.modelfitting.Metric children
+        metric: ~brian2modelfitting.modelfitting.Metric children
             Child of Metric class, specifies optimization metric
         n_rounds: int
             Number of rounds to optimize over. (feedback provided over each round)

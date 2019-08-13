@@ -79,4 +79,4 @@ target/
 .rope*
 
 # Installation and auto-generated files
-brian2tools.egg-info
+brian2modelfitting.egg-info
