@@ -80,40 +80,26 @@ class Fitter(object):
         """Initialize the fitter."""
         if dt is None:
             raise Exception('dt (sampling frequency of the input) must be set')
-
         defaultclock.dt = dt
-        self.simulator = self.setup_fit()
+
         self.results_, self.errors = [], []
 
-        parameter_names = model.parameter_names
-        n_traces, n_steps = input.shape
-        duration = n_steps * dt
-        n_neurons = n_traces * n_samples
+        self.simulator = self.setup_fit()
 
-        # Replace input variable by TimedArray
-        output_traces = TimedArray(output.transpose(), dt=dt)
-        input_traces = TimedArray(input.transpose(), dt=dt)
-        model = model + Equations(input_var + '= input_var(t, i % n_traces) :\
-                                  ' + "% s" % repr(input.dim))
-        self.model = model
+        self.parameter_names = model.parameter_names
+        self.n_traces, n_steps = input.shape
+        self.duration = n_steps * dt
+        self.n_neurons = self.n_traces * n_samples
+
+        self.n_samples = n_samples
         self.method = method
         self.threshold = threshold
         self.reset = reset
         self.refractory = refractory
-        self.parameter_names = parameter_names
-        self.duration = duration
-        self.n_samples = n_samples
-        self.n_traces = n_traces
+
+        self.input = input
         self.output = output
         self.output_var = output_var
-        self.input_traces = input_traces
-        self.input = input
-
-        # Setup NeuronGroup
-        self.neurons = self.setup_neuron_group(n_neurons,
-                                               input_var=input_traces,
-                                               output_var=output_traces,
-                                               n_traces=n_traces)
 
     def setup_fit(self):
         simulators = {
@@ -277,7 +263,21 @@ class TraceFitter(Fitter):
             if output.shape != input.shape:
                 raise Exception("Input and output must have the same size")
 
-        # Set up Simulator and Optimizer
+        # Replace input variable by TimedArray
+        output_traces = TimedArray(output.transpose(), dt=dt)
+        input_traces = TimedArray(input.transpose(), dt=dt)
+        model = model + Equations(input_var + '= input_var(t, i % n_traces) :\
+                                  ' + "% s" % repr(input.dim))
+
+        self.input_traces = input_traces
+        self.model = model
+
+        # Setup NeuronGroup
+        self.neurons = self.setup_neuron_group(self.n_neurons,
+                                               input_var=input_traces,
+                                               output_var=output_traces,
+                                               n_traces=self.n_traces)
+
         monitor = StateMonitor(self.neurons, output_var, record=True,
                                name='monitor')
         self.network = Network(self.neurons, monitor)
@@ -300,9 +300,30 @@ class TraceFitter(Fitter):
 
 
 class SpikeFitter(Fitter):
-    def __init__(self, **kwds):
+    def __init__(self, model=None, input_var='I', input=None,
+                 output_var='v', output=None, dt=None, method=None,
+                 reset=None, refractory=False, threshold=None,
+                 callback=None, n_samples=None):
         """Initialize the fitter."""
-        pass
+        super().__init__(dt, model, input, output, input_var, output_var,
+                         n_samples, threshold, reset, refractory, method)
+
+        # Replace input variable by TimedArray
+        input_traces = TimedArray(input.transpose(), dt=dt)
+        model = model + Equations(input_var + '= input_var(t, i % n_traces) :\
+                                   ' + "% s" % repr(input.dim))
+
+        self.input_traces = input_traces
+        self.model = model
+
+        # Setup NeuronGroup
+        self.neurons = self.setup_neuron_group(self.n_neurons,
+                                               input_var=input_traces,
+                                               n_traces=self.n_traces)
+
+        monitor = SpikeMonitor(self.neurons, record=True, name='monitor')
+        self.network = Network(self.neurons, monitor)
+        self.simulator.initialize(self.network)
 
     def calc_errors(self, metric):
         """
@@ -313,6 +334,8 @@ class SpikeFitter(Fitter):
         errors = metric.calc(spikes, self.output, self.n_traces)
         return errors
 
-    def generate_spikes(self):
+    def generate_spikes(self, params=None, param_init=None):
         """Generates traces for best fit of parameters and all inputs"""
-        pass
+        fits = self.generate(params=params, output_var='spikes',
+                             param_init=param_init)
+        return fits
