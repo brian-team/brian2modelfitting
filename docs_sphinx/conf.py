@@ -84,7 +84,7 @@ html_static_path = ['_static']
 
 # -- Extension configuration -------------------------------------------------
 intersphinx_mapping = {'python': ('https://docs.python.org/', None),
-                       'brian2': ('https://brian2.readthedocs.org/en/2.0rc/', None),
+                       'brian2': ('https://brian2.readthedocs.org/en/stable/', None),
                        'matplotlib': ('http://matplotlib.org/', None),
                        'numpy': ('http://docs.scipy.org/doc/numpy/', None),
                        'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
