@@ -173,8 +173,8 @@ class GammaFactor(Metric):
     @check_units(dt=second, delta=second)
     def __init__(self, dt, delta=None):
         """
-        Initialize the metric with time window delta and time step dt
-output
+        Initialize the metric with time window delta and time step dt output
+
         Parameters
         ----------
         dt: time step [ms]

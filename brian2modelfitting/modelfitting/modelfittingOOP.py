@@ -1,8 +1,8 @@
 import abc
 from types import FunctionType
-from numpy import mean, ones, array, arange
+from numpy import ones, array, arange
 from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
-                    StateMonitor, SpikeMonitor, ms, second, device)
+                    StateMonitor, SpikeMonitor, ms, device)
 from brian2.input import TimedArray
 from brian2.equations.equations import Equations
 from .simulation import RuntimeSimulation, CPPStandaloneSimulation
@@ -69,31 +69,21 @@ def get_spikes(monitor):
     return spikes
 
 
-### temp functions
-def calc_errors_spikes(metric, simulator, n_traces, output):
-    """
-    Returns errors after simulation with SpikeMonitor.
-    To be used inside optim_iter.
-    """
-    spikes = get_spikes(simulator.network['monitor'])
-    errors = metric.calc(spikes, output, n_traces)
-
-    return errors
-
-
 class Fitter(object):
     """
     Abstract Fitter class for model fitting applications.
     """
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, dt, model, input, output, input_var, output_var, n_samples,
-                 threshold, reset, refractory, method):
+    def __init__(self, dt, model, input, output, input_var, output_var,
+                 n_samples, threshold, reset, refractory, method):
         """Initialize the fitter."""
         if dt is None:
             raise Exception('dt (sampling frequency of the input) must be set')
+
         defaultclock.dt = dt
         self.simulator = self.setup_fit()
+        self.results_, self.errors = [], []
 
         parameter_names = model.parameter_names
         n_traces, n_steps = input.shape
@@ -168,16 +158,18 @@ class Fitter(object):
 
         parameters = optimizer.ask(n_samples=self.n_samples)
 
-        d_param = get_param_dic(parameters, self.parameter_names, self.n_traces,
-                                self.n_samples)
+        d_param = get_param_dic(parameters, self.parameter_names,
+                                self.n_traces, self.n_samples)
         self.simulator.run(self.duration, d_param, self.parameter_names)
         errors = self.calc_errors(metric)
 
         optimizer.tell(parameters, errors)
+        self.results_.append(parameters)
+        self.errors.append(errors)
+
         results = optimizer.recommend()
 
         return results, parameters, errors
-
 
     def fit(self, optimizer=None, metric=None,
             n_samples=10,
@@ -209,20 +201,21 @@ class Fitter(object):
                                                              param_init)
 
             # create output variables
-            self.results = make_dic(self.parameter_names, res)
+            self.best_res = make_dic(self.parameter_names, res)
             error = min(errors)
 
             if callback(res, errors, parameters, k) is True:
                 break
 
-        return self.results, error
+        return self.best_res, error
 
     def results(self):
         """
         Returns all of the so far gathered results
         In one of the 3 formats: dataframe, list, dict.
         """
-        pass
+
+        return self.results_, self.errors
 
     def generate(self, params=None, output_var=None, param_init=None):
         """
@@ -230,7 +223,7 @@ class Fitter(object):
         If provided with other parameters provides those.
         """
         if params is None:
-            params = self.results
+            params = self.best_res
 
         if get_device().__class__.__name__ == 'CPPStandaloneDevice':
             device.has_been_run = False
@@ -301,7 +294,8 @@ class TraceFitter(Fitter):
 
     def generate_traces(self, params=None, param_init=None):
         """Generates traces for best fit of parameters and all inputs"""
-        fits = self.generate(self, params=None, output_var=self.output_var, param_init=None)
+        fits = self.generate(params=params, output_var=self.output_var,
+                             param_init=param_init)
         return fits
 
 
@@ -309,6 +303,15 @@ class SpikeFitter(Fitter):
     def __init__(self, **kwds):
         """Initialize the fitter."""
         pass
+
+    def calc_errors(self, metric):
+        """
+        Returns errors after simulation with SpikeMonitor.
+        To be used inside optim_iter.
+        """
+        spikes = get_spikes(self.simulator.network['monitor'])
+        errors = metric.calc(spikes, self.output, self.n_traces)
+        return errors
 
     def generate_spikes(self):
         """Generates traces for best fit of parameters and all inputs"""

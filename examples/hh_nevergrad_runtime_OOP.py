@@ -121,14 +121,14 @@ res, error = fitter.fit(n_rounds=2,
 print('correct:', params_correct, '\n output:', res)
 print('error', error)
 
+all_param, all_errors = fitter.results()
+print('all_param:', all_param)
+print('all_errors:', all_errors)
 
 # visualization of the results
 start_scope()
-fits = fitter.generate(params=None, output_var='v', param_init={'v': -65*mV})
-# fits = generate_fits(model=eqs, method='exponential_euler', params=res,
-#                      input=inp_trace * amp, input_var='I', output_var='v',
-#                      dt=dt, param_init={'v': -65*mV})
-
+# fits = fitter.generate(params=None, output_var='v', param_init={'v': -65*mV})
+fits = fitter.generate_traces(params=None, param_init={'v': -65*mV})
 
 fig, ax = plt.subplots(nrows=2)
 ax[0].plot(np.arange(len(out_trace[0]))*dt/ms, out_trace[0])
