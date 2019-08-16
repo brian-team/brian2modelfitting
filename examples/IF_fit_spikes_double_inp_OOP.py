@@ -64,14 +64,18 @@ print('out_spikes', out_spikes)
 
 # FIT SPIKES
 start_scope()
+EL = -70*mV
+VT = -50*mV
+DeltaT = 2*mV
+
 eqs_fit = Equations('''
     dv/dt = (gL*(EL-v)+gL*DeltaT*exp((v-VT)/DeltaT) + I)/C : volt
     gL: siemens (constant)
     C: farad (constant)
     ''',
-    EL = -70*mV,
-    VT = -50*mV,
-    DeltaT = 2*mV,
+    # EL = -70*mV,
+    # VT = -50*mV,
+    # DeltaT = 2*mV,
     # C=1*nF
     )
 
@@ -104,10 +108,17 @@ res = {'gL': [result_dict['gL']*siemens], 'C': [result_dict['C']*farad]}
 
 # visualization of the results
 start_scope()
+
+EL = -70*mV
+VT = -50*mV
+DeltaT = 2*mV
 spikes = fitter.generate_spikes(params=None, param_init={'v': -70*mV})
 print('spike times:', spikes)
 
 start_scope()
+EL = -70*mV
+VT = -50*mV
+DeltaT = 2*mV
 fits = fitter.generate(params=None,
                        output_var='v',
                        param_init={'v': -70*mV})

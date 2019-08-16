@@ -112,10 +112,11 @@ class Fitter(metaclass=abc.ABCMeta):
         refractory after a spike (e.g. 'v > -20*mV')
     method: string, optional
         Integration method
-
+    level : int, optional
+        How much farther to go down in the stack to find the namespace.
     """
     def __init__(self, dt, model, input, output, input_var, output_var,
-                 n_samples, threshold, reset, refractory, method):
+                 n_samples, threshold, reset, refractory, method, level=0):
         """Initialize the fitter."""
         if dt is None:
             raise ValueError('dt (sampling frequency of the input) must be set')
@@ -162,7 +163,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
         return simulators[get_device().__class__.__name__]
 
-    def setup_neuron_group(self, n_neurons, **namespace):
+    def setup_neuron_group(self, n_neurons, namespace):
         """
         Setup neuron group, initialize required number of neurons, create
         namespace and initite the parameters.
@@ -183,7 +184,7 @@ class Fitter(metaclass=abc.ABCMeta):
         neurons = NeuronGroup(n_neurons, self.model, method=self.method,
                               threshold=self.threshold, reset=self.reset,
                               refractory=self.refractory, name='neurons')
-        neurons.namespace
+        # neurons.namespace
 
         for name in namespace:
             neurons.namespace[name] = namespace[name]
@@ -349,7 +350,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
             return DataFrame(data=data, columns=names)
 
-    def generate(self, params=None, output_var=None, param_init=None):
+    def generate(self, params=None, output_var=None, param_init=None, level=0):
         """
         Generates traces for best fit of parameters and all inputs.
         If provided with other parameters provides those.
@@ -362,6 +363,8 @@ class Fitter(metaclass=abc.ABCMeta):
             Name of the output variable to be monitored.
         param_init: dict
             Dictionary of initial values for the model.
+        level : int, optional
+            How much farther to go down in the stack to find the namespace.
         """
         if params is None:
             params = self.best_res
@@ -373,10 +376,13 @@ class Fitter(metaclass=abc.ABCMeta):
             device.activate()
 
         Ntraces, Nsteps = self.input.shape
-        self.neurons = self.setup_neuron_group(Ntraces,
-                                               input_var=self.input_traces,
-                                               output_var=output_var,
-                                               n_traces=Ntraces)
+
+        # Setup NeuronGroup
+        namespace = get_local_namespace(level=level+1)
+        namespace['input_var'] = self.input_traces
+        namespace['n_traces'] = Ntraces
+        namespace['output_var'] = output_var
+        self.neurons = self.setup_neuron_group(Ntraces, namespace)
 
         if output_var == 'spikes':
             monitor = SpikeMonitor(self.neurons, record=True, name='monitor')
@@ -406,7 +412,7 @@ class TraceFitter(Fitter):
     def __init__(self, model=None, input_var=None, input=None,
                  output_var=None, output=None, dt=None, method=None,
                  reset=None, refractory=False, threshold=None,
-                 callback=None, n_samples=None):
+                 callback=None, n_samples=None, level=0):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method)
@@ -429,10 +435,11 @@ class TraceFitter(Fitter):
         self.model = model
 
         # Setup NeuronGroup
-        self.neurons = self.setup_neuron_group(self.n_neurons,
-                                               input_var=input_traces,
-                                               output_var=output_traces,
-                                               n_traces=self.n_traces)
+        namespace = get_local_namespace(level=level+1)
+        namespace['input_var'] = input_traces
+        namespace['output_var'] = output_traces
+        namespace['n_traces'] = self.n_traces
+        self.neurons = self.setup_neuron_group(self.n_neurons, namespace)
 
         monitor = StateMonitor(self.neurons, output_var, record=True,
                                name='monitor')
@@ -448,10 +455,10 @@ class TraceFitter(Fitter):
         errors = metric.calc(traces, self.output, self.n_traces)
         return errors
 
-    def generate_traces(self, params=None, param_init=None):
+    def generate_traces(self, params=None, param_init=None, level=1):
         """Generates traces for best fit of parameters and all inputs"""
         fits = self.generate(params=params, output_var=self.output_var,
-                             param_init=param_init)
+                             param_init=param_init, level=1)
         return fits
 
 
@@ -459,7 +466,7 @@ class SpikeFitter(Fitter):
     def __init__(self, model=None, input_var='I', input=None,
                  output_var='v', output=None, dt=None, method=None,
                  reset=None, refractory=False, threshold=None,
-                 callback=None, n_samples=None):
+                 callback=None, n_samples=None, level=0):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method)
@@ -468,16 +475,15 @@ class SpikeFitter(Fitter):
         input_traces = TimedArray(input.transpose(), dt=dt)
         model = model + Equations(input_var + '= input_var(t, i % n_traces) :\
                                    ' + "% s" % repr(input.dim))
-        level=0
-        print('namespace', get_local_namespace(level=level+1))
 
         self.input_traces = input_traces
         self.model = model
 
         # Setup NeuronGroup
-        self.neurons = self.setup_neuron_group(self.n_neurons,
-                                               input_var=input_traces,
-                                               n_traces=self.n_traces)
+        namespace = get_local_namespace(level=level+1)
+        namespace['input_var'] = input_traces
+        namespace['n_traces'] = self.n_traces
+        self.neurons = self.setup_neuron_group(self.n_neurons, namespace)
 
         monitor = SpikeMonitor(self.neurons, record=True, name='monitor')
         self.network = Network(self.neurons, monitor)
@@ -495,7 +501,7 @@ class SpikeFitter(Fitter):
     def generate_spikes(self, params=None, param_init=None):
         """Generates traces for best fit of parameters and all inputs"""
         fits = self.generate(params=params, output_var='spikes',
-                             param_init=param_init)
+                             param_init=param_init, level=1)
         return fits
 
 
@@ -504,7 +510,7 @@ class OnlineTraceFitter(Fitter):
     def __init__(self, model=None, input_var=None, input=None,
                  output_var=None, output=None, dt=None, method=None,
                  reset=None, refractory=False, threshold=None,
-                 callback=None, n_samples=None):
+                 callback=None, n_samples=None, level=0):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method)
@@ -528,11 +534,12 @@ class OnlineTraceFitter(Fitter):
         self.model = model
 
         # Setup NeuronGroup
-        self.neurons = self.setup_neuron_group(self.n_neurons,
-                                               input_var=input_traces,
-                                               output_var=output_traces,
-                                               n_traces=self.n_traces,
-                                               )
+        namespace = get_local_namespace(level=level+1)
+        namespace['input_var'] = input_traces
+        namespace['output_var'] = output_traces
+        namespace['n_traces'] = self.n_traces
+        self.neurons = self.setup_neuron_group(self.n_neurons, namespace)
+
         self.t_start = 0*second
         self.neurons.namespace['t_start'] = self.t_start
         self.neurons.run_regularly('total_error +=  (' + output_var + '-output_var\
@@ -553,5 +560,5 @@ class OnlineTraceFitter(Fitter):
     def generate_traces(self, params=None, param_init=None):
         """Generates traces for best fit of parameters and all inputs"""
         fits = self.generate(params=params, output_var=self.output_var,
-                             param_init=param_init)
+                             param_init=param_init, level=1)
         return fits
