@@ -2,7 +2,8 @@ import abc
 from types import FunctionType
 from numpy import ones, array, arange, concatenate, mean
 from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
-                    StateMonitor, SpikeMonitor, ms, device, second)
+                    StateMonitor, SpikeMonitor, ms, device, second,
+                    get_local_namespace)
 from brian2.input import TimedArray
 from brian2.equations.equations import Equations
 from .simulation import RuntimeSimulation, CPPStandaloneSimulation
@@ -182,6 +183,8 @@ class Fitter(metaclass=abc.ABCMeta):
         neurons = NeuronGroup(n_neurons, self.model, method=self.method,
                               threshold=self.threshold, reset=self.reset,
                               refractory=self.refractory, name='neurons')
+        neurons.namespace
+
         for name in namespace:
             neurons.namespace[name] = namespace[name]
 
@@ -465,6 +468,8 @@ class SpikeFitter(Fitter):
         input_traces = TimedArray(input.transpose(), dt=dt)
         model = model + Equations(input_var + '= input_var(t, i % n_traces) :\
                                    ' + "% s" % repr(input.dim))
+        level=0
+        print('namespace', get_local_namespace(level=level+1))
 
         self.input_traces = input_traces
         self.model = model
@@ -527,11 +532,11 @@ class OnlineTraceFitter(Fitter):
                                                input_var=input_traces,
                                                output_var=output_traces,
                                                n_traces=self.n_traces,
-                                               t_start=0*second)
-        # t_start = 0*second
-        # self.neurons.namespace['t_start'] = t_start
+                                               )
+        self.t_start = 0*second
+        self.neurons.namespace['t_start'] = self.t_start
         self.neurons.run_regularly('total_error +=  (' + output_var + '-output_var\
-                                   (t,i % Ntraces))**2 * int(t>=t_start)', when='end')
+                                   (t,i % n_traces))**2 * int(t>=t_start)', when='end')
 
         monitor = StateMonitor(self.neurons, output_var, record=True,
                                name='monitor')

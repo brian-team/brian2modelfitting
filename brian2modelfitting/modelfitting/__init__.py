@@ -14,5 +14,5 @@ __all__ = ['fit_traces', 'fit_spikes',
            'Optimizer', 'NevergradOptimizer', 'SkoptOptimizer',
            'Simulation', 'RuntimeSimulation', 'CPPStandaloneSimulation',
            'MSEMetric', 'Metric', 'GammaFactor', 'get_gamma_factor', 'firing_rate',
-           'Fitter', 'SpikeFitter', 'TraceFitter',
+           'Fitter', 'SpikeFitter', 'TraceFitter', 'OnlineTraceFitter',
            ]
