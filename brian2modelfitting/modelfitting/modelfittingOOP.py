@@ -1,6 +1,5 @@
 import abc
-from types import FunctionType
-from numpy import ones, array, arange, concatenate
+from numpy import ones, array, arange, concatenate, mean
 from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
                     StateMonitor, SpikeMonitor, ms, device, second)
 from brian2.input import TimedArray
@@ -105,7 +104,7 @@ class Fitter(metaclass=abc.ABCMeta):
                  n_samples, threshold, reset, refractory, method):
         """Initialize the fitter."""
         if dt is None:
-            raise Exception('dt (sampling frequency of the input) must be set')
+            raise ValueError('dt (sampling frequency of the input) must be set')
         defaultclock.dt = dt
 
         self.results_, self.errors = [], []
@@ -243,12 +242,12 @@ class Fitter(metaclass=abc.ABCMeta):
         """
 
         if not (isinstance(metric, Metric) or metric is None):
-            raise Exception("metric has to be a child of class Metric or None")
+            raise TypeError("metric has to be a child of class Metric or None")
 
         if param_init:
             for param, val in param_init.items():
                 if not (param in self.model.identifiers or param in self.model.names):
-                    raise Exception("%s is not a model variable or an identifier \
+                    raise ValueError("%s is not a model variable or an identifier \
                                     in the model")
 
         callback = callback_setup(callback, n_rounds)
@@ -465,8 +464,8 @@ class OnlineTraceFitter(Fitter):
 
         if output_var not in model.names:
             raise Exception("%s is not a model variable" % output_var)
-            if output.shape != input.shape:
-                raise Exception("Input and output must have the same size")
+        if output.shape != input.shape:
+            raise Exception("Input and output must have the same size")
 
         # Replace input variable by TimedArray
         output_traces = TimedArray(output.transpose(), dt=dt)
