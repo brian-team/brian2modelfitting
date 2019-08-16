@@ -2,7 +2,7 @@ import abc
 from types import FunctionType
 from numpy import ones, array, arange, concatenate
 from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
-                    StateMonitor, SpikeMonitor, ms, device)
+                    StateMonitor, SpikeMonitor, ms, device, second)
 from brian2.input import TimedArray
 from brian2.equations.equations import Equations
 from .simulation import RuntimeSimulation, CPPStandaloneSimulation
@@ -41,9 +41,7 @@ def callback_setup(set_type, n_rounds):
 
 def make_dic(names, values):
     """Create dictionary based on list of strings and 2D array"""
-    result_dict = dict()
-    for name, value in zip(names, values):
-        result_dict[name] = value
+    result_dict = {name: value for name, value in zip(names, values)}
 
     return result_dict
 
@@ -74,7 +72,7 @@ def get_spikes(monitor):
     return spikes
 
 
-class Fitter(object):
+class Fitter(metaclass=abc.ABCMeta):
     """
     Base Fitter class for model fitting applications.
 
@@ -101,7 +99,7 @@ class Fitter(object):
         Number of parameter samples to be optimized over.
 
     """
-    __metaclass__ = abc.ABCMeta
+    # __metaclass__ = abc.ABCMeta
 
     def __init__(self, dt, model, input, output, input_var, output_var,
                  n_samples, threshold, reset, refractory, method):
@@ -128,6 +126,12 @@ class Fitter(object):
         self.input = input
         self.output = output
         self.output_var = output_var
+
+        # initialization of attributes used later
+        self.best_res = None
+        self.input_traces = None
+        self.model = None
+        self.network = None
 
     def setup_fit(self):
         """
@@ -165,7 +169,7 @@ class Fitter(object):
         return neurons
 
     @abc.abstractmethod
-    def calc_errors(self):
+    def calc_errors(self, metric):
         """Abstract method required in all Fitter classes"""
         pass
 
@@ -365,8 +369,8 @@ class TraceFitter(Fitter):
 
         if output_var not in model.names:
             raise Exception("%s is not a model variable" % output_var)
-            if output.shape != input.shape:
-                raise Exception("Input and output must have the same size")
+        if output.shape != input.shape:
+            raise Exception("Input and output must have the same size")
 
         # Replace input variable by TimedArray
         output_traces = TimedArray(output.transpose(), dt=dt)
@@ -442,5 +446,62 @@ class SpikeFitter(Fitter):
     def generate_spikes(self, params=None, param_init=None):
         """Generates traces for best fit of parameters and all inputs"""
         fits = self.generate(params=params, output_var='spikes',
+                             param_init=param_init)
+        return fits
+
+
+class OnlineTraceFitter(Fitter):
+    """Input nad output have to have the same dimensions."""
+    def __init__(self, model=None, input_var=None, input=None,
+                 output_var=None, output=None, dt=None, method=None,
+                 reset=None, refractory=False, threshold=None,
+                 callback=None, n_samples=None):
+        """Initialize the fitter."""
+        super().__init__(dt, model, input, output, input_var, output_var,
+                         n_samples, threshold, reset, refractory, method)
+
+        if input_var not in model.identifiers:
+            raise Exception("%s is not an identifier in the model" % input_var)
+
+        if output_var not in model.names:
+            raise Exception("%s is not a model variable" % output_var)
+            if output.shape != input.shape:
+                raise Exception("Input and output must have the same size")
+
+        # Replace input variable by TimedArray
+        output_traces = TimedArray(output.transpose(), dt=dt)
+        input_traces = TimedArray(input.transpose(), dt=dt)
+        model = model + Equations(input_var + '= input_var(t, i % n_traces) :\
+                                  ' + "% s" % repr(input.dim))
+        model = model + Equations('total_error : %s' % repr(output.dim**2))
+
+        self.input_traces = input_traces
+        self.model = model
+
+        # Setup NeuronGroup
+        self.neurons = self.setup_neuron_group(self.n_neurons,
+                                               input_var=input_traces,
+                                               output_var=output_traces,
+                                               n_traces=self.n_traces)
+        t_start = 0*second
+        self.neurons.namespace['t_start'] = t_start
+        self.neurons.run_regularly('total_error +=  (' + output_var + '-output_var\
+                                   (t,i % Ntraces))**2 * int(t>=t_start)', when='end')
+
+        monitor = StateMonitor(self.neurons, output_var, record=True,
+                               name='monitor')
+        self.network = Network(self.neurons, monitor)
+        self.simulator.initialize(self.network)
+
+    def calc_errors(self, metric=None):
+        """Calculates error in online fashion.To be used inside optim_iter."""
+        errors = self.simulator.network['neurons'].total_error/int((self.duration-self.t_start)/defaultclock.dt)
+        errors = self.neurons.total_error/int((self.duration-self.t_start)/defaultclock.dt)
+        errors = mean(errors.reshape((self.n_samples, self.n_traces)), axis=1)
+        return array(errors)
+
+    def generate_traces(self, params=None, param_init=None):
+        """Generates traces for best fit of parameters and all inputs"""
+        fits = self.generate(params=params, output_var=self.output_var,
                              param_init=param_init)
         return fits
