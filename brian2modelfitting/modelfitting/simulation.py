@@ -88,35 +88,35 @@ class Simulation(object):
 
 class RuntimeSimulation(Simulation):
     """Simulation class created for use with RuntimeDevice"""
-    def initialize(self, network):
-        if network['neurons'] is NeuronGroup:
+    def initialize(self, network, name='neurons'):
+        if network[name] is NeuronGroup:
             raise Exception("Network needs to have a NeuronGroup 'neurons'")
 
         self.network = network
         self.network.store()
 
-    def run(self, duration, params, params_names):
+    def run(self, duration, params, params_names, name='neurons'):
         self.network.restore()
-        self.network['neurons'].set_states(params, units=False)
+        self.network[name].set_states(params, units=False)
         self.network.run(duration, namespace={})
 
 
 class CPPStandaloneSimulation(Simulation):
     """Simulation class created for use with CPPStandaloneDevice"""
-    def initialize(self, network):
-        if not network['neurons']:
+    def initialize(self, network, name='neurons'):
+        if not network[name]:
             raise Exception("Network needs to have a NeuronGroup 'neurons'")
 
         self.network = network
 
-    def run(self, duration, params, params_names):
+    def run(self, duration, params, params_names, name='neurons'):
         """
         Simulation has to be run in two stages in order to initalize the
         code generaion
         """
         if not device.has_been_run:
             self.params_init = initialize_neurons(params_names,
-                                                  self.network['neurons'],
+                                                  self.network[name],
                                                   params)
             self.network.run(duration)
 

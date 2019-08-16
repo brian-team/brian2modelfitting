@@ -6,6 +6,7 @@ from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
                     get_local_namespace)
 from brian2.input import TimedArray
 from brian2.equations.equations import Equations
+from brian2.devices import reinit_devices
 from .simulation import RuntimeSimulation, CPPStandaloneSimulation
 from .metric import Metric
 from tqdm.autonotebook import tqdm
@@ -121,7 +122,8 @@ class Fitter(metaclass=abc.ABCMeta):
         if dt is None:
             raise ValueError('dt (sampling frequency of the input) must be set')
         defaultclock.dt = dt
-
+        self.dt = dt
+        
         self.results_, self.errors = [], []
 
         self.simulator = self.setup_fit()
@@ -149,8 +151,8 @@ class Fitter(metaclass=abc.ABCMeta):
 
     def setup_fit(self):
         """
-        Function sets up simulator in one of the two availabel modes: runtime or
-        standalone (set in the script calling fit_traces/fit spikes).
+        Function sets up simulator in one of the two availabel modes: runtime
+        or standalone (set in the script calling fit_traces/fit spikes).
 
         Returns
         -------
@@ -163,7 +165,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
         return simulators[get_device().__class__.__name__]
 
-    def setup_neuron_group(self, n_neurons, namespace):
+    def setup_neuron_group(self, n_neurons, namespace, name='neurons'):
         """
         Setup neuron group, initialize required number of neurons, create
         namespace and initite the parameters.
@@ -183,7 +185,7 @@ class Fitter(metaclass=abc.ABCMeta):
         """
         neurons = NeuronGroup(n_neurons, self.model, method=self.method,
                               threshold=self.threshold, reset=self.reset,
-                              refractory=self.refractory, name='neurons')
+                              refractory=self.refractory, name=name)
         # neurons.namespace
 
         for name in namespace:
@@ -245,8 +247,8 @@ class Fitter(metaclass=abc.ABCMeta):
             **params):
         """
         Run the optimization algorithm for given amount of rounds with given
-        number of samples drawn. Return best set of parameters and corresponging
-        error.
+        number of samples drawn. Return best set of parameters and
+        corresponding error.
 
         Parameters
         ----------
@@ -280,8 +282,8 @@ class Fitter(metaclass=abc.ABCMeta):
         if param_init:
             for param, val in param_init.items():
                 if not (param in self.model.identifiers or param in self.model.names):
-                    raise ValueError("%s is not a model variable or an identifier \
-                                    in the model")
+                    raise ValueError("%s is not a model variable or an \
+                                      identifier in the model")
 
         callback = callback_setup(callback, n_rounds)
         optimizer.initialize(self.parameter_names, **params)
@@ -370,11 +372,12 @@ class Fitter(metaclass=abc.ABCMeta):
             params = self.best_res
 
         if get_device().__class__.__name__ == 'CPPStandaloneDevice':
-            device.has_been_run = False
+            # device.has_been_run = False
             # reinit_devices()
             device.reinint()
             device.activate()
 
+        defaultclock.dt = self.dt
         Ntraces, Nsteps = self.input.shape
 
         # Setup NeuronGroup
@@ -382,27 +385,27 @@ class Fitter(metaclass=abc.ABCMeta):
         namespace['input_var'] = self.input_traces
         namespace['n_traces'] = Ntraces
         namespace['output_var'] = output_var
-        self.neurons = self.setup_neuron_group(Ntraces, namespace)
+        self.neurons = self.setup_neuron_group(Ntraces, namespace, name='neurons_')
 
         if output_var == 'spikes':
-            monitor = SpikeMonitor(self.neurons, record=True, name='monitor')
+            monitor = SpikeMonitor(self.neurons, record=True, name='monitor_')
         else:
             monitor = StateMonitor(self.neurons, output_var, record=True,
-                                   name='monitor')
+                                   name='monitor_')
         network = Network(self.neurons, monitor)
         self.simulator.initialize(self.network)
 
         if param_init:
             for k, v in param_init.items():
-                network['neurons'].__setattr__(k, v)
+                network['neurons_'].__setattr__(k, v)
 
-        self.simulator.initialize(network)
-        self.simulator.run(self.duration, params, self.parameter_names)
+        self.simulator.initialize(network, name='neurons_')
+        self.simulator.run(self.duration, params, self.parameter_names, name='neurons_')
 
         if output_var == 'spikes':
-            fits = get_spikes(self.simulator.network['monitor'])
+            fits = get_spikes(self.simulator.network['monitor_'])
         else:
-            fits = getattr(self.simulator.network['monitor'], output_var)
+            fits = getattr(self.simulator.network['monitor_'], output_var)
 
         return fits
 
