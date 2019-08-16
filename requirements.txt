@@ -1,6 +1,4 @@
+brian2
 nevergrad
 scikit-optimize
 tqdm
-
-pytest-coverage
-coveralls
