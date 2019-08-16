@@ -1,4 +1,5 @@
 import abc
+from types import FunctionType
 from numpy import ones, array, arange, concatenate, mean
 from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
                     StateMonitor, SpikeMonitor, ms, device, second)
@@ -32,8 +33,11 @@ def callback_setup(set_type, n_rounds):
         callback = callback_text
     elif set_type == 'progressbar':
         callback = ProgressBar(n_rounds)
-    elif set_type is not None:
+    elif type(set_type) is FunctionType:
         callback = set_type
+    else:
+        raise TypeError("callback has to be a str ('text' or 'progressbar') or\
+                         callable")
 
     return callback
 
@@ -83,23 +87,32 @@ class Fitter(metaclass=abc.ABCMeta):
 
     Parameters
     ----------
+    dt : time step
     model : `~brian2.equations.Equations` or string
         The equations describing the model.
+    input : input data as a 2D array
+    output : output data as a 2D array
     input_var : string
         Input variable name.
-    input : input data as a 2D array
     output_var : string
         Output variable name.
-    output : output data as a 2D array
-    dt : time step
-    method: string, optional
-        Integration method
     n_samples: int
         Number of parameter samples to be optimized over.
+    threshold: str, optional
+        The condition which produces spikes. Should be a single line boolean
+        expression.
+    reset: str, optional
+        The (possibly multi-line) string with the code to execute on reset.
+    refractory: {str, 'Quantity'}, optional
+        Either the length of the refractory period (e.g. 2*ms), a string
+        expression that evaluates to the length of the refractory period after
+        each spike (e.g. '(1 + rand())*ms'), or a string expression evaluating
+        to a boolean value, given the condition under which the neuron stays
+        refractory after a spike (e.g. 'v > -20*mV')
+    method: string, optional
+        Integration method
 
     """
-    # __metaclass__ = abc.ABCMeta
-
     def __init__(self, dt, model, input, output, input_var, output_var,
                  n_samples, threshold, reset, refractory, method):
         """Initialize the fitter."""
@@ -150,8 +163,15 @@ class Fitter(metaclass=abc.ABCMeta):
 
     def setup_neuron_group(self, n_neurons, **namespace):
         """
-        Setup neuron group, initialize required number of neurons, create namespace
-        and initite the parameters.
+        Setup neuron group, initialize required number of neurons, create
+        namespace and initite the parameters.
+
+        Parameters
+        ----------
+        n_neurons: int
+            number of required neurons
+        **namespace :
+            arguments to be added to NeuronGroup namespace
 
         Returns
         -------
@@ -169,7 +189,15 @@ class Fitter(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def calc_errors(self, metric):
-        """Abstract method required in all Fitter classes"""
+        """
+        Abstract method required in all Fitter classes, used for
+        calculating errors
+
+        Parameters
+        ----------
+        metric:~brian2modelfitting.modelfitting.Metric children
+            Child of Metric class, specifies optimization metric
+        """
         pass
 
     def optimization_iter(self, optimizer, metric, param_init, *args):
@@ -207,7 +235,6 @@ class Fitter(metaclass=abc.ABCMeta):
         return results, parameters, errors
 
     def fit(self, optimizer=None, metric=None,
-            n_samples=10,
             n_rounds=1,
             callback='progressbar',
             param_init=None,
@@ -224,9 +251,11 @@ class Fitter(metaclass=abc.ABCMeta):
         metric: ~brian2modelfitting.modelfitting.Metric children
             Child of Metric class, specifies optimization metric
         n_rounds: int
-            Number of rounds to optimize over. (feedback provided over each round)
-        callback: callable
-            Provide custom feedback function func(results, errors, parameters, index)
+            Number of rounds to optimize over (feedback provided over each
+            round).
+        callback: str('text' or 'progressbar') or callable
+            For strings outputs default feedback or a progressbar. Provide
+            custom feedback function func(results, errors, parameters, index)
             If callback returns True the fitting execution is interrupted.
         param_init: dict
             Dictionary of variables to be initialized with respective value
@@ -235,7 +264,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
         Returns
         -------
-        best_res : dict
+        best_results : dict
             dictionary with best parameter set
         error: float
             error value for best parameter set
@@ -274,8 +303,15 @@ class Fitter(metaclass=abc.ABCMeta):
 
         Parameters
         ----------
-        format: string ('list')
-            string with output format ('dataframe', 'list', 'dict')
+        format: string ('dataframe', 'list', 'dict')
+            string with output format
+
+        Returns
+        -------
+        results:
+            'dataframe': returns pandas `DataFrame` without units
+            'list': list of dictionaries
+            'dict': dictionary of lists
         """
         names = list(self.parameter_names)
         names.append('errors')
@@ -314,6 +350,15 @@ class Fitter(metaclass=abc.ABCMeta):
         """
         Generates traces for best fit of parameters and all inputs.
         If provided with other parameters provides those.
+
+        Parameters
+        ----------
+        params: dict
+            Dictionary of parameters to generate fits for.
+        output_var: str
+            Name of the output variable to be monitored.
+        param_init: dict
+            Dictionary of initial values for the model.
         """
         if params is None:
             params = self.best_res
@@ -481,9 +526,10 @@ class OnlineTraceFitter(Fitter):
         self.neurons = self.setup_neuron_group(self.n_neurons,
                                                input_var=input_traces,
                                                output_var=output_traces,
-                                               n_traces=self.n_traces)
-        t_start = 0*second
-        self.neurons.namespace['t_start'] = t_start
+                                               n_traces=self.n_traces,
+                                               t_start=0*second)
+        # t_start = 0*second
+        # self.neurons.namespace['t_start'] = t_start
         self.neurons.run_regularly('total_error +=  (' + output_var + '-output_var\
                                    (t,i % Ntraces))**2 * int(t>=t_start)', when='end')
 
