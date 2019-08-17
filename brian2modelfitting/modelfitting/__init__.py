@@ -2,7 +2,7 @@
 Package to fit models to experimental data
 """
 
-from .modelfittingOOP import *
+from .modelfitting import *
 from .optimizer import *
 from .metric import *
 from .simulation import *
