@@ -1,86 +1,40 @@
-from brian2 import (NeuronGroup, TimedArray, Equations, get_device, Network,
-                    StateMonitor, SpikeMonitor, device)
-from .modelfitting import setup_fit, setup_neuron_group, get_spikes
+from tqdm.autonotebook import tqdm
 
 
-def generate_fits(model=None,
-                  params=None,
-                  input=None,
-                  input_var=None,
-                  output_var=None,
-                  dt=None,
-                  method=None,
-                  reset=None, refractory=False, threshold=None,
-                  param_init=None):
+def callback_text(res, errors, parameters, k):
+    print("Round {}: fit {} with error: {}".format(k, res, min(errors)))
+
+
+class ProgressBar(object):
+    """Setup for tqdm progress bar in Fitter"""
+    def __init__(self, toolbar_width=10):
+        self.toolbar_width = toolbar_width
+        self.t = tqdm(total=toolbar_width)
+
+    def __call__(self, res, errors, parameters, k):
+        self.t.update(1)
+
+
+def callback_setup(set_type, n_rounds):
     """
-    Generate instance of best fits for predicted parameters and all of the
-    traces
-
-    Parameters
-    ----------
-    model : `~brian2.equations.Equations` or string
-        The equations describing the model.
-    params : dict
-        Predicted parameters
-    input : input data as a 2D array
-    input_var : string
-        Input variable name.
-    output_var : string
-        Output variable name or 'spikes' to reproduce spike time.
-    dt : time step
-    method: string, optional
-        Integration method
-    param_init: dict
-        Dictionary of variables to be initialized with the value
-
-    Returns
-    -------
-    fits: array
-        Traces of output varaible or spike times
+    Helper function for callback setup in Fitter, loads option:
+    'text', 'progressbar' or custion FunctionType
     """
-    if get_device().__class__.__name__ == 'CPPStandaloneDevice':
-        device.has_been_run = False
-        # reinit_devices()
-        device.reinint()
-        device.activate()
-
-    simulator = setup_fit(model, dt, param_init, input_var, None)
-
-    parameter_names = model.parameter_names
-    Ntraces, Nsteps = input.shape
-    duration = Nsteps * dt
-    n_neurons = Ntraces
-
-    input_traces = TimedArray(input.transpose(), dt=dt)
-    input_unit = input.dim
-    model = model + Equations(input_var + '= input_var(t, i % Ntraces) :\
-                              ' + "% s" % repr(input_unit))
-
-    neurons = setup_neuron_group(model, n_neurons, method, threshold, reset,
-                                 refractory, param_init,
-                                 input_var=input_traces,
-                                 output_var=output_var,
-                                 Ntraces=Ntraces)
-
-    if output_var == 'spikes':
-        monitor = SpikeMonitor(neurons, record=True, name='monitor')
+    if set_type == 'text':
+        callback = callback_text
+    elif set_type == 'progressbar':
+        callback = ProgressBar(n_rounds)
+    elif type(set_type) is FunctionType:
+        callback = set_type
     else:
-        monitor = StateMonitor(neurons, output_var, record=True,
-                               name='monitor')
+        raise TypeError("callback has to be a str ('text' or 'progressbar') or\
+                         callable")
 
-    network = Network(neurons, monitor)
-    if param_init:
-        for k, v in param_init.items():
-            network['neurons'].__setattr__(k, v)
+    return callback
 
 
-    simulator.initialize(network)
+def make_dic(names, values):
+    """Create dictionary based on list of strings and 2D array"""
+    result_dict = {name: value for name, value in zip(names, values)}
 
-    simulator.run(duration, params, parameter_names)
-
-    if output_var == 'spikes':
-        fits = get_spikes(simulator.network['monitor'])
-    else:
-        fits = getattr(simulator.network['monitor'], output_var)
-
-    return fits
+    return result_dict
