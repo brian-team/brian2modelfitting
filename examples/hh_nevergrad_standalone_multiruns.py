@@ -91,15 +91,43 @@ res, error = fitter.fit(n_rounds=2,
                         g_kd=[1*msiemens*cm**-2 * area, 1000*msiemens*cm**-2 * area],
                         )
 
+# n_opt = NevergradOptimizer(method='PSO')
+# metric = GammaFactor(dt, 60*ms)
+
+res, error = fitter.fit(n_rounds=2,
+                        optimizer=n_opt, metric=metric,
+                        callback='progressbar',
+                        param_init={'v': -65*mV},
+                        gl=[1e-8*siemens*cm**-2 * area, 1e-3*siemens*cm**-2 * area],
+                        g_na=[1*msiemens*cm**-2 * area, 2000*msiemens*cm**-2 * area],
+                        g_kd=[1*msiemens*cm**-2 * area, 1000*msiemens*cm**-2 * area],
+                        )
+# device.reinit()
+# device.activate()
+# fitter = TraceFitter(model=eqs, input_var='I', output_var='v',
+#                      input=inp_trace * amp, output=[out_trace]*mV, dt=dt,
+#                      n_samples=5,
+#                      method='exponential_euler',)
+#
+#
+# res, error = fitter.fit(n_rounds=2,
+#                         optimizer=n_opt, metric=metric,
+#                         callback='progressbar',
+#                         param_init={'v': -65*mV},
+#                         gl=[1e-8*siemens*cm**-2 * area, 1e-3*siemens*cm**-2 * area],
+#                         g_na=[1*msiemens*cm**-2 * area, 2000*msiemens*cm**-2 * area],
+#                         g_kd=[1*msiemens*cm**-2 * area, 1000*msiemens*cm**-2 * area],
+#                         )
+
 # give information to the optimizer
 print('correct:', params_correct, '\n output:', res)
 print('error', error)
-
 
 # visualization of the results
 start_scope()
 device.reinit()
 device.activate()
+# reinit_devices()
 fits = fitter.generate_traces(params=None, param_init={'v': -65*mV})
 
 fig, ax = plt.subplots(nrows=1)

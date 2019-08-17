@@ -81,6 +81,14 @@ class Fitter(metaclass=abc.ABCMeta):
     def __init__(self, dt, model, input, output, input_var, output_var,
                  n_samples, threshold, reset, refractory, method, level=0):
         """Initialize the fitter."""
+
+        if get_device().__class__.__name__ == 'CPPStandaloneDevice':
+            if device.has_been_run is True:
+                raise Exception("To run another fitter in standalone mode you need \
+                                 to create new script")
+                # raise Exception("You need to reset the device before starting a new\
+                                # fit in standalone mode, add: device.reinit() & device.activate()")
+
         if dt is None:
             raise ValueError('dt (sampling frequency of the input) must be set')
         defaultclock.dt = dt
@@ -110,6 +118,10 @@ class Fitter(metaclass=abc.ABCMeta):
         self.input_traces = None
         self.model = None
         self.network = None
+
+        self.optimizer = None
+        self.metric = None
+
 
     def setup_fit(self):
         """
@@ -237,15 +249,26 @@ class Fitter(metaclass=abc.ABCMeta):
         error: float
             error value for best parameter set
         """
-
-        if not (isinstance(metric, Metric) or metric is None):
-            raise TypeError("metric has to be a child of class Metric or None")
-
         if param_init:
             for param, val in param_init.items():
                 if not (param in self.model.identifiers or param in self.model.names):
                     raise ValueError("%s is not a model variable or an \
                                       identifier in the model")
+
+        if not (isinstance(metric, Metric) or metric is None):
+            raise TypeError("metric has to be a child of class Metric or None")
+
+        if not self.metric is None:
+            if not metric is self.metric:
+                raise Exception("You can not change the metric between fits")
+
+        if not self.optimizer is None:
+            if not optimizer is self.optimizer:
+                raise Exception("You can not change the optimizer between fits")
+
+
+        self.optimizer = optimizer
+        self.metric = metric
 
         callback = callback_setup(callback, n_rounds)
         optimizer.initialize(self.parameter_names, **params)
@@ -330,14 +353,14 @@ class Fitter(metaclass=abc.ABCMeta):
         level : int, optional
             How much farther to go down in the stack to find the namespace.
         """
-        if params is None:
-            params = self.best_res
 
         if get_device().__class__.__name__ == 'CPPStandaloneDevice':
-            # device.has_been_run = False
-            # reinit_devices()
-            device.reinint()
-            device.activate()
+            if device.has_been_run is True:
+                raise Exception("You need to reset the device before generating the traces\
+                                in standalone mode, which will make you lose monitor data\
+                                add: device.reinit() & device.activate()")
+        if params is None:
+            params = self.best_res
 
         defaultclock.dt = self.dt
         Ntraces, Nsteps = self.input.shape
