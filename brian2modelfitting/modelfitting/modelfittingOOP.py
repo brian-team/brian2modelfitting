@@ -123,7 +123,7 @@ class Fitter(metaclass=abc.ABCMeta):
             raise ValueError('dt (sampling frequency of the input) must be set')
         defaultclock.dt = dt
         self.dt = dt
-        
+
         self.results_, self.errors = [], []
 
         self.simulator = self.setup_fit()

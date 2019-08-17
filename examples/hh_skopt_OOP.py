@@ -1,6 +1,6 @@
 from brian2 import *
 from brian2modelfitting import *
-from brian2.devices import reinit_devices
+
 
 prefs.codegen.target = 'cython'  # weave is not multiprocess-safe!
 
@@ -12,16 +12,17 @@ EK = -90*mV
 ENa = 50*mV
 VT = -63*mV
 
-dt = 0.01*ms
-
 # Generate a step-current input and an "experimental" voltage trace
+dt = 0.01*ms
 input_current = np.hstack([np.zeros(int(5*ms/dt)), np.ones(int(5*ms/dt)), np.zeros(int(5*ms/dt))])*nA
 
+N, n1 = np.array([input_current]).shape
 params_correct = {'gl': float(5e-5*siemens*cm**-2 * area),
-                  'g_na': float(100*msiemens*cm**-2 * area),
-                  'g_kd': float(30*msiemens*cm**-2 * area)}
+          'g_na': float(100*msiemens*cm**-2 * area),
+          'g_kd': float(30*msiemens*cm**-2 * area)}
 
 defaultclock.dt = dt
+I = TimedArray(input_current, dt=dt)
 
 # The model
 eqsHH = Equations('''
@@ -37,23 +38,19 @@ g_kd : siemens (constant)
 gl   : siemens (constant)
 ''')
 
-I = TimedArray(input_current, dt=dt)
-
 G = NeuronGroup(1, eqsHH, method='exponential_euler')
 G.v = El
 G.set_states(params_correct, units=False)
 mon = StateMonitor(G, 'v', record=0)
-run(25*ms)
+run(20*ms)
 
 voltage = mon.v[0]/mV
 voltage += np.random.randn(len(voltage))
 
-
 inp_trace = np.array([input_current])
+
 n0, n1 = inp_trace.shape
-
-out_trace = np.array(voltage[:n1])
-
+out_trace = np.array([voltage[:n1]])
 
 # Model for modelfitting
 eqs = Equations(
@@ -71,19 +68,16 @@ gl   : siemens (constant)
 ''',
 Cm=1*ufarad*cm**-2 * area, El=-65*mV, EK=-90*mV, ENa=50*mV, VT=-63*mV)
 
-set_device('cpp_standalone', directory='parallel', clean=False)
-
-n_opt = NevergradOptimizer()
+s_opt = SkoptOptimizer(method='gp', random_state=1)
 metric = MSEMetric()
-
 # pass parameters to the NeuronGroup
 fitter = TraceFitter(model=eqs, input_var='I', output_var='v',
-                     input=inp_trace * amp, output=[out_trace]*mV, dt=dt,
+                     input=inp_trace * amp, output=out_trace*mV, dt=dt,
                      n_samples=5,
                      method='exponential_euler',)
 
 res, error = fitter.fit(n_rounds=2,
-                        optimizer=n_opt, metric=metric,
+                        optimizer=s_opt, metric=metric,
                         callback='progressbar',
                         param_init={'v': -65*mV},
                         gl=[1e-8*siemens*cm**-2 * area, 1e-3*siemens*cm**-2 * area],
@@ -91,20 +85,15 @@ res, error = fitter.fit(n_rounds=2,
                         g_kd=[1*msiemens*cm**-2 * area, 1000*msiemens*cm**-2 * area],
                         )
 
-# give information to the optimizer
 print('correct:', params_correct, '\n output:', res)
 print('error', error)
 
-
 # visualization of the results
-start_scope()
-device.reinit()
-device.activate()
-# reinit_devices()
 fits = fitter.generate_traces(params=None, param_init={'v': -65*mV})
+
+print(fits)
 
 fig, ax = plt.subplots(nrows=1)
 ax.plot(out_trace)
 ax.plot(fits[0]/mV)
-plt.title('nevergrad optimization')
 plt.show()

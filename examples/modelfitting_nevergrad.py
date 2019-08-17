@@ -16,14 +16,18 @@ model = Equations('''
     E : volt (constant)
     ''')
 
-
 n_opt = NevergradOptimizer()
 metric =  MSEMetric()
-# pass parameters to the NeuronGroup
-res, error = fit_traces(model=model, input_var='v', output_var='I',
-                        input=input_traces, output=output_traces,
-                        dt=0.1*ms, optimizer=n_opt, metric=metric,
-                        n_rounds=2, n_samples=10,
-                        g=[1*nS, 30*nS], E=[-20*mV, 100*mV],)
 
+# pass parameters to the NeuronGroup
+fitter = TraceFitter(model=model, dt=0.1*ms,
+                     input_var='v', output_var='I',
+                     input=input_traces, output=output_traces,
+                     n_samples=10,)
+
+res, error = fitter.fit(n_rounds=2,
+                        optimizer=n_opt, metric=metric,
+                        g=[1*nS, 30*nS], E=[-20*mV, 100*mV],
+                        callback='progressbar',
+                        )
 print(res, error)

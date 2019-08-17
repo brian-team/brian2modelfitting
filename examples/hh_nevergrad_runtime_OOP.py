@@ -126,7 +126,6 @@ print(all_output)
 
 # visualization of the results
 start_scope()
-# fits = fitter.generate(params=None, output_var='v', param_init={'v': -65*mV})
 fits = fitter.generate_traces(params=None, param_init={'v': -65*mV})
 
 fig, ax = plt.subplots(nrows=2)
