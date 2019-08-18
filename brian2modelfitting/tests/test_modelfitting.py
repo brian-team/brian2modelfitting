@@ -29,3 +29,59 @@ def test_get_param_dic():
 def test_get_spikes():
     # needs spike monitor to be run
     pass
+
+
+# Fitter class
+def test_fitter_init():
+    Fitter(dt=0.1*ms, model='')
+    pass
+
+def test_fitter_setup_fit():
+    pass
+
+def test_fitter_setup_neuron_group():
+    pass
+
+def test_fitter_optimization_iter():
+    pass
+
+def test_fitter_fit():
+    pass
+
+def test_fitter_results():
+    pass
+
+def test_fitter_generate():
+    pass
+
+# TraceFitter class
+def test_tracefitter_init():
+    pass
+
+def test_tracefitter_calc_errors():
+    pass
+
+def test_tracefitter_generate_traces():
+    pass
+
+
+# SpikeFitter class
+def test_spikefitter_init():
+    pass
+
+def test_spikefitter_calc_errors():
+    pass
+
+def test_spikefitter_generate_traces():
+    pass
+
+
+# OnlineTraceFitter class
+def test_onlinetracefitter_init():
+    pass
+
+def test_onlinetracefitter_calc_errors():
+    pass
+
+def test_onlinetracefitter_generate_traces():
+    pass
