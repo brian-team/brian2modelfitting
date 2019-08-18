@@ -2,15 +2,12 @@ import abc
 from numpy import ones, array, arange, concatenate, mean
 from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
                     StateMonitor, SpikeMonitor, ms, device, second,
-                    get_local_namespace)
+                    get_local_namespace, Quantity)
 from brian2.input import TimedArray
 from brian2.equations.equations import Equations
 from .simulation import RuntimeSimulation, CPPStandaloneSimulation
 from .metric import Metric
 from .utils import callback_setup, make_dic
-# from types import FunctionType
-# from tqdm.autonotebook import tqdm
-# from brian2.devices import reinit_devices
 
 
 def get_param_dic(params, param_names, n_traces, n_samples):
@@ -160,7 +157,6 @@ class Fitter(metaclass=abc.ABCMeta):
         neurons = NeuronGroup(n_neurons, self.model, method=self.method,
                               threshold=self.threshold, reset=self.reset,
                               refractory=self.refractory, name=name)
-        # neurons.namespace
 
         for name in namespace:
             neurons.namespace[name] = namespace[name]
@@ -312,6 +308,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
         errors = array([array(self.errors).flatten()])
         data = concatenate((params, errors.transpose()), axis=1)
+        dim = self.model.dimensions
 
         if format == 'list':
             res_list = []
@@ -319,22 +316,23 @@ class Fitter(metaclass=abc.ABCMeta):
                 temp_data = data[j]
                 res_dict = dict()
 
-                for i, n in enumerate(names):
-                    res_dict[n] = temp_data[i]
+                for i,n in enumerate(names[:-1]):
+                    res_dict[n] = Quantity(temp_data[i], dim=dim[n])
+                res_dict[names[-1]] = temp_data[-1]
                 res_list.append(res_dict)
 
             return res_list
 
         elif format == 'dict':
             res_dict = dict()
-            for i, n in enumerate(names):
-                res_dict[n] = data[:, i]
+            for i,n in enumerate(names[:-1]):
+                res_dict[n] = Quantity(data[:, i], dim=dim[n])
 
+            res_dict[names[-1]] = data[:, -1]
             return res_dict
 
         elif format == 'dataframe':
             from pandas import DataFrame
-
             return DataFrame(data=data, columns=names)
 
     def generate(self, params=None, output_var=None, param_init=None, level=0):

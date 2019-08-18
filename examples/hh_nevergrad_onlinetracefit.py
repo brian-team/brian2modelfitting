@@ -121,7 +121,7 @@ res, error = fitter.fit(n_rounds=2,
 print('correct:', params_correct, '\n output:', res)
 print('error', error)
 
-all_output = fitter.results(format='dataframe')
+all_output = fitter.results(format='list')
 print(all_output)
 
 # visualization of the results
