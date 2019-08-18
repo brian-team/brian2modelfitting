@@ -13,7 +13,7 @@ class Optimizer(object):
     """
     Optimizer class created as a base for optimization initialization and
     performance with different libraries. To be used with modelfitting
-    fit_traces.
+    Fitter.
     """
     __metaclass__ = abc.ABCMeta
 

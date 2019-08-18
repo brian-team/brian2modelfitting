@@ -121,7 +121,7 @@ class Fitter(metaclass=abc.ABCMeta):
     def setup_fit(self):
         """
         Function sets up simulator in one of the two availabel modes: runtime
-        or standalone (set in the script calling fit_traces/fit spikes).
+        or standalone.
 
         Returns
         -------

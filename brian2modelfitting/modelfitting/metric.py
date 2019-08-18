@@ -65,7 +65,7 @@ def get_gamma_factor(source, target, delta, dt):
 class Metric(object):
     """
     Metic abstract class to define functions required for a custom metric
-    To be used with modelfitting fit_traces.
+    To be used with modelfitting Fitters.
     """
     __metaclass__ = abc.ABCMeta
 
@@ -77,7 +77,7 @@ class Metric(object):
     def get_features(self, traces, output):
         """
         Function calculates features / errors for each of the traces and stores
-        it in an attibute metric.features
+        it in an attribute metric.features
 
 
         Parameters
