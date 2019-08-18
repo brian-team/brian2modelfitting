@@ -5,5 +5,4 @@ Model Fitting
    :maxdepth: 2
 
    introduction
-   installation
    howitworks
