@@ -5,6 +5,8 @@ from types import FunctionType
 def callback_text(res, errors, parameters, k):
     print("Round {}: fit {} with error: {}".format(k, res, min(errors)))
 
+def callback_none(res, errors, parameters, k):
+    pass
 
 class ProgressBar(object):
     """Setup for tqdm progress bar in Fitter"""
@@ -27,9 +29,11 @@ def callback_setup(set_type, n_rounds):
         callback = ProgressBar(n_rounds)
     elif type(set_type) is FunctionType:
         callback = set_type
+    elif set_type is None:
+        callback = callback_none
     else:
-        raise TypeError("callback has to be a str ('text' or 'progressbar') or\
-                         callable")
+        raise TypeError("callback has to be a str ('text' or 'progressbar'),\
+                         callable or None")
 
     return callback
 
