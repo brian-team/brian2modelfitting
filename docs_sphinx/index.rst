@@ -21,7 +21,11 @@ Contents
    :maxdepth: 2
    :titlesonly:
 
-   fitting
+   introduction/index
+   optimizer/index
+   metric/index
+   features/index
+   examples/index
 
 API reference
 -------------
@@ -29,7 +33,7 @@ API reference
    :maxdepth: 5
    :titlesonly:
 
-   brian2modelfitting.modelfitting.rst
+   api/index
 
 Indices and tables
 ------------------

@@ -1,4 +1,5 @@
 from tqdm.autonotebook import tqdm
+from types import FunctionType
 
 
 def callback_text(res, errors, parameters, k):
