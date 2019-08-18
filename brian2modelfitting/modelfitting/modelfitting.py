@@ -83,8 +83,6 @@ class Fitter(metaclass=abc.ABCMeta):
             if device.has_been_run is True:
                 raise Exception("To run another fitter in standalone mode you need \
                                  to create new script")
-                # raise Exception("You need to reset the device before starting a new\
-                                # fit in standalone mode, add: device.reinit() & device.activate()")
 
         if dt is None:
             raise ValueError('dt (sampling frequency of the input) must be set')
