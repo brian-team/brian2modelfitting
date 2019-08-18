@@ -4,7 +4,7 @@ GammaFactor
 To be used with `SpikeFitter`. Calculated according to:
 
 
-.. math:: \Gamma = \left (\frac{2}{1-2\delta r_{exp}}\right) \left(\frac{N_{coinc} - 2\delta N_{exp}r_{exp}}{N_{exp} + N_{model}}\right)$$
+.. math:: \Gamma = \left (\frac{2}{1-2\delta r_{exp}}\right) \left(\frac{N_{coinc} - 2\delta N_{exp}r_{exp}}{N_{exp} + N_{model}}\right)
 
 :math:`N_{coinc}$` - number of coincidences
 

@@ -1,12 +1,20 @@
 Optimizer
----------
+=========
+
 Optimizer class is responsible for maximizing a fitness function. Our approach
 uses gradient free global optimization methods (evolutionary algorithms, genetic algorithms,
 Bayesian optimization). We provided access to two libraries.
-Provided libraries and methods:
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**1. Nevergrad**
+
+
+.. contents::
+    Provided libraries:
+    :local:
+
+
+
+Nevergrad
+---------
 
 .. _Nevergrad: https://github.com/facebookresearch/nevergrad
 
@@ -44,7 +52,8 @@ Important notes:
 
 
 
-**2. Scikit-Optimize_ (skopt)**
+Scikit-Optimize_ (skopt)
+------------------------
 
 .. _Scikit-Optimize: https://scikit-optimize.github.io/
 
