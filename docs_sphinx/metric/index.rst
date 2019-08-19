@@ -5,7 +5,7 @@ Metric input to specifies the fitness function measuring the performance of the 
 This function gets applied on each simulated trace. We have implemented few metrics within
 modelfitting.
 
- .. contents::
+.. contents::
    Provided metrics:
      :local:
      :depth: 1
@@ -65,9 +65,11 @@ custom made metrics.
 
 New metric will need to be inherited from :py:class:`~brian2modelfitting.modelfitting.metric.Metric` and specify following
 functions:
- - :py:class:`~brian2modelfitting.modelfitting.metric.Metric.get_features()` calculates features / errors for each of the traces and stores
-    it in an attribute metric.features
- - :py:class:`~brian2modelfitting.modelfitting.metric.Metric.get_errors()` weights features/multiple errors into one final error per each
-    set of parameters and inputs stored metric.errors.
- - - :py:class:`~brian2modelfitting.modelfitting.metric.Metric.calc()` performs the error calculation across simulation for all parameters
-    of each round
+
+ - :py:func:`~brian2modelfitting.modelfitting.metric.Metric.get_features()`
+    calculates features / errors for each of the traces and stores it in a :py:attr:`~brian2modelfitting.modelfitting.metric.Metric.metric.features` attribute
+
+ - :py:func:`~brian2modelfitting.modelfitting.metric.Metric.get_errors()`
+    weights features/multiple errors into one final error per each set of parameters and inputs stored in :py:attr:`~brian2modelfitting.modelfitting.metric.Metric.metric.errors`
+ - :py:func:`~brian2modelfitting.modelfitting.metric.Metric.calc()`
+    performs the error calculation across simulation for all parameters of each round
