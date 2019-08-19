@@ -1,5 +1,5 @@
-Model Fitting Examples
-======================
+Examples
+========
 
 .. toctree::
    :maxdepth: 2
