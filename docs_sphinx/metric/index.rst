@@ -14,7 +14,7 @@ modelfitting.
 Mean Square Error
 -----------------
 
-To be used with ``TraceFitter``. Calculated according to well known formula:
+:py:class:`~brian2modelfitting.modelfitting.metric.MSEMetric` is implemented to use with :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`. Calculated according to well known formula:
 
 .. math:: MSE ={\frac {1}{n}}\sum _{i=1}^{n}(Y_{i}-{\hat {Y_{i}}})^{2}
 
@@ -26,14 +26,14 @@ To be called in a following way:
   metric = MSEMetric()
 
 
-In ``OnlineTraceFitter`` mean square error gets calculated in online manner,
+In :py:class:`~brian2modelfitting.modelfitting.modelfitting.OnlineTraceFitter` mean square error gets calculated in online manner,
 with no need of specifying a metric object.
 
 
 GammaFactor
 -----------
 
-To be used with ``SpikeFitter``. Calculated according to:
+:py:class:`~brian2modelfitting.modelfitting.metric.GammaFactor` is implemented to use with :py:class:`~brian2modelfitting.modelfitting.modelfitting.SpikeFitter`. Calculated according to:
 
 
 .. math:: \Gamma = \left (\frac{2}{1-2\delta r_{exp}}\right) \left(\frac{N_{coinc} - 2\delta N_{exp}r_{exp}}{N_{exp} + N_{model}}\right)
@@ -60,17 +60,14 @@ Custom Metric
 -------------
 
 User is not limited to the provided in the module metrics. Modularity applies
-here as well, with provided abstract ``class Metric`` prepared for different
+here as well, with provided abstract class :py:class:`~brian2modelfitting.modelfitting.metric.Metric` prepared for different
 custom made metrics.
 
-New metric will need to be inherited from ``class Metric`` and specify following
+New metric will need to be inherited from :py:class:`~brian2modelfitting.modelfitting.metric.Metric` and specify following
 functions:
- - ``get_features()``
-    calculates features / errors for each of the traces and stores
+ - :py:class:`~brian2modelfitting.modelfitting.metric.Metric.get_features()` calculates features / errors for each of the traces and stores
     it in an attribute metric.features
- - ``get_errors()``
-    weights features/multiple errors into one final error per each
+ - :py:class:`~brian2modelfitting.modelfitting.metric.Metric.get_errors()` weights features/multiple errors into one final error per each
     set of parameters and inputs stored metric.errors.
- - ``calc()``
-    performs the error calculation across simulation for all parameters
+ - - :py:class:`~brian2modelfitting.modelfitting.metric.Metric.calc()` performs the error calculation across simulation for all parameters
     of each round

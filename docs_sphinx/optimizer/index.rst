@@ -17,7 +17,7 @@ Nevergrad
 .. _Nevergrad: https://github.com/facebookresearch/nevergrad
 
 Offers an extensive collection of algorithms that do not require gradient computation.
-Nevergrad optimizer can be specified in the following way:
+:py:class:`~brian2modelfitting.modelfitting.metric.NevergradOptimizer` can be specified in the following way:
 
 .. code:: python
 
@@ -64,7 +64,7 @@ and focuses on bayesian methods. Algorithms are based on scikit-learn minimize f
  - Sequential optimisation using decision trees [``'ET'``]
  - Random forest regressor [``'RF'``]
 
-User can also provide a custom made `sklearn regressor`. Skopt optimizer can be specified in the following way:
+User can also provide a custom made `sklearn regressor`. :py:class:`~brian2modelfitting.modelfitting.metric.SkoptOptimizer` can be specified in the following way:
 
 
 Parameters:
@@ -87,17 +87,12 @@ Custom Optimizer
 ----------------
 
 To use a different back-end optimization library, user can provide a
-custom class that inherits from provided abstract class:
-
-.. code:: python
-
-   Optimizer()
-
+custom class that inherits from provided abstract class :py:class:`~brian2modelfitting.modelfitting.metric.Optimizer`
 
 Follows `ask()/tell()` interface
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 User can plug in different optimization tool, as long as it follows ```ask() / tell```
-interface. Abstract ``class Optimizer`` prepared for different back-end libraries.
+interface. Abstract class :py:class:`~brian2modelfitting.modelfitting.metric.Optimizer` prepared for different back-end libraries.
 All of the optimizer specific arguments have to be provided upon
 optimizers initialization.
 
