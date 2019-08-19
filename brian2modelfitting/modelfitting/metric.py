@@ -62,13 +62,11 @@ def get_gamma_factor(source, target, delta, dt):
     return gamma
 
 
-class Metric(object):
+class Metric(metaclass=abc.ABCMeta):
     """
     Metic abstract class to define functions required for a custom metric
     To be used with modelfitting Fitters.
     """
-    __metaclass__ = abc.ABCMeta
-
     def __init__(self, **kwds):
         """Initialize the metric."""
         pass

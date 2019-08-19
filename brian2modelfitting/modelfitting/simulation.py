@@ -46,12 +46,10 @@ def set_states(init_dict, values):
         set_parameter_value(init_dict[obj_name], obj_values)
 
 
-class Simulation(object):
+class Simulation(metaclass=abc.ABCMeta):
     """
     Simluation class created to perform a simulation for fit_traces
     """
-    __metaclass__ = abc.ABCMeta
-
     def __init__(self):
         """pass"""
         pass
