@@ -231,8 +231,7 @@ class SkoptOptimizer(Optimizer):
         self.optim = skoptOptimizer(
             dimensions=instruments,
             base_estimator=self.method,
-            **self.kwds
-        )
+            **self.kwds)
 
     def ask(self, n_samples):
         return self.optim.ask(n_points=n_samples)
