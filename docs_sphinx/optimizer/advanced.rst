@@ -6,14 +6,13 @@ custom class that inherits from provided abstract class:
 
 .. code:: python
 
-  Optimizer()
-
+   Optimizer()
 
 
 Follows `ask()/tell()` interface
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 User can plug in different optimization tool, as long as it follows ```ask() / tell```
-interface. Abstract `class Optimizer` prepared for different back-end libraries.
+interface. Abstract ``class Optimizer`` prepared for different back-end libraries.
 All of the optimizer specific arguments have to be provided upon
 optimizers initialization.
 

@@ -15,7 +15,7 @@ Please report bugs at the `github issue tracker <https://github.com/brian-team/b
 Model fitting
 -------------
 
-The `brian2modelfitting` offers model fitting package, that allows for data driven optimization of custom
+The ``brian2modelfitting`` offers model fitting package, that allows for data driven optimization of custom
 models.
 
 The toolbox allows the user to find the best fit of the parameters for recorded traces and
@@ -23,9 +23,9 @@ spike trains. Just like Brian the Model Fitting Toolbox is designed to be easily
 save time through automatic parallelization of the simulations using code generation.
 
 Model Fitting provides three optimization classes:
- - `TraceFitter()`
- - `SpikeFitter()`
- - `OnlineTraceFitter()`
+ - ``TraceFitter()``
+ - ``SpikeFitter()``
+ - ``OnlineTraceFitter()``
 
 The class accept the a model and data as an input and returns best fit of parameters
 and corresponding error. Proposed solution can accept multiple traces to optimize over

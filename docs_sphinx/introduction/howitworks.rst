@@ -34,21 +34,21 @@ optimized specified as constants in a following way:
   '''
 
 Initialization of Fitter requires:
-  - `dt` - time step
-  - `input` - set of input traces (list or array)
-  - `output` - set of goal output (traces/spike trains) (list or array)
-  - `input_var` - name of the input trace variable (string)
-  - `output_var` - name of the output trace variable (string)
-  - `n_samples` - number of samples to draw in each round (limited by method)
-  - `reset`, and `threshold` in case of spiking neurons (can take refractory as well)
+  - ``dt`` - time step
+  - ``input`` - set of input traces (list or array)
+  - ``output`` - set of goal output (traces/spike trains) (list or array)
+  - ``input_var`` - name of the input trace variable (string)
+  - ``output_var`` - name of the output trace variable (string)
+  - ``n_samples`` - number of samples to draw in each round (limited by method)
+  - ``reset``, and ``threshold`` in case of spiking neurons (can take refractory as well)
 
 
 
-Additionally, upon call of `fit()`, object requires:
- - `n_rounds` - number of rounds to optimize over
+Additionally, upon call of ``fit()``, object requires:
+ - ``n_rounds`` - number of rounds to optimize over
  - parameters with ranges to be optimized over
 
-...as well as an `optimizer` and a `metric`
+...as well as an ``optimizer`` and a ``metric``
 
 Each free parameter of the model that shall be fitted is defined by two values:
 
@@ -60,20 +60,20 @@ Ready to use elements
 ---------------------
 
 Alongside three optimization classes:
- - `TraceFitter`
- - `SpikeFitter`
- - `OnlineTraceFitter`
+ - ``TraceFitter``
+ - ``SpikeFitter``
+ - ``OnlineTraceFitter``
 
 We also provide ready optimizers:
- - `NevergradOptimizer`
- - `SkoptOptimizer`
+ - ``NevergradOptimizer``
+ - ``SkoptOptimizer``
 
 and metrics:
- - `MSE` (for TraceFitter)
- - `GammaFactor` (for SpikeFitter)
+ - ``MSEMetric`` (for ``TraceFitter``)
+ - ``GammaFactor`` (for ``SpikeFitter``)
 
 
-Example of `TraceFitter()` with all of the necessary arguments:
+Example of ``TraceFitter()`` with all of the necessary arguments:
 
 .. code:: python
 
@@ -93,9 +93,9 @@ Example of `TraceFitter()` with all of the necessary arguments:
 Remarks
 -------
  - After performing first fitting, user can continue the optimization
-   with another `fitter.fit()` run.
+   with another ``fitter.fit()`` run.
 
- - Number of samples can not be changed between rounds or `fit()` calls,
+ - Number of samples can not be changed between rounds or ``fit()`` calls,
    due to parallelization of the simulations.
 
- - User is not allowed to change the optimizer or metric between `fit()` calls.
+.. warning:: User is not allowed to change the optimizer or metric between ``fit()`` calls.

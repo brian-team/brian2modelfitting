@@ -1,7 +1,7 @@
 Introduction
 ============
 
-The `brian2modelfitting` offers model fitting package, that allows for data driven optimization of custom
+The ``brian2modelfitting`` offers model fitting package, that allows for data driven optimization of custom
 models.
 
 The toolbox allows the user to find the best fit of the parameters for recorded traces and
@@ -9,9 +9,9 @@ spike trains. Just like Brian the Model Fitting Toolbox is designed to be easily
 save time through automatic parallelization of the simulations using code generation.
 
 Model provides three optimization classes:
- - `TraceFitter()`
- - `SpikeFitter()`
- - `OnlineTraceFitter()`
+ - ``TraceFitter()``
+ - ``SpikeFitter()``
+ - ``OnlineTraceFitter()``
 
 The class accept the a model and data as an input and returns best fit of parameters
 and corresponding error. Proposed solution can accept multiple traces to optimize over
@@ -39,7 +39,7 @@ Testing Model Fitting
 ---------------------
 
 Version on master branch gets automatically tested with Travis services.
-To test the code yourself, you will need to have `pytest` installed run a command:
+To test the code yourself, you will need to have ``pytest`` installed run a command:
 
 
 .. code:: python

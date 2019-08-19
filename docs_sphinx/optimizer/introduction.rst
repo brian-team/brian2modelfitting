@@ -28,10 +28,10 @@ Nevergrad optimizer can be specified in the following way:
 where method input is a string with specific optimization algorithm.
 
 **Available methods include:**
- - Differential evolution. ['DE']
- - Covariance matrix adaptation.['CMA']
- - Particle swarm optimization.['PSO']
- - Sequential quadratic programming.['SQP']
+ - Differential evolution. [``'DE'``]
+ - Covariance matrix adaptation.[``'CMA'``]
+ - Particle swarm optimization.[``'PSO'``]
+ - Sequential quadratic programming.[``'SQP'``]
 
 
 Nevergrad is not yet documented, to check all available methods use following code:
@@ -61,21 +61,21 @@ Skopt implements several methods for sequential model-based ("blackbox") optimiz
 and focuses on bayesian methods. Algorithms are based on scikit-learn minimize function.
 
 **Available Methods:**
- - Gaussian process-based minimization algorithms ['GP']
- - Sequential optimization using gradient boosted trees ['GBRT']
- - Sequential optimisation using decision trees ['ET']
- - Random forest regressor ['RF']
+ - Gaussian process-based minimization algorithms [``'GP'``]
+ - Sequential optimization using gradient boosted trees [``'GBRT'``]
+ - Sequential optimisation using decision trees [``'ET'``]
+ - Random forest regressor [``'RF'``]
 
-User can also provide a custom made sklearn regressor. Skopt optimizer can be specified in the following way:
+User can also provide a custom made `sklearn regressor`. Skopt optimizer can be specified in the following way:
 
 
 Parameters:
 
- - method = ["GP", "RF", "ET", "GBRT" or sklearn regressor, default="GP"]
- - n_initial_points [int, default=10]
- - acq_func
- - acq_optimizer
- - random_state
+ - ``method = ["GP", "RF", "ET", "GBRT" or sklearn regressor, default="GP"]``
+ - ``n_initial_points [int, default=10]``
+ - ``acq_func``
+ - ``acq_optimizer``
+ - ``random_state``
 
 For more detail check Optimizer documentation. https://scikit-optimize.github.io/#skopt.Optimizer
 
