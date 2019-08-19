@@ -233,7 +233,7 @@ class Fitter(metaclass=abc.ABCMeta):
             Dictionary of variables to be initialized with respective value
         restart bool
             Flag that reinitializes the Fitter to reset the optimization.
-            With restart True user is allowed to change optimizer/metric. 
+            With restart True user is allowed to change optimizer/metric.
         **params:
             bounds for each parameter
 

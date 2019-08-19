@@ -117,13 +117,22 @@ res, error = fitter.fit(n_rounds=2,
                         g_kd=[1*msiemens*cm**-2 * area, 1000*msiemens*cm**-2 * area],
                         )
 
+res, error = fitter.fit(n_rounds=2,
+                        optimizer=n_opt, metric=metric,
+                        callback='progressbar',
+                        param_init={'v': -65*mV},
+                        gl=[1e-8*siemens*cm**-2 * area, 1e-3*siemens*cm**-2 * area],
+                        g_na=[1*msiemens*cm**-2 * area, 2000*msiemens*cm**-2 * area],
+                        g_kd=[1*msiemens*cm**-2 * area, 1000*msiemens*cm**-2 * area],
+                        )
+
 all_output = fitter.results(format='dataframe')
 print(all_output)
 
 n_opt = NevergradOptimizer('PSO')
 
 res, error = fitter.fit(n_rounds=2,
-                        reset=True,
+                        restart=True,
                         optimizer=n_opt, metric=metric,
                         callback='progressbar',
                         param_init={'v': -65*mV},

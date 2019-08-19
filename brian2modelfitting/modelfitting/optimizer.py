@@ -125,8 +125,6 @@ class NevergradOptimizer(Optimizer):
     method : (str), optional
         The optimization method. By default differential evolution, can be
         chosen from any method in Nevergrad registry
-
-    TODO: specify kwds
     budget: int/None
         number of allowed evaluations
     num_workers: int
@@ -142,7 +140,7 @@ class NevergradOptimizer(Optimizer):
 
         self.method = method
         self.popsize = popsize
-        self.kwds = kwds  # TODO: check if kwds are a valible arguemnt
+        self.kwds = kwds
 
     def initialize(self, parameter_names, **params):
         for param in params.keys():
@@ -200,9 +198,7 @@ class SkoptOptimizer(Optimizer):
     method : (str), optional
         The optimization method. Possibilities: "GP", "RF", "ET", "GBRT" or
         sklearn regressor, default="GP"
-
-    TODO: specify kwds
-    n_calls [int, default=100]:
+    n_calls: (int, default=100)
         Number of calls to `func`.
     """
     def __init__(self, method='GP', **kwds):
@@ -213,7 +209,7 @@ class SkoptOptimizer(Optimizer):
                                   optimization or a regressor".format(method))
 
         self.method = method
-        self.kwds = kwds  # TODO: check if kwds are a valible arguemnt
+        self.kwds = kwds
 
     def initialize(self, parameter_names, **params):
         for param in params.keys():
