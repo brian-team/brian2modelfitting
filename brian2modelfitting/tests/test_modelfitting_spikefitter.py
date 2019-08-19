@@ -11,20 +11,20 @@ from brian2modelfitting import (NevergradOptimizer, SkoptOptimizer, TraceFitter,
 from brian2modelfitting.modelfitting.modelfitting import (get_param_dic, get_spikes)
 from abc import ABCMeta
 
-input_traces = zeros((10,5))*volt
-for i in range(5):
-    input_traces[5:,i]=i*10*mV
-
-output_traces = 10*nS*input_traces
-
-model = Equations('''
-    I = g*(v-E) : amp
-    g : siemens (constant)
-    E : volt (constant)
-    ''')
-
-n_opt = NevergradOptimizer()
-metric =  MSEMetric()
+# input_traces = zeros((10,5))*volt
+# for i in range(5):
+#     input_traces[5:,i]=i*10*mV
+#
+# output_traces = 10*nS*input_traces
+#
+# model = Equations('''
+#     I = g*(v-E) : amp
+#     g : siemens (constant)
+#     E : volt (constant)
+#     ''')
+#
+# n_opt = NevergradOptimizer()
+# metric =  MSEMetric()
 
 def test_get_param_dic():
     d = get_param_dic([1, 2], ['a', 'b'], 2, 2)
@@ -46,23 +46,6 @@ def test_get_spikes():
     pass
 
 
-def test_tracefitter_init():
-    tf = TraceFitter(dt=0.1*ms,
-                     model=model,
-                     input_var='v',
-                     output_var='I',
-                     input=input_traces,
-                     output=output_traces,
-                     n_samples=10,)
-
-    attr_list = ['dt', 'results_', 'simulator', 'parameter_names', 'n_traces',
-                 'duration', 'n_neurons', 'n_samples', 'method', 'threshold',
-                 'reset', 'refractory', 'input', 'output', 'output_var',
-                 'best_res', 'input_traces', 'model', 'network', 'optimizer',
-                 'metric',]
-    for attr in attr_list:
-        assert hasattr(tf, attr)
-
 def test_fitter_setup_neuron_group():
     pass
 
@@ -78,15 +61,6 @@ def test_fitter_results():
 def test_fitter_generate():
     pass
 
-# TraceFitter class
-
-def test_tracefitter_calc_errors():
-    pass
-
-def test_tracefitter_generate_traces():
-    pass
-
-
 # SpikeFitter class
 def test_spikefitter_init():
     pass
@@ -95,15 +69,4 @@ def test_spikefitter_calc_errors():
     pass
 
 def test_spikefitter_generate_traces():
-    pass
-
-
-# OnlineTraceFitter class
-def test_onlinetracefitter_init():
-    pass
-
-def test_onlinetracefitter_calc_errors():
-    pass
-
-def test_onlinetracefitter_generate_traces():
     pass

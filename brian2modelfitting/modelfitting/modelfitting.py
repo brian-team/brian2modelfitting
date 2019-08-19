@@ -36,6 +36,22 @@ def get_spikes(monitor):
     return spikes
 
 
+def setup_fit():
+    """
+    Function sets up simulator in one of the two availabel modes: runtime
+    or standalone.
+
+    Returns
+    -------
+    simulator : object ~brian2modelfitting.modelfitting.Simulator
+    """
+    simulators = {
+        'CPPStandaloneDevice': CPPStandaloneSimulation(),
+        'RuntimeDevice': RuntimeSimulation()
+    }
+
+    return simulators[get_device().__class__.__name__]
+
 class Fitter(metaclass=abc.ABCMeta):
     """
     Base Fitter class for model fitting applications.
@@ -90,8 +106,7 @@ class Fitter(metaclass=abc.ABCMeta):
         self.dt = dt
 
         self.results_, self.errors = [], []
-
-        self.simulator = self.setup_fit()
+        self.simulator = setup_fit()
 
         self.parameter_names = model.parameter_names
         self.n_traces, n_steps = input.shape
@@ -118,21 +133,6 @@ class Fitter(metaclass=abc.ABCMeta):
         self.metric = None
 
 
-    def setup_fit(self):
-        """
-        Function sets up simulator in one of the two availabel modes: runtime
-        or standalone.
-
-        Returns
-        -------
-        simulator : object ~brian2modelfitting.modelfitting.Simulator
-        """
-        simulators = {
-            'CPPStandaloneDevice': CPPStandaloneSimulation(),
-            'RuntimeDevice': RuntimeSimulation()
-        }
-
-        return simulators[get_device().__class__.__name__]
 
     def setup_neuron_group(self, n_neurons, namespace, name='neurons'):
         """

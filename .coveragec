@@ -5,7 +5,7 @@ branch = True
 source = brian2modelfitting
 omit =
     */brian2modelfitting/tests/*
-
+    */examples/*
 [report]
 # Regexes for lines to exclude from consideration
 exclude_lines =
