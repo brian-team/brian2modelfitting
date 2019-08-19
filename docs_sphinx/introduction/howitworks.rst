@@ -44,7 +44,9 @@ Initialization of Fitter requires:
 
 
 
-Additionally, upon call of ``fit()``, object requires:
+Additionally, upon call of :py:func:`~brian2modelfitting.modelfitting.modelfitting.Fitter.fit()`,
+object requires:
+
  - ``n_rounds`` - number of rounds to optimize over
  - parameters with ranges to be optimized over
 
@@ -93,9 +95,11 @@ Example of ``TraceFitter()`` with all of the necessary arguments:
 Remarks
 -------
  - After performing first fitting, user can continue the optimization
-   with another ``fitter.fit()`` run.
+   with another :py:func:`~brian2modelfitting.modelfitting.modelfitting.Fitter.fit()` run.
 
- - Number of samples can not be changed between rounds or ``fit()`` calls,
-   due to parallelization of the simulations.
+ - Number of samples can not be changed between rounds or :py:func:`~brian2modelfitting.modelfitting.modelfitting.Fitter.fit()`
+   calls, due to parallelization of the simulations.
 
-.. warning:: User is not allowed to change the optimizer or metric between ``fit()`` calls.
+.. warning::
+  User is not allowed to change the optimizer or metric between :py:func:`~brian2modelfitting.modelfitting.modelfitting.Fitter.fit()`
+  calls.

@@ -11,15 +11,15 @@ objects, to help the user with easier and more flexible applications.
 Parameters initialization
 -------------------------
 
-Whilst running ``fitter.fit()`` user can specify values with which model evaluation
+Whilst running :py:func:`~brian2modelfitting.modelfitting.modelfitting.Fitter.fit()` user can specify values with which model evaluation
 of differential equations start.
 
 The fitting functions accept additional dictionary input to address that. To do so,
-dictionary argument has to be added to ``fit()`` call:
+dictionary argument has to be added to :py:func:`~brian2modelfitting.modelfitting.modelfitting.Fitter.fit()` call:
 
 .. code:: python
 
- param_init = {'v': -30*mV}
+   param_init = {'v': -30*mV}
 
 
 .. code:: python
@@ -212,7 +212,7 @@ OnlineTraceFitter
 
 ``OnlineTraceFitter`` was created to work with long traces or big optimization.
 This ``Fitter`` uses online Mean Square Error as a metric.
-When ``fit()`` is called there is no need of specifying a metric, that is by
+When :py:func:`~brian2modelfitting.modelfitting.modelfitting.Fitter.fit()` is called there is no need of specifying a metric, that is by
 default set to None. Instead the errors are calculated with use of brian's ``run_regularly``,
 with each simulation.
 
