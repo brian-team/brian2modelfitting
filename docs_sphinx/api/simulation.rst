@@ -1,5 +1,5 @@
-modelfitting.simulation module
-------------------------------
+simulation module
+-----------------
 
 .. automodule:: brian2modelfitting.modelfitting.simulation
    :members:

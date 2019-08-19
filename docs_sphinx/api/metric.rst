@@ -1,5 +1,5 @@
-modelfitting.metric module
---------------------------
+metric module
+-------------
 
 .. automodule:: brian2modelfitting.modelfitting.metric
    :members:

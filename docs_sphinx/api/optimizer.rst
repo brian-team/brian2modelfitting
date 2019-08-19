@@ -1,5 +1,6 @@
-modelfitting.optimizer module
------------------------------
+optimizer module
+----------------
+
 
 .. automodule:: brian2modelfitting.modelfitting.optimizer
    :members:

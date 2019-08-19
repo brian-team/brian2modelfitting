@@ -1,5 +1,5 @@
-modelfitting.modelfitting module
----------------------------------------------------
+modelfitting module
+-------------------
 
 .. automodule:: brian2modelfitting.modelfitting.modelfitting
    :members:
