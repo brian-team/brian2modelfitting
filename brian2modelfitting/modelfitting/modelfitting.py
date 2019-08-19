@@ -154,10 +154,7 @@ class Fitter(metaclass=abc.ABCMeta):
         """
         neurons = NeuronGroup(n_neurons, self.model, method=self.method,
                               threshold=self.threshold, reset=self.reset,
-                              refractory=self.refractory, name=name)
-
-        for name in namespace:
-            neurons.namespace[name] = namespace[name]
+                              refractory=self.refractory, name=name, namespace=namespace)
 
         return neurons
 
@@ -439,10 +436,10 @@ class TraceFitter(Fitter):
         errors = metric.calc(traces, self.output, self.n_traces)
         return errors
 
-    def generate_traces(self, params=None, param_init=None, level=1):
+    def generate_traces(self, params=None, param_init=None, level=0):
         """Generates traces for best fit of parameters and all inputs"""
         fits = self.generate(params=params, output_var=self.output_var,
-                             param_init=param_init, level=1)
+                             param_init=param_init, level=level+1)
         return fits
 
 
@@ -482,10 +479,10 @@ class SpikeFitter(Fitter):
         errors = metric.calc(spikes, self.output, self.n_traces)
         return errors
 
-    def generate_spikes(self, params=None, param_init=None):
+    def generate_spikes(self, params=None, param_init=None, level=0):
         """Generates traces for best fit of parameters and all inputs"""
         fits = self.generate(params=params, output_var='spikes',
-                             param_init=param_init, level=1)
+                             param_init=param_init, level=level+1)
         return fits
 
 
@@ -541,8 +538,8 @@ class OnlineTraceFitter(Fitter):
         errors = mean(errors.reshape((self.n_samples, self.n_traces)), axis=1)
         return array(errors)
 
-    def generate_traces(self, params=None, param_init=None):
+    def generate_traces(self, params=None, param_init=None, level=0):
         """Generates traces for best fit of parameters and all inputs"""
         fits = self.generate(params=params, output_var=self.output_var,
-                             param_init=param_init, level=1)
+                             param_init=param_init, level=level+1)
         return fits
