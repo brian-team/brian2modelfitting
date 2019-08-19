@@ -12,9 +12,9 @@ def callback_none(res, errors, parameters, k):
 
 class ProgressBar(object):
     """Setup for tqdm progress bar in Fitter"""
-    def __init__(self, toolbar_width=10):
+    def __init__(self, toolbar_width=10, **kwds):
         self.toolbar_width = toolbar_width
-        self.t = tqdm(total=toolbar_width)
+        self.t = tqdm(total=toolbar_width, **kwds)
 
     def __call__(self, res, errors, parameters, k):
         self.t.update(1)
