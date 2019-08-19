@@ -50,10 +50,6 @@ class Simulation(metaclass=abc.ABCMeta):
     """
     Simluation class created to perform a simulation for fit_traces
     """
-    def __init__(self):
-        """pass"""
-        pass
-
     @abc.abstractmethod
     def initialize(self, network):
         """

@@ -7,9 +7,24 @@ from numpy.testing.utils import assert_equal
 from brian2 import zeros, Equations, SpikeMonitor
 from brian2 import nS, mV, volt, ms
 from brian2modelfitting import (NevergradOptimizer, SkoptOptimizer, TraceFitter,
-                                OnlineTraceFitter, SpikeFitter)
+                                OnlineTraceFitter, SpikeFitter, MSEMetric)
 from brian2modelfitting.modelfitting.modelfitting import (get_param_dic, get_spikes)
+from abc import ABCMeta
 
+# input_traces = zeros((10,5))*volt
+# for i in range(5):
+#     input_traces[5:,i]=i*10*mV
+#
+# output_traces = 10*nS*input_traces
+#
+# model = Equations('''
+#     I = g*(v-E) : amp
+#     g : siemens (constant)
+#     E : volt (constant)
+#     ''')
+#
+# n_opt = NevergradOptimizer()
+# metric =  MSEMetric()
 
 def test_get_param_dic():
     d = get_param_dic([1, 2], ['a', 'b'], 2, 2)
@@ -32,9 +47,17 @@ def test_get_spikes():
 
 
 # Fitter class
-def test_fitter_init():
-    # Fitter(dt=0.1*ms, model='')
-    pass
+# def test_fitter_init():
+#     fitter = Fitter(dt=0.1*ms,
+#                     model=model,
+#                     input_var='v',
+#                     output_var='I',
+#                     input=input_traces,
+#                     output=output_traces,
+#                     n_samples=10,)
+
+    # assert hasattr(fitter, 'dt')
+
 
 def test_fitter_setup_fit():
     pass

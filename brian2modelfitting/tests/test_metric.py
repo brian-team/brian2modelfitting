@@ -28,7 +28,6 @@ def test_get_gamma_factor():
 
 
 def test_init():
-    Metric()
     MSEMetric()
     GammaFactor(10*ms, 0.1*ms)
 

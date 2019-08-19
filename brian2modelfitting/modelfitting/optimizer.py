@@ -9,48 +9,34 @@ from nevergrad import instrumentation as inst
 from nevergrad.optimization import optimizerlib, registry
 
 
-class Optimizer(object):
+def calc_bounds(parameter_names, **params):
+    """
+    Verify and get the provided for parameters bounds
+
+    Parameters
+    ----------
+    parameter_names: list
+        list of parameter names in use
+    **params:
+        bounds for each parameter
+    """
+    for param in parameter_names:
+        if (param not in params):
+            raise Exception("Bounds must be set for parameter %s" % param)
+
+    bounds = []
+    for name in parameter_names:
+        bounds.append(params[name])
+
+    return bounds
+
+
+class Optimizer(metaclass=abc.ABCMeta):
     """
     Optimizer class created as a base for optimization initialization and
     performance with different libraries. To be used with modelfitting
     Fitter.
     """
-    __metaclass__ = abc.ABCMeta
-
-    def __init__(self, method='DE', **kwds):
-        """
-        Initialize the given optimizator with method and specific arguments
-
-        Parameters
-        ----------
-        method: string
-            optimization method
-        **kwds:
-            parameters to be passed to optimization init
-        """
-        pass
-
-    def calc_bounds(self, parameter_names, **params):
-        """
-        Verify and get the provided for parameters bounds
-
-        Parameters
-        ----------
-        parameter_names: list
-            list of parameter names in use
-        **params:
-            bounds for each parameter
-        """
-        for param in parameter_names:
-            if (param not in params):
-                raise Exception("Bounds must be set for parameter %s" % param)
-
-        bounds = []
-        for name in parameter_names:
-            bounds.append(params[name])
-
-        return bounds
-
     @abc.abstractmethod
     def initialize(self, parameter_names, **params):
         """
@@ -148,7 +134,7 @@ class NevergradOptimizer(Optimizer):
                 raise Exception("Parameter %s must be defined as a parameter \
                                  in the model" % param)
 
-        bounds = self.calc_bounds(parameter_names, **params)
+        bounds = calc_bounds(parameter_names, **params)
 
         instruments = []
         for i, name in enumerate(parameter_names):
@@ -217,7 +203,7 @@ class SkoptOptimizer(Optimizer):
                 raise Exception("Parameter %s must be defined as a parameter \
                                  in the model" % param)
 
-        bounds = self.calc_bounds(parameter_names, **params)
+        bounds = calc_bounds(parameter_names, **params)
 
         instruments = []
         for i, name in enumerate(parameter_names):

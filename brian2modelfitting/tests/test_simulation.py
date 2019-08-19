@@ -31,7 +31,6 @@ wrong_net = Network(NeuronGroup(1, model, name='neurons2'))
 
 
 def test_init():
-    Simulation()
     RuntimeSimulation()
     CPPStandaloneSimulation()
 

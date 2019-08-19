@@ -3,7 +3,7 @@ Test the optimizer class
 '''
 import numpy as np
 from numpy.testing.utils import assert_equal, assert_raises
-from brian2modelfitting import Optimizer, NevergradOptimizer, SkoptOptimizer
+from brian2modelfitting import Optimizer, NevergradOptimizer, SkoptOptimizer, calc_bounds
 
 from skopt import Optimizer as SOptimizer
 from nevergrad import instrumentation as inst
@@ -19,7 +19,7 @@ CM = CandidateMaker(instrum)
 
 
 def test_init():
-    Optimizer()
+    # Optimizer()
     NevergradOptimizer()
     SkoptOptimizer()
 
@@ -37,13 +37,10 @@ def test_init_kwds():
 
 
 def test_calc_bounds():
-    opt = Optimizer()
-    assert_raises(Exception, opt.calc_bounds, {'a', 'b'}, a=[1, 2])
-
-    bounds = opt.calc_bounds({'a'}, a=[0, 1])
+    bounds = calc_bounds({'a'}, a=[0, 1])
     assert_equal(bounds, [[0, 1]])
 
-    bounds = opt.calc_bounds(['a', 'b'], a=[0, 1], b=[2, 3])
+    bounds = calc_bounds(['a', 'b'], a=[0, 1], b=[2, 3])
     assert_equal(bounds, [[0, 1], [2, 3]])
 
 

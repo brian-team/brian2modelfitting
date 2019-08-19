@@ -67,10 +67,6 @@ class Metric(metaclass=abc.ABCMeta):
     Metic abstract class to define functions required for a custom metric
     To be used with modelfitting Fitters.
     """
-    def __init__(self, **kwds):
-        """Initialize the metric."""
-        pass
-
     @abc.abstractmethod
     def get_features(self, traces, output):
         """
@@ -102,7 +98,6 @@ class Metric(metaclass=abc.ABCMeta):
         """
         pass
 
-    @abc.abstractmethod
     def calc(self, traces, output, n_traces):
         """
         Perform the error calculation across all parameters,
@@ -133,9 +128,9 @@ class Metric(metaclass=abc.ABCMeta):
 class MSEMetric(Metric):
     __doc__ = "Mean Square Error between goal and calculated output." + \
               Metric.get_features.__doc__
-
-    def __init__(self):
-        super(Metric, self).__init__()
+    def __init__(self, **kwds):
+            """Initialize the metric."""
+            pass
 
     def get_features(self, traces, output, n_traces):
         mselist = []
@@ -178,7 +173,6 @@ class GammaFactor(Metric):
         dt: time step [ms]
         delta: time window [ms]
         """
-        super(Metric, self)
         if delta is None:
             raise AssertionError('delta (time window for gamma factor), \
                                  has to be set to ms')
