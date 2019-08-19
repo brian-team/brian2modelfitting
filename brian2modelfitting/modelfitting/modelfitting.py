@@ -209,6 +209,7 @@ class Fitter(metaclass=abc.ABCMeta):
             n_rounds=1,
             callback='text',
             param_init=None,
+            restart=False,
             **params):
         """
         Run the optimization algorithm for given amount of rounds with given
@@ -230,6 +231,9 @@ class Fitter(metaclass=abc.ABCMeta):
             If callback returns True the fitting execution is interrupted.
         param_init: dict
             Dictionary of variables to be initialized with respective value
+        restart bool
+            Flag that reinitializes the Fitter to reset the optimization.
+            With restart True user is allowed to change optimizer/metric. 
         **params:
             bounds for each parameter
 
@@ -249,20 +253,22 @@ class Fitter(metaclass=abc.ABCMeta):
         if not (isinstance(metric, Metric) or metric is None):
             raise TypeError("metric has to be a child of class Metric or None")
 
-        if not self.metric is None:
+        if not self.metric is None and restart is False:
             if not metric is self.metric:
                 raise Exception("You can not change the metric between fits")
 
-        if not self.optimizer is None:
+        if not self.optimizer is None and restart is False:
             if not optimizer is self.optimizer:
                 raise Exception("You can not change the optimizer between fits")
 
+        if self.optimizer is None or restart is True:
+            self.results_, self.errors = [], []
+            optimizer.initialize(self.parameter_names, **params)
 
         self.optimizer = optimizer
         self.metric = metric
 
         callback = callback_setup(callback, n_rounds)
-        optimizer.initialize(self.parameter_names, **params)
 
         # Run Optimization Loop
         for k in range(n_rounds):

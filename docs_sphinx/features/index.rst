@@ -28,6 +28,20 @@ dictionary argument has to be added to :py:func:`~brian2modelfitting.modelfittin
    result, error  = fitter.run(..., param_init = {'v': -30*mV})
 
 
+Restart
+-------
+TODO: add better description
+
+By default fitter works in continuous optimization mode between run, where all of the
+parameters drawn are being evaluated.
+
+Through changing the flag ``restart`` to ``True``, user can reset the optimizer and
+start the optimization from scratch.
+
+Used by Fitter optimizer and metric can only be changed when the flat is `True`.
+
+
+
 
 Callback function
 -----------------

@@ -117,7 +117,13 @@ res, error = fitter.fit(n_rounds=2,
                         g_kd=[1*msiemens*cm**-2 * area, 1000*msiemens*cm**-2 * area],
                         )
 
+all_output = fitter.results(format='dataframe')
+print(all_output)
+
+n_opt = NevergradOptimizer('PSO')
+
 res, error = fitter.fit(n_rounds=2,
+                        reset=True,
                         optimizer=n_opt, metric=metric,
                         callback='progressbar',
                         param_init={'v': -65*mV},
@@ -125,6 +131,10 @@ res, error = fitter.fit(n_rounds=2,
                         g_na=[1*msiemens*cm**-2 * area, 2000*msiemens*cm**-2 * area],
                         g_kd=[1*msiemens*cm**-2 * area, 1000*msiemens*cm**-2 * area],
                         )
+
+all_output = fitter.results(format='dataframe')
+print(all_output)
+
 
 fitter = TraceFitter(model=eqs, input_var='I', output_var='v',
                      input=inp_trace * amp, output=out_trace*mV, dt=dt,
