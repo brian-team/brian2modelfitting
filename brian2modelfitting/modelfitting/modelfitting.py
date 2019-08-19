@@ -210,7 +210,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
     def fit(self, optimizer=None, metric=None,
             n_rounds=1,
-            callback='progressbar',
+            callback='text',
             param_init=None,
             **params):
         """

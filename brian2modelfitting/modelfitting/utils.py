@@ -3,9 +3,11 @@ from types import FunctionType
 
 
 def callback_text(res, errors, parameters, k):
+    """Default callback print-out for Fitters"""
     print("Round {}: fit {} with error: {}".format(k, res, min(errors)))
 
 def callback_none(res, errors, parameters, k):
+    """Non-verbose callback"""
     pass
 
 class ProgressBar(object):
