@@ -15,16 +15,18 @@ def test_firing_rate():
 
 
 def test_get_gamma_factor():
-    # two same traces
-    # two different traces
-    # src = [7, 9, 11] * ms
-    # src2 = [1, 2, 3] * ms
-    # trg = [0, 2, 4, 6, 8] * ms
-    #
-    # get_gamma_factor(trg, trg, delta=12*ms, dt=0.1*ms)
-    # get_gamma_factor(src2, trg, delta=12*ms, dt=0.1*ms)
-    # get_gamma_factor(src, src2, delta=5*ms, dt=0.1*ms)
-    pass
+    src = [7, 9, 11] * ms
+    src2 = [1, 2, 3] * ms
+    trg = [0, 2, 4, 6, 8] * ms
+
+    gf0 = get_gamma_factor(trg, trg, delta=12*ms, dt=0.1*ms)
+    gf1 = get_gamma_factor(src2, trg, delta=12*ms, dt=0.1*ms)
+    gf2 = get_gamma_factor(src, src2, delta=5*ms, dt=0.1*ms)
+
+    assert_equal(gf0, 1.0)
+    assert gf1 > 1.0
+    assert gf2 > 1.0
+    assert gf1 > gf2
 
 
 def test_init():

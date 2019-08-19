@@ -15,9 +15,11 @@ def test_callback_text(capsys):
     c, _ = capsys.readouterr()
     assert_equal(c, "Round 3: fit {'a': 1} with error: 1.2\n")
 
+
 def test_callback_none():
     c = callback_none({'a':1}, [1.2], [1, 2, 3], 3)
     assert isinstance(c, type(None))
+
 
 def test_ProgressBar():
     pb = ProgressBar(toolbar_width=10)
@@ -45,6 +47,7 @@ def test_callback_setup():
     assert callable(c)
     x = c({'a':1}, [1.2], [1, 2, 3], 3)
     assert_equal(x, [1, 2, 3])
+
 
 def test_make_dic():
     names = ['a', 'b']
