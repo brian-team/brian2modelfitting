@@ -10,5 +10,6 @@ objects, to help the user with easier and more flexible applications.
    parameters
    callback
    generate
-   standalone
    results
+   standalone
+   onlinefitting
