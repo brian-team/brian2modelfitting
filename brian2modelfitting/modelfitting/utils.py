@@ -29,10 +29,10 @@ def callback_setup(set_type, n_rounds):
         callback = callback_text
     elif set_type == 'progressbar':
         callback = ProgressBar(n_rounds)
-    elif type(set_type) is FunctionType:
-        callback = set_type
     elif set_type is None:
         callback = callback_none
+    elif type(set_type) is FunctionType:
+        callback = set_type
     else:
         raise TypeError("callback has to be a str ('text' or 'progressbar'),\
                          callable or None")

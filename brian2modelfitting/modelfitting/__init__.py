@@ -8,7 +8,7 @@ from .metric import *
 from .simulation import *
 from .utils import *
 
-__all__ = ['callback_setup', 'callback_text', 'make_dic',
+__all__ = ['callback_setup', 'callback_text', 'make_dic', 'callback_none',
            'Optimizer', 'NevergradOptimizer', 'SkoptOptimizer',
            'Simulation', 'RuntimeSimulation', 'CPPStandaloneSimulation',
            'MSEMetric', 'Metric', 'GammaFactor', 'get_gamma_factor', 'firing_rate',
