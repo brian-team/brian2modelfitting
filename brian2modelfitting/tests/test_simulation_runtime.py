@@ -10,8 +10,8 @@ from brian2.devices.device import Dummy
 from brian2modelfitting import Simulation, RuntimeSimulation
 from brian2modelfitting.modelfitting.simulation import (initialize_neurons,
                                                         initialize_parameter)
-
 from brian2.devices.device import reinit_devices
+
 
 model = Equations('''
     I = g*(v-E) : amp

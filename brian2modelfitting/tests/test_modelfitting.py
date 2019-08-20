@@ -5,7 +5,7 @@ import pytest
 # import numpy as np
 from numpy.testing.utils import assert_equal
 from brian2 import (zeros, Equations, NeuronGroup, StateMonitor, TimedArray,
-                    nS, mV, volt, ms, start_scope)
+                    nS, mV, volt, ms, nA, start_scope)
 from brian2modelfitting import (NevergradOptimizer, TraceFitter, MSEMetric,
                                 OnlineTraceFitter, Simulation, Metric,
                                 Optimizer, GammaFactor)
@@ -238,12 +238,50 @@ def test_fit_restart_errors(setup):
                restart=False,)
 
 
-def test_fit_param_init():
-    pass
+def test_fit_restart_change(setup):
+    dt = setup
+    tf = TraceFitter(dt=dt,
+                     model=model,
+                     input_var='v',
+                     output_var='I',
+                     input=input_traces,
+                     output=output_traces,
+                     n_samples=2,)
+
+    results, errors = tf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             g=[1*nS, 30*nS],
+                             restart=False,)
+
+    n_opt2 = NevergradOptimizer('PSO')
+    results2, errors2 = tf.fit(n_rounds=2,
+                               optimizer=n_opt2,
+                               metric=metric,
+                               g=[1*nS, 30*nS],
+                               restart=True,)
 
 
+# def test_fitter_generate_traces(setup):
+    # dt = setup
 def test_fitter_generate_traces():
-    pass
+    tf = TraceFitter(dt=0.1*ms,
+                     model=model,
+                     input_var='v',
+                     output_var='I',
+                     input=input_traces,
+                     output=output_traces,
+                     n_samples=2,)
+
+    results, errors = tf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             g=[1*nS, 30*nS],
+                             restart=False,)
+    traces = tf.generate_traces()
+    print(traces)
+
+test_fitter_generate_traces()
 
 
 def test_fitter_results():
