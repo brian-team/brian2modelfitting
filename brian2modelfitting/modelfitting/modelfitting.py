@@ -7,6 +7,7 @@ from brian2.input import TimedArray
 from brian2.equations.equations import Equations
 from .simulation import RuntimeSimulation, CPPStandaloneSimulation
 from .metric import Metric
+from .optimizer import Optimizer
 from .utils import callback_setup, make_dic
 
 
@@ -250,8 +251,11 @@ class Fitter(metaclass=abc.ABCMeta):
                     raise ValueError("%s is not a model variable or an \
                                       identifier in the model")
 
-        if not (isinstance(metric, Metric) or metric is None):
-            raise TypeError("metric has to be a child of class Metric or None")
+        if not (isinstance(metric, Metric)) or metric is None:
+            raise TypeError("metric has to be a child of class Metric")
+
+        if not (isinstance(optimizer, Optimizer)) or optimizer is None:
+            raise TypeError("metric has to be a child of class Optimizer")
 
         if not self.metric is None and restart is False:
             if not metric is self.metric:
