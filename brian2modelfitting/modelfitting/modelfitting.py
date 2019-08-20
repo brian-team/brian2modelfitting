@@ -53,6 +53,7 @@ def setup_fit():
 
     return simulators[get_device().__class__.__name__]
 
+
 class Fitter(metaclass=abc.ABCMeta):
     """
     Base Fitter class for model fitting applications.
@@ -100,7 +101,6 @@ class Fitter(metaclass=abc.ABCMeta):
             if device.has_been_run is True:
                 raise Exception("To run another fitter in standalone mode you need \
                                  to create new script")
-        if method is None: method = 'exponential_euler'
         if dt is None:
             raise ValueError('dt (sampling frequency of the input) must be set')
         defaultclock.dt = dt
@@ -459,6 +459,7 @@ class SpikeFitter(Fitter):
                  reset=None, refractory=False, threshold=None,
                  callback=None, n_samples=None, level=0):
         """Initialize the fitter."""
+        if method is None: method = 'exponential_euler'
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method)
 

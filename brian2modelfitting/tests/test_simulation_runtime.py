@@ -1,15 +1,17 @@
 '''
-Test the simulation class
+Test the simulation class - runtime
 '''
+import pytest
 import numpy as np
 from numpy.testing.utils import assert_equal, assert_raises
 from brian2 import (Equations, NeuronGroup, StateMonitor, Network, ms,
-                    defaultclock, device, start_scope)
+                    start_scope)
 from brian2.devices.device import Dummy
 from brian2modelfitting import Simulation, RuntimeSimulation
 from brian2modelfitting.modelfitting.simulation import (initialize_neurons,
                                                         initialize_parameter)
 
+from brian2.devices.device import reinit_devices
 
 model = Equations('''
     I = g*(v-E) : amp
@@ -18,16 +20,24 @@ model = Equations('''
     E : volt (constant)
     ''')
 
-dt = 0.1 * ms
-duration = 10 * ms
-defaultclock.dt = dt
-
 neurons = NeuronGroup(1, model, name='neurons')
 monitor = StateMonitor(neurons, 'I', record=True, name='monitor')
 
 net = Network(neurons, monitor)
 empty_net = Network()
 wrong_net = Network(NeuronGroup(1, model, name='neurons2'))
+
+
+@pytest.fixture()
+def setup(request):
+    dt = 0.1 * ms
+    duration = 10 * ms
+
+    def fin():
+        reinit_devices()
+    request.addfinalizer(fin)
+
+    return dt, duration
 
 
 def test_init():
@@ -39,12 +49,12 @@ def test_initialize_parameter():
     g_init = initialize_parameter(neurons.__getattr__('g'), 100)
     assert(isinstance(g_init, Dummy))
 
+
 def test_initialize_neurons():
     params_init = initialize_neurons(['g', 'E'], neurons, {'g': 100, 'E': 10})
     assert(isinstance(params_init, dict))
     assert(isinstance(params_init['g'], Dummy))
     assert(isinstance(params_init['E'], Dummy))
-
 
 
 def test_initialize_simulation_runtime():
@@ -58,7 +68,8 @@ def test_initialize_simulation_runtime():
     assert_raises(Exception, rts.initialize, wrong_net)
 
 
-def test_run_simulation_runtime():
+def test_run_simulation_runtime(setup):
+    dt, duration = setup
     start_scope()
 
     neurons = NeuronGroup(1, model, name='neurons')

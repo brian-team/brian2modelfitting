@@ -1,14 +1,16 @@
 '''
-Test the simulation class
+Test the simulation class - standalone
 '''
+import pytest
 import numpy as np
 from numpy.testing.utils import assert_equal, assert_raises
 from brian2 import (Equations, NeuronGroup, StateMonitor, Network, ms,
-                    defaultclock, device, start_scope)
+                    device, start_scope)
 from brian2.devices.device import Dummy
 from brian2modelfitting import Simulation, CPPStandaloneSimulation
 from brian2modelfitting.modelfitting.simulation import (initialize_neurons,
                                                         initialize_parameter)
+from brian2.devices.device import reinit_devices
 
 
 model = Equations('''
@@ -18,10 +20,6 @@ model = Equations('''
     E : volt (constant)
     ''')
 
-dt = 0.1 * ms
-duration = 10 * ms
-defaultclock.dt = dt
-
 neurons = NeuronGroup(1, model, name='neurons')
 monitor = StateMonitor(neurons, 'I', record=True, name='monitor')
 
@@ -30,9 +28,22 @@ empty_net = Network()
 wrong_net = Network(NeuronGroup(1, model, name='neurons2'))
 
 
+@pytest.fixture()
+def setup(request):
+    dt = 0.1 * ms
+    duration = 10 * ms
+
+    def fin():
+        reinit_devices()
+    request.addfinalizer(fin)
+
+    return dt, duration
+
+
 def test_init():
     sts = CPPStandaloneSimulation()
     assert isinstance(sts, Simulation)
+
 
 def test_initialize_parameter():
     g_init = initialize_parameter(neurons.__getattr__('g'), 100)
@@ -57,19 +68,23 @@ def test_initialize_simulation_standalone():
     assert(isinstance(sas.network, Network))
 
 
-def test_run_simulation_standalone():
+def test_run_simulation_standalone(setup):
+    dt, duration = setup
     start_scope()
 
     neurons = NeuronGroup(1, model, name='neurons')
     monitor = StateMonitor(neurons, 'I', record=True, name='monitor')
     net = Network(neurons, monitor)
 
+    device.reinit()
+    device.activate()
     device.has_been_run = False
     sas = CPPStandaloneSimulation()
     sas.initialize(net)
 
     sas.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
     I = getattr(sas.network['monitor'], 'I')
+    print(I)
     assert_equal(np.shape(I), (1, duration/dt))
 
     sas.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
