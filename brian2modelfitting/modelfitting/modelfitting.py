@@ -100,7 +100,7 @@ class Fitter(metaclass=abc.ABCMeta):
             if device.has_been_run is True:
                 raise Exception("To run another fitter in standalone mode you need \
                                  to create new script")
-
+        if method is None: method = 'exponential_euler'
         if dt is None:
             raise ValueError('dt (sampling frequency of the input) must be set')
         defaultclock.dt = dt
@@ -461,6 +461,9 @@ class SpikeFitter(Fitter):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method)
+
+        if input_var not in model.identifiers:
+            raise Exception("%s is not an identifier in the model" % input_var)
 
         # Replace input variable by TimedArray
         input_traces = TimedArray(input.transpose(), dt=dt)

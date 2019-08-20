@@ -56,9 +56,8 @@ fitter = SpikeFitter(model=eqs_fit, input_var='I', dt=dt,
                      input=inp_trace * amp, output=out_spikes,
                      n_samples=30,
                      threshold='v > -50*mV',
-                     reset='v = -70*mV',
-                     method='exponential_euler',
-                     )
+                     reset='v = -70*mV',)
+                     
 result_dict, error = fitter.fit(n_rounds=2,
                                 optimizer=n_opt,
                                 metric=metric,
