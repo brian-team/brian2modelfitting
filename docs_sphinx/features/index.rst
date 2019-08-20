@@ -226,7 +226,7 @@ OnlineTraceFitter
 :py:class:`~brian2modelfitting.modelfitting.modelfitting.OnlineTraceFitter` was created to work with long traces or big optimization.
 This :py:class:`~brian2modelfitting.modelfitting.modelfitting.Fitter` uses online Mean Square Error as a metric.
 When :py:func:`~brian2modelfitting.modelfitting.modelfitting.Fitter.fit()` is called there is no need of specifying a metric, that is by
-default set to None. Instead the errors are calculated with use of brian's :py:func:`~brian2.groups.group.Group.run_regularly`,
+default set to None. Instead the errors are calculated with use of brian's :py:meth:`~brian2.groups.group.Group.run_regularly`,
 with each simulation.
 
 .. code:: python
