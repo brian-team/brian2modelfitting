@@ -250,9 +250,9 @@ class Fitter(metaclass=abc.ABCMeta):
                 if not (param in self.model.identifiers or param in self.model.names):
                     raise ValueError("%s is not a model variable or an \
                                       identifier in the model")
-
-        if not (isinstance(metric, Metric)) or metric is None:
-            raise TypeError("metric has to be a child of class Metric")
+        if not (isinstance(metric, Metric) or metric is None):
+            raise TypeError("metric has to be a child of class Metric or None \
+                             for OnlineTraceFitter")
 
         if not (isinstance(optimizer, Optimizer)) or optimizer is None:
             raise TypeError("metric has to be a child of class Optimizer")

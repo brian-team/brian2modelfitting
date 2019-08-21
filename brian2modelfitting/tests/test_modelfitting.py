@@ -2,10 +2,12 @@
 Test the modelfitting module
 '''
 import pytest
-# import numpy as np
+import numpy as np
+import pandas as pd
 from numpy.testing.utils import assert_equal
 from brian2 import (zeros, Equations, NeuronGroup, StateMonitor, TimedArray,
-                    nS, mV, volt, ms, nA, start_scope)
+                    nS, mV, volt, ms, nA, start_scope, Quantity,)
+from brian2 import have_same_dimensions
 from brian2modelfitting import (NevergradOptimizer, TraceFitter, MSEMetric,
                                 OnlineTraceFitter, Simulation, Metric,
                                 Optimizer, GammaFactor)
@@ -174,7 +176,7 @@ def test_fitter_fit_errors(setup):
     with pytest.raises(TypeError):
         tf.fit(n_rounds=2,
                optimizer=n_opt,
-               metric=None,
+               metric=1,
                g=[1*nS, 30*nS])
 
 
@@ -262,10 +264,9 @@ def test_fit_restart_change(setup):
                                restart=True,)
 
 
-# def test_fitter_generate_traces(setup):
-    # dt = setup
-def test_fitter_generate_traces():
-    tf = TraceFitter(dt=0.1*ms,
+def test_fitter_generate_traces(setup):
+    dt = setup
+    tf = TraceFitter(dt=dt,
                      model=model,
                      input_var='v',
                      output_var='I',
@@ -279,19 +280,138 @@ def test_fitter_generate_traces():
                              g=[1*nS, 30*nS],
                              restart=False,)
     traces = tf.generate_traces()
-    print(traces)
+    assert_equal(np.shape(traces), np.shape(output_traces))
+    assert isinstance(traces, np.ndarray)
 
-test_fitter_generate_traces()
+
+def test_fitter_results(setup):
+    dt = setup
+    tf = TraceFitter(dt=dt,
+                     model=model,
+                     input_var='v',
+                     output_var='I',
+                     input=input_traces,
+                     output=output_traces,
+                     n_samples=2,)
+
+    best_res, errors = tf.fit(n_rounds=2,
+                              optimizer=n_opt,
+                              metric=metric,
+                              g=[1*nS, 30*nS],
+                              restart=False,)
 
 
-def test_fitter_results():
-    pass
+    params_list = tf.results(format='list')
+    assert isinstance(params_list, list)
+    assert isinstance(params_list[0], dict)
+    assert isinstance(params_list[0]['g'], Quantity)
+    assert 'g' in params_list[0].keys()
+    assert 'errors' in params_list[0].keys()
+    assert_equal(np.shape(params_list), (4,))
+    assert_equal(len(params_list[0]), 2)
+    assert have_same_dimensions(params_list[0]['g'].dim, nS)
+
+    params_dic = tf.results(format='dict')
+    assert isinstance(params_dic, dict)
+    assert 'g' in params_dic.keys()
+    assert 'errors' in params_dic.keys()
+    assert isinstance(params_dic['g'], Quantity)
+    assert_equal(len(params_dic), 2)
+    assert_equal(np.shape(params_dic['g']), (4,))
+    assert_equal(np.shape(params_dic['errors']), (4,))
+
+    params_df = tf.results(format='dataframe')
+    assert isinstance(params_df, pd.DataFrame)
+    assert_equal(params_df.shape, (4, 2))
+    assert 'g' in params_df.keys()
+    assert 'errors' in params_df.keys()
 
 
 # OnlineTraceFitter class
-def test_onlinetracefitter_init():
-    pass
+def test_onlinetracefitter_init(setup):
+    dt = setup
+    otf = OnlineTraceFitter(dt=dt,
+                     model=model,
+                     input_var='v',
+                     output_var='I',
+                     input=input_traces,
+                     output=output_traces,
+                     n_samples=10,)
+
+    attr_fitter = ['dt', 'results_', 'simulator', 'parameter_names', 'n_traces',
+                   'duration', 'n_neurons', 'n_samples', 'method', 'threshold',
+                   'reset', 'refractory', 'input', 'output', 'output_var',
+                   'best_res', 'input_traces', 'model', 'network', 'optimizer',
+                   'metric']
+    for attr in attr_fitter:
+        assert hasattr(otf, attr)
+
+    assert otf.metric is None
+    assert otf.optimizer is None
+    assert otf.best_res is None
+
+    attr_tracefitter = ['input_traces', 'model', 'neurons', 'network',
+                        'simulator']
+    for attr in attr_tracefitter:
+        assert hasattr(otf, attr)
+
+    assert isinstance(otf.network['neurons'], NeuronGroup)
+    assert isinstance(otf.network['monitor'], StateMonitor)
+    assert isinstance(otf.simulator, Simulation)
+    assert isinstance(otf.input_traces, TimedArray)
+    assert isinstance(otf.model, Equations)
 
 
-def test_onlinetracefitter_fit():
-    pass
+
+def test_onlinetracefitter_init_errors(setup):
+    dt = setup
+    with pytest.raises(Exception):
+        OnlineTraceFitter(dt=dt, model=model, input=input_traces,
+                          n_samples=10,
+                          output=output_traces,
+                          output_var='I',
+                          input_var='Exception',)
+
+    with pytest.raises(Exception):
+        OnlineTraceFitter(dt=0.1*ms, model=model, input=input_traces,
+                          n_samples=10,
+                          output=output_traces,
+                          input_var='v',
+                          output_var='Exception',)
+
+    with pytest.raises(Exception):
+        OnlineTraceFitter(dt=0.1*ms, model=model, input=input_traces,
+                          n_samples=10,
+                          output=[1],
+                          input_var='v',
+                          output_var='I',)
+
+
+def test_onlinetracefitter_fit(setup):
+    dt = setup
+    otf = OnlineTraceFitter(dt=dt,
+                     model=model,
+                     input_var='v',
+                     output_var='I',
+                     input=input_traces,
+                     output=output_traces,
+                     n_samples=10,)
+
+    results, errors = otf.fit(n_rounds=2,
+                              optimizer=n_opt,
+                              g=[1*nS, 30*nS],
+                              restart=False,)
+
+    attr_fit = ['optimizer', 'metric', 'best_res']
+    for attr in attr_fit:
+        assert hasattr(otf, attr)
+
+    assert otf.metric is None
+    assert isinstance(otf.optimizer, Optimizer)
+    assert isinstance(otf.simulator, Simulation)
+
+    assert isinstance(results, dict)
+    assert isinstance(errors, float)
+    assert 'g' in results.keys()
+
+    assert_equal(results, otf.best_res)
