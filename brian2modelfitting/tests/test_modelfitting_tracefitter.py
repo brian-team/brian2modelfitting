@@ -6,14 +6,13 @@ import numpy as np
 import pandas as pd
 from numpy.testing.utils import assert_equal
 from brian2 import (zeros, Equations, NeuronGroup, StateMonitor, TimedArray,
-                    nS, mV, volt, ms, nA, start_scope, Quantity,)
+                    nS, mV, volt, ms, Quantity)
 from brian2 import have_same_dimensions
 from brian2modelfitting import (NevergradOptimizer, TraceFitter, MSEMetric,
                                 OnlineTraceFitter, Simulation, Metric,
                                 Optimizer, GammaFactor)
-from brian2modelfitting.modelfitting.modelfitting import (get_param_dic,
-                                                          get_spikes)
 from brian2.devices.device import reinit_devices
+from brian2modelfitting.modelfitting.modelfitting import get_param_dic
 
 
 E = 40*mV
@@ -45,7 +44,6 @@ def setup(request):
 
     def fin():
         reinit_devices()
-        start_scope()
     request.addfinalizer(fin)
 
     return dt, tf
@@ -85,9 +83,6 @@ def test_get_param_dic():
     assert_equal(d, {'a': [1, 1, 2, 2], 'b': [3, 3, 4, 4]})
 
 
-def test_get_spikes():
-    # needs spike monitor to be run
-    pass
 
 
 def test_tracefitter_init(setup):

@@ -8,7 +8,7 @@ from brian2 import (Equations, NeuronGroup, SpikeMonitor, TimedArray,
                     nS, nF, mV, ms, nA, amp, start_scope)
 from brian2modelfitting import (NevergradOptimizer, SpikeFitter, GammaFactor,
                                 Simulation, Metric, Optimizer)
-
+from brian2modelfitting.modelfitting.modelfitting import get_spikes
 from brian2.devices.device import reinit_devices
 
 dt_def = 0.01 * ms
@@ -39,6 +39,9 @@ def setup(request):
 
     return dt
 
+def test_get_spikes():
+    # needs spike monitor to be run
+    pass
 
 def test_spikefitter_init(setup):
     dt = setup
