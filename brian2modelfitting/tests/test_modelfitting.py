@@ -35,12 +35,39 @@ metric = MSEMetric()
 @pytest.fixture()
 def setup(request):
     dt = 0.01 * ms
+    tf = TraceFitter(dt=dt,
+                     model=model,
+                     input_var='v',
+                     output_var='I',
+                     input=input_traces,
+                     output=output_traces,
+                     n_samples=2,)
+
+    def fin():
+        reinit_devices()
+        start_scope()
+    request.addfinalizer(fin)
+
+    return dt, tf
+
+
+@pytest.fixture()
+def setup_online(request):
+    dt = 0.01 * ms
+
+    otf = OnlineTraceFitter(dt=dt,
+                            model=model,
+                            input_var='v',
+                            output_var='I',
+                            input=input_traces,
+                            output=output_traces,
+                            n_samples=10,)
 
     def fin():
         reinit_devices()
     request.addfinalizer(fin)
 
-    return dt
+    return dt, otf
 
 
 def test_get_param_dic():
@@ -64,15 +91,7 @@ def test_get_spikes():
 
 
 def test_tracefitter_init(setup):
-    dt = setup
-    tf = TraceFitter(dt=dt,
-                     model=model,
-                     input_var='v',
-                     output_var='I',
-                     input=input_traces,
-                     output=output_traces,
-                     n_samples=10,)
-
+    dt, tf = setup
     attr_fitter = ['dt', 'results_', 'simulator', 'parameter_names', 'n_traces',
                    'duration', 'n_neurons', 'n_samples', 'method', 'threshold',
                    'reset', 'refractory', 'input', 'output', 'output_var',
@@ -98,7 +117,7 @@ def test_tracefitter_init(setup):
 
 
 def test_tracefitter_init_errors(setup):
-    dt = setup
+    dt, _ = setup
     with pytest.raises(Exception):
         TraceFitter(dt=dt, model=model, input=input_traces,
                     n_samples=10,
@@ -121,21 +140,8 @@ def test_tracefitter_init_errors(setup):
                     output_var='I',)
 
 
-def test_namespace():
-    pass
-
-
 def test_fitter_fit(setup):
-    dt = setup
-    start_scope()
-    tf = TraceFitter(dt=dt,
-                     model=model,
-                     input_var='v',
-                     output_var='I',
-                     input=input_traces,
-                     output=output_traces,
-                     n_samples=2,)
-
+    dt, tf = setup
     results, errors = tf.fit(n_rounds=2,
                              optimizer=n_opt,
                              metric=metric,
@@ -157,16 +163,7 @@ def test_fitter_fit(setup):
 
 
 def test_fitter_fit_errors(setup):
-    dt = setup
-    start_scope()
-    tf = TraceFitter(dt=dt,
-                     model=model,
-                     input_var='v',
-                     output_var='I',
-                     input=input_traces,
-                     output=output_traces,
-                     n_samples=2,)
-
+    dt, tf = setup
     with pytest.raises(TypeError):
         tf.fit(n_rounds=2,
                optimizer=None,
@@ -181,15 +178,7 @@ def test_fitter_fit_errors(setup):
 
 
 def test_fit_restart(setup):
-    dt = setup
-    tf = TraceFitter(dt=dt,
-                     model=model,
-                     input_var='v',
-                     output_var='I',
-                     input=input_traces,
-                     output=output_traces,
-                     n_samples=2,)
-
+    dt, tf = setup
     results, errors = tf.fit(n_rounds=2,
                              optimizer=n_opt,
                              metric=metric,
@@ -208,15 +197,7 @@ def test_fit_restart(setup):
 
 
 def test_fit_restart_errors(setup):
-    dt = setup
-    tf = TraceFitter(dt=dt,
-                     model=model,
-                     input_var='v',
-                     output_var='I',
-                     input=input_traces,
-                     output=output_traces,
-                     n_samples=2,)
-
+    dt, tf = setup
     results, errors = tf.fit(n_rounds=2,
                              optimizer=n_opt,
                              metric=metric,
@@ -241,15 +222,7 @@ def test_fit_restart_errors(setup):
 
 
 def test_fit_restart_change(setup):
-    dt = setup
-    tf = TraceFitter(dt=dt,
-                     model=model,
-                     input_var='v',
-                     output_var='I',
-                     input=input_traces,
-                     output=output_traces,
-                     n_samples=2,)
-
+    dt, tf = setup
     results, errors = tf.fit(n_rounds=2,
                              optimizer=n_opt,
                              metric=metric,
@@ -265,15 +238,7 @@ def test_fit_restart_change(setup):
 
 
 def test_fitter_generate_traces(setup):
-    dt = setup
-    tf = TraceFitter(dt=dt,
-                     model=model,
-                     input_var='v',
-                     output_var='I',
-                     input=input_traces,
-                     output=output_traces,
-                     n_samples=2,)
-
+    dt, tf = setup
     results, errors = tf.fit(n_rounds=2,
                              optimizer=n_opt,
                              metric=metric,
@@ -285,21 +250,12 @@ def test_fitter_generate_traces(setup):
 
 
 def test_fitter_results(setup):
-    dt = setup
-    tf = TraceFitter(dt=dt,
-                     model=model,
-                     input_var='v',
-                     output_var='I',
-                     input=input_traces,
-                     output=output_traces,
-                     n_samples=2,)
-
+    dt, tf = setup
     best_res, errors = tf.fit(n_rounds=2,
                               optimizer=n_opt,
                               metric=metric,
                               g=[1*nS, 30*nS],
                               restart=False,)
-
 
     params_list = tf.results(format='list')
     assert isinstance(params_list, list)
@@ -327,17 +283,9 @@ def test_fitter_results(setup):
     assert 'errors' in params_df.keys()
 
 
-# OnlineTraceFitter class
-def test_onlinetracefitter_init(setup):
-    dt = setup
-    otf = OnlineTraceFitter(dt=dt,
-                     model=model,
-                     input_var='v',
-                     output_var='I',
-                     input=input_traces,
-                     output=output_traces,
-                     n_samples=10,)
-
+# OnlineTraceFitter
+def test_onlinetracefitter_init(setup_online):
+    dt, otf = setup_online
     attr_fitter = ['dt', 'results_', 'simulator', 'parameter_names', 'n_traces',
                    'duration', 'n_neurons', 'n_samples', 'method', 'threshold',
                    'reset', 'refractory', 'input', 'output', 'output_var',
@@ -362,9 +310,8 @@ def test_onlinetracefitter_init(setup):
     assert isinstance(otf.model, Equations)
 
 
-
-def test_onlinetracefitter_init_errors(setup):
-    dt = setup
+def test_onlinetracefitter_init_errors(setup_online):
+    dt, _ = setup_online
     with pytest.raises(Exception):
         OnlineTraceFitter(dt=dt, model=model, input=input_traces,
                           n_samples=10,
@@ -387,16 +334,8 @@ def test_onlinetracefitter_init_errors(setup):
                           output_var='I',)
 
 
-def test_onlinetracefitter_fit(setup):
-    dt = setup
-    otf = OnlineTraceFitter(dt=dt,
-                     model=model,
-                     input_var='v',
-                     output_var='I',
-                     input=input_traces,
-                     output=output_traces,
-                     n_samples=10,)
-
+def test_onlinetracefitter_fit(setup_online):
+    dt, otf = setup_online
     results, errors = otf.fit(n_rounds=2,
                               optimizer=n_opt,
                               g=[1*nS, 30*nS],
