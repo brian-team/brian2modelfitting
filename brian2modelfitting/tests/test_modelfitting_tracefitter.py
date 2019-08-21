@@ -240,8 +240,8 @@ def test_fitter_generate_traces(setup):
                              g=[1*nS, 30*nS],
                              restart=False,)
     traces = tf.generate_traces()
-    assert_equal(np.shape(traces), np.shape(output_traces))
     assert isinstance(traces, np.ndarray)
+    assert_equal(np.shape(traces), np.shape(output_traces))
 
 
 def test_fitter_results(setup):

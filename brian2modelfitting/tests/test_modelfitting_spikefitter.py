@@ -5,7 +5,7 @@ import pytest
 import numpy as np
 from numpy.testing.utils import assert_equal
 from brian2 import (Equations, NeuronGroup, SpikeMonitor, TimedArray,
-                    nS, nF, mV, ms, nA, amp, start_scope)
+                    NeuronGroup, nS, nF, mV, ms, nA, amp, start_scope, run)
 from brian2modelfitting import (NevergradOptimizer, SpikeFitter, GammaFactor,
                                 Simulation, Metric, Optimizer)
 from brian2modelfitting.modelfitting.modelfitting import get_spikes
@@ -32,26 +32,55 @@ metric = GammaFactor(dt_def, 60*ms)
 @pytest.fixture()
 def setup(request):
     dt = 0.01 * ms
-
-    def fin():
-        reinit_devices()
-    request.addfinalizer(fin)
-
-    return dt
-
-def test_get_spikes():
-    # needs spike monitor to be run
-    pass
-
-def test_spikefitter_init(setup):
-    dt = setup
-    start_scope()
     sf = SpikeFitter(model=model, input_var='I', dt=dt,
                      input=inp_trace*amp, output=output,
                      n_samples=2,
                      threshold='v > -50*mV',
                      reset='v = -70*mV',)
 
+    def fin():
+        reinit_devices()
+    request.addfinalizer(fin)
+
+    return dt, sf
+
+
+@pytest.fixture()
+def setup_spikes(request):
+    def fin():
+        reinit_devices()
+    request.addfinalizer(fin)
+    EL = -70*mV
+    VT = -50*mV
+    DeltaT = 2*mV
+    C = 1*nF
+    gL = 30*nS
+    I = TimedArray(input_current, dt=0.01 * ms)
+    model = Equations('''
+                      dv/dt = (gL*(EL-v)+gL*DeltaT*exp((v-VT)/DeltaT) + I(t))/C : volt
+                      ''')
+    group = NeuronGroup(1, model,
+                        threshold='v > -50*mV',
+                        reset='v = -70*mV',
+                        method='exponential_euler')
+    group.v = -70 * mV
+    spike_mon = SpikeMonitor(group)
+    run(60*ms)
+    spikes = getattr(spike_mon, 't') / ms
+
+    return spike_mon, spikes
+
+
+def test_get_spikes(setup_spikes):
+    spike_mon, spikes = setup_spikes
+    gs = get_spikes(spike_mon)
+    assert isinstance(gs, list)
+    assert isinstance(gs[0], np.ndarray)
+    assert_equal(gs, [np.array(spikes)])
+
+
+def test_spikefitter_init(setup):
+    dt, sf = setup
     attr_fitter = ['dt', 'results_', 'simulator', 'parameter_names', 'n_traces',
                    'duration', 'n_neurons', 'n_samples', 'method', 'threshold',
                    'reset', 'refractory', 'input', 'output', 'output_var',
@@ -77,7 +106,7 @@ def test_spikefitter_init(setup):
 
 
 def test_tracefitter_init_errors(setup):
-    dt = setup
+    dt, _ = setup
     with pytest.raises(Exception):
         SpikeFitter(model=model, input_var='Exception', dt=dt,
                     input=inp_trace*amp, output=output,
@@ -87,13 +116,7 @@ def test_tracefitter_init_errors(setup):
 
 
 def test_spikefitter_fit(setup):
-    dt = setup
-    sf = SpikeFitter(model=model, input_var='I', dt=dt,
-                     input=inp_trace*amp, output=output,
-                     n_samples=2,
-                     threshold='v > -50*mV',
-                     reset='v = -70*mV',)
-
+    dt, sf = setup
     results, errors = sf.fit(n_rounds=2,
                              optimizer=n_opt,
                              metric=metric,
@@ -116,9 +139,44 @@ def test_spikefitter_fit(setup):
     assert_equal(results, sf.best_res)
 
 
-def test_spikefitter_calc_errors():
-    pass
+def test_spikefitter_fit_param_init(setup):
+    dt, sf = setup
+    results, errors = sf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             gL=[20*nS, 40*nS],
+                             C=[0.5*nF, 1.5*nF],
+                             param_init={'v':-60*mV})
+
+    with pytest.raises(ValueError):
+        results, errors = sf.fit(n_rounds=2,
+                                 optimizer=n_opt,
+                                 metric=metric,
+                                 gL=[20*nS, 40*nS],
+                                 C=[0.5*nF, 1.5*nF],
+                                 param_init={'Error':-60*mV})
+
+def test_spikefitter_generate_spikes(setup):
+    dt, sf = setup
+    results, errors = sf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             gL=[20*nS, 40*nS],
+                             C=[0.5*nF, 1.5*nF])
+    spikes = sf.generate_spikes()
+    assert isinstance(spikes[0], np.ndarray)
+    assert_equal(np.shape(spikes)[0], np.shape(inp_trace)[0])
 
 
-def test_spikefitter_generate_traces():
-    pass
+def test_spikefitter_generate(setup):
+    dt, sf = setup
+    results, errors = sf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             gL=[20*nS, 40*nS],
+                             C=[0.5*nF, 1.5*nF])
+    traces = sf.generate(params=None,
+                         output_var='v',
+                         param_init={'v': -70*mV})
+    assert isinstance(traces, np.ndarray)
+    assert_equal(np.shape(traces), np.shape(inp_trace))
