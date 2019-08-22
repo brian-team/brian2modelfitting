@@ -13,6 +13,12 @@ Brian2modelfitting is released under the terms of the CeCILL 2.1 license.
 Please report issues at the github issue tracker (https://github.com/brian-team/brian2/issues) or at the brian support mailing list (http://groups.google.com/group/briansupport/)
 
 
+Installation
+------------
+Module can be install with pypi:
+```
+pip install brian2modelfitting
+```
 
 
 Testing status
