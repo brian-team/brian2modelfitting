@@ -15,7 +15,7 @@ Please report issues at the github issue tracker (https://github.com/brian-team/
 
 Installation
 ------------
-Module can be install with pypi:
+Module can be installed with pypi:
 ```
 pip install brian2modelfitting
 ```

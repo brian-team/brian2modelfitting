@@ -6,7 +6,6 @@ This function gets applied on each simulated trace. We have implemented few metr
 modelfitting.
 
 .. contents::
-   Provided metrics:
      :local:
      :depth: 1
 
