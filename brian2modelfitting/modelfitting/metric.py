@@ -153,9 +153,6 @@ class MSEMetric(Metric):
     def get_features(self, traces, output, n_traces):
         mselist = []
         output = atleast_2d(output)
-        import matplotlib.pyplot as plt
-        plt.plot(traces.transpose())
-        # plt.show()
 
         for i in arange(n_traces):
             temp_out = output[i]
@@ -236,21 +233,16 @@ class FeatureMetric(Metric):
         for r in feat_list:
             for k, v in r.items():
                 if v is None:
-                    # print('None for key:{}'.format(k))
                     r[k] = array([99]) # WARNING HERE
+                    # raise Warning('None for key:{}'.format(k))
                 if (len(r[k])) > 1:
+                    # raise ValueError('you can only use features that return one value') # ERROR HERE
                     print('you can only use features that return one value') # ERROR HERE
 
     def get_features(self, traces, output, n_traces):
-        import matplotlib.pyplot as plt
-        plt.plot(traces.transpose())
-        plt.show()
-
-        output = asarray(output) * 1000
-        traces = asarray(traces) * 1000
-
-        print('output', output)
-        print('traces', traces)
+        unit = output.get_best_unit()
+        output = output/unit
+        traces = traces/unit
         self.out_feat = calc_eFEL(output, self.traces_times, self.feat_list)
         self.check_values(self.out_feat)
 
@@ -260,7 +252,8 @@ class FeatureMetric(Metric):
 
         for ii in arange(sl):
             temp_trace = temp_traces[ii]
-            temp_feat = calc_eFEL(temp_trace, self.traces_times, self.feat_list)
+            temp_feat = calc_eFEL(temp_trace, self.traces_times,
+                                  self.feat_list)
             self.check_values(temp_feat)
             feat.append(temp_feat)
 
