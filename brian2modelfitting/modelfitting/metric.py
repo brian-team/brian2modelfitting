@@ -233,11 +233,12 @@ class FeatureMetric(Metric):
         for r in feat_list:
             for k, v in r.items():
                 if v is None:
-                    r[k] = array([99]) # WARNING HERE
-                    # raise Warning('None for key:{}'.format(k))
+                    r[k] = array([99])
+                    raise Warning('None for key:{}'.format(k))
                 if (len(r[k])) > 1:
-                    # raise ValueError('you can only use features that return one value') # ERROR HERE
-                    print('you can only use features that return one value') # ERROR HERE
+                    # print(k, r[k])
+                    raise ValueError('you can only use features that return \
+                                      one value')
 
     def get_features(self, traces, output, n_traces):
         unit = output.get_best_unit()

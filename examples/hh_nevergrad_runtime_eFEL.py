@@ -102,8 +102,8 @@ n_opt = NevergradOptimizer()
 traces_times = [[50, 100], [50, 100], [50, 100], [50, 100]]
 # feat_list = ['voltage_base', 'AP_amplitude', 'AP_duration', 'AP_height',
 #              'AP_width', 'AP_begin_time', 'time_to_first_spike']
-
-feat_list = ['voltage_base', 'AP_amplitude', 'AP_duration',  'AP_begin_time', 'time_to_first_spike', 'Spikecount',  'AP_amplitude_from_voltagebase',]
+# feat_list = ['voltage_base', 'AP_amplitude', 'AP_duration',  'AP_begin_time', 'time_to_first_spike', 'Spikecount',  'AP_amplitude_from_voltagebase',]
+feat_list = ['voltage_base', 'time_to_first_spike', 'Spikecount', ]
 metric = FeatureMetric(traces_times, feat_list)
 
 # pass parameters to the NeuronGroup
