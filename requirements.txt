@@ -2,3 +2,4 @@ brian2
 nevergrad
 scikit-optimize
 tqdm
+efel
