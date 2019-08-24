@@ -240,6 +240,19 @@ class FeatureMetric(Metric):
                     raise ValueError('you can only use features that return \
                                       one value')
 
+    def feat_to_err(self, d1, d2):
+        d = {}
+        err = 0
+        for key in d1.keys():
+            x = d1[key]
+            y = d2[key]
+            d[key] = self.combine(x, y)
+
+        for k, v in d.items():
+            err += sum(v)
+
+        return err
+
     def get_features(self, traces, output, n_traces):
         unit = output.get_best_unit()
         output = output/unit
@@ -259,19 +272,6 @@ class FeatureMetric(Metric):
             feat.append(temp_feat)
 
         self.features = feat
-
-    def feat_to_err(self, d1, d2):
-        d = {}
-        err = 0
-        for key in d1.keys():
-            x = d1[key]
-            y = d2[key]
-            d[key] = self.combine(x, y)
-
-        for k, v in d.items():
-            err += sum(v)
-
-        return err
 
     def get_errors(self, features, n_traces):
         errors = []

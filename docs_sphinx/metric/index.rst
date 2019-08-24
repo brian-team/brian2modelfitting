@@ -54,6 +54,40 @@ Jolivet et al. 2008, “A benchmark test for a quantitative assessment of simple
   metric = GammaFactor(delta=10*ms, dt=0.1*ms)
 
 
+FeatureMetric
+-------------
+:py:class:`~brian2modelfitting.modelfitting.metric.FeatureMetric` is implemented to use with :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`.
+Metric demonstrates a use of feature based metric in the toolbox. Features used for optimization get calculated with use of
+
+The Electrophys Feature Extract Library (eFEL) library, for which the documentation is available under following link: https://efel.readthedocs.io/en/latest/
+
+To get all of the eFEL features you can run the following code:
+
+.. code:: python
+
+  import efel
+  efel.api.getFeatureNames()
+
+
+.. note::
+
+  User is only allowed to use features that return array of more than one value.
+
+
+To define the :py:class:`~brian2modelfitting.modelfitting.metric.FeatureMetric`, user has to define following input parameters:
+
+- ``traces_times`` - list of times indicating start and end of input current, has to be specified for each of input traces
+- ``feat_list`` - list of strings with names of features to be used
+- ``combine`` - function to be used to compare features between output and simulated traces, (for `combine=None`, subtracts the features)
+
+Example code usage:
+
+.. code:: python
+
+  traces_times = [[50, 100], [50, 100], [50, 100], [50, 100]]
+  feat_list = ['voltage_base', 'time_to_first_spike', 'Spikecount']
+  metric = FeatureMetric(traces_times, feat_list, combine=None)
+
 
 Custom Metric
 -------------
