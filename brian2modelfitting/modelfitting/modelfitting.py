@@ -193,7 +193,6 @@ class Fitter(metaclass=abc.ABCMeta):
                 self.simulator.network['neurons'].__setattr__(k, v)
             self.simulator.network.store()
 
-
         parameters = optimizer.ask(n_samples=self.n_samples)
 
         d_param = get_param_dic(parameters, self.parameter_names,

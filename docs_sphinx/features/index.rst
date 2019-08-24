@@ -25,7 +25,7 @@ dictionary argument has to be added to :py:func:`~brian2modelfitting.modelfittin
 .. code:: python
 
    fitter = TraceFitter(...)
-   result, error  = fitter.run(..., param_init = {'v': -30*mV})
+   result, error  = fitter.fit(..., param_init = {'v': -30*mV})
 
 
 Restart
@@ -71,7 +71,7 @@ An example function:
 .. code:: python
 
    fitter = TraceFitter(...)
-   result, error  = fitter.run(..., callback=)
+   result, error  = fitter.fit(..., callback=)
 
 
 
