@@ -92,6 +92,8 @@ class Fitter(metaclass=abc.ABCMeta):
         Integration method
     level : int, optional
         How much farther to go down in the stack to find the namespace.
+    param_init: dict
+        Dictionary of variables to be initialized with respective values
     """
     def __init__(self, dt, model, input, output, input_var, output_var,
                  n_samples, threshold, reset, refractory, method, level=0):
@@ -172,7 +174,7 @@ class Fitter(metaclass=abc.ABCMeta):
         """
         pass
 
-    def optimization_iter(self, optimizer, metric, param_init, *args):
+    def optimization_iter(self, optimizer, metric,  *args):
         """
         Function performs all operations required for one iteration of
         optimization. Drawing parameters, setting them to simulator and
@@ -187,11 +189,11 @@ class Fitter(metaclass=abc.ABCMeta):
         errors: list
             calculated errors
         """
-        if param_init:
-            self.simulator.network.restore()
-            for k, v in param_init.items():
-                self.simulator.network['neurons'].__setattr__(k, v)
-            self.simulator.network.store()
+        # if param_init:
+        #     self.simulator.network.restore()
+        #     for k, v in param_init.items():
+        #         self.simulator.network['neurons'].__setattr__(k, v)
+        #     self.simulator.network.store()
 
         parameters = optimizer.ask(n_samples=self.n_samples)
 
@@ -232,8 +234,6 @@ class Fitter(metaclass=abc.ABCMeta):
             For strings outputs default feedback or a progressbar. Provide
             custom feedback function func(results, errors, parameters, index)
             If callback returns True the fitting execution is interrupted.
-        param_init: dict
-            Dictionary of variables to be initialized with respective value
         restart bool
             Flag that reinitializes the Fitter to reset the optimization.
             With restart True user is allowed to change optimizer/metric.
@@ -247,11 +247,11 @@ class Fitter(metaclass=abc.ABCMeta):
         error: float
             error value for best parameter set
         """
-        if param_init:
-            for param, val in param_init.items():
-                if not (param in self.model.identifiers or param in self.model.names):
-                    raise ValueError("%s is not a model variable or an \
-                                      identifier in the model")
+        # if param_init:
+        #     for param, val in param_init.items():
+        #         if not (param in self.model.identifiers or param in self.model.names):
+        #             raise ValueError("%s is not a model variable or an \
+        #                               identifier in the model")
         if not (isinstance(metric, Metric) or metric is None):
             raise TypeError("metric has to be a child of class Metric or None \
                              for OnlineTraceFitter")
@@ -405,7 +405,7 @@ class TraceFitter(Fitter):
     def __init__(self, model=None, input_var=None, input=None,
                  output_var=None, output=None, dt=None, method=None,
                  reset=None, refractory=False, threshold=None,
-                 callback=None, n_samples=None, level=0):
+                 callback=None, n_samples=None, level=0, param_init=None):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method)
@@ -437,6 +437,14 @@ class TraceFitter(Fitter):
         monitor = StateMonitor(self.neurons, output_var, record=True,
                                name='monitor')
         self.network = Network(self.neurons, monitor)
+        if param_init:
+            for param, val in param_init.items():
+                if not (param in self.model.identifiers or param in self.model.names):
+                    raise ValueError("%s is not a model variable or an \
+                    identifier in the model")
+            for k, v in param_init.items():
+                self.network['neurons'].__setattr__(k, v)
+
         self.simulator.initialize(self.network)
 
     def calc_errors(self, metric):
@@ -459,7 +467,7 @@ class SpikeFitter(Fitter):
     def __init__(self, model=None, input_var='I', input=None,
                  output_var='v', output=None, dt=None, method=None,
                  reset=None, refractory=False, threshold=None,
-                 callback=None, n_samples=None, level=0):
+                 callback=None, n_samples=None, level=0, param_init=None):
         """Initialize the fitter."""
         if method is None: method = 'exponential_euler'
         super().__init__(dt, model, input, output, input_var, output_var,
@@ -484,6 +492,15 @@ class SpikeFitter(Fitter):
 
         monitor = SpikeMonitor(self.neurons, record=True, name='monitor')
         self.network = Network(self.neurons, monitor)
+
+        if param_init:
+            for param, val in param_init.items():
+                if not (param in self.model.identifiers or param in self.model.names):
+                    raise ValueError("%s is not a model variable or an \
+                    identifier in the model")
+            for k, v in param_init.items():
+                self.network['neurons'].__setattr__(k, v)
+
         self.simulator.initialize(self.network)
 
     def calc_errors(self, metric):
@@ -507,7 +524,7 @@ class OnlineTraceFitter(Fitter):
     def __init__(self, model=None, input_var=None, input=None,
                  output_var=None, output=None, dt=None, method=None,
                  reset=None, refractory=False, threshold=None,
-                 callback=None, n_samples=None, level=0):
+                 callback=None, n_samples=None, level=0, param_init=None):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method)
@@ -545,6 +562,14 @@ class OnlineTraceFitter(Fitter):
         monitor = StateMonitor(self.neurons, output_var, record=True,
                                name='monitor')
         self.network = Network(self.neurons, monitor)
+        if param_init:
+            for param, val in param_init.items():
+                if not (param in self.model.identifiers or param in self.model.names):
+                    raise ValueError("%s is not a model variable or an \
+                    identifier in the model")
+            for k, v in param_init.items():
+                self.network['neurons'].__setattr__(k, v)
+
         self.simulator.initialize(self.network)
 
     def calc_errors(self, metric=None):

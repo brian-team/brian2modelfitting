@@ -139,22 +139,22 @@ def test_spikefitter_fit(setup):
     assert_equal(results, sf.best_res)
 
 
-def test_spikefitter_fit_param_init(setup):
-    dt, sf = setup
-    results, errors = sf.fit(n_rounds=2,
-                             optimizer=n_opt,
-                             metric=metric,
-                             gL=[20*nS, 40*nS],
-                             C=[0.5*nF, 1.5*nF],
-                             param_init={'v':-60*mV})
-
-    with pytest.raises(ValueError):
-        results, errors = sf.fit(n_rounds=2,
-                                 optimizer=n_opt,
-                                 metric=metric,
-                                 gL=[20*nS, 40*nS],
-                                 C=[0.5*nF, 1.5*nF],
-                                 param_init={'Error':-60*mV})
+# def test_spikefitter_fit_param_init(setup):
+#     dt, sf = setup
+#     results, errors = sf.fit(n_rounds=2,
+#                              optimizer=n_opt,
+#                              metric=metric,
+#                              gL=[20*nS, 40*nS],
+#                              C=[0.5*nF, 1.5*nF],
+#                              param_init={'v':-60*mV})
+#
+#     with pytest.raises(ValueError):
+#         results, errors = sf.fit(n_rounds=2,
+#                                  optimizer=n_opt,
+#                                  metric=metric,
+#                                  gL=[20*nS, 40*nS],
+#                                  C=[0.5*nF, 1.5*nF],
+#                                  param_init={'Error':-60*mV})
 
 def test_spikefitter_generate_spikes(setup):
     dt, sf = setup

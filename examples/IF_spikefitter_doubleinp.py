@@ -89,13 +89,12 @@ fitter = SpikeFitter(model=eqs_fit, input_var='I', dt=dt,
                      n_samples=30,
                      threshold='v > -50*mV',
                      reset='v = -70*mV',
-                     method='exponential_euler',
-                     )
+                     param_init={'v': -70*mV},
+                     method='exponential_euler',)
 result_dict, error = fitter.fit(n_rounds=2,
                                 optimizer=n_opt,
                                 metric=metric,
                                 callback='progressbar',
-                                param_init={'v': -70*mV},
                                 gL=[20*nS, 40*nS],
                                 C = [0.5*nF, 1.5*nF])
 

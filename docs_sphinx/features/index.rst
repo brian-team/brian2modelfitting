@@ -11,11 +11,11 @@ objects, to help the user with easier and more flexible applications.
 Parameters initialization
 -------------------------
 
-Whilst running :py:func:`~brian2modelfitting.modelfitting.modelfitting.Fitter.fit()` user can specify values with which model evaluation
+Whilst running :py:class:`~brian2modelfitting.modelfitting.modelfitting.Fitter` user can specify values with which model evaluation
 of differential equations start.
 
 The fitting functions accept additional dictionary input to address that. To do so,
-dictionary argument has to be added to :py:func:`~brian2modelfitting.modelfitting.modelfitting.Fitter.fit()` call:
+dictionary argument has to be added to :py:class:`~brian2modelfitting.modelfitting.modelfitting.Fitter` initialization:
 
 .. code:: python
 
@@ -24,8 +24,7 @@ dictionary argument has to be added to :py:func:`~brian2modelfitting.modelfittin
 
 .. code:: python
 
-   fitter = TraceFitter(...)
-   result, error  = fitter.fit(..., param_init = {'v': -30*mV})
+   fitter = TraceFitter(..., param_init = {'v': -30*mV})
 
 
 Restart
@@ -71,7 +70,7 @@ An example function:
 .. code:: python
 
    fitter = TraceFitter(...)
-   result, error  = fitter.fit(..., callback=)
+   result, error  = fitter.fit(..., callback=...)
 
 
 
