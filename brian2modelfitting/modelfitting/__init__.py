@@ -11,6 +11,6 @@ from .utils import *
 __all__ = ['callback_setup', 'callback_text', 'make_dic', 'callback_none',
            'Optimizer', 'NevergradOptimizer', 'SkoptOptimizer', 'calc_bounds',
            'Simulation', 'RuntimeSimulation', 'CPPStandaloneSimulation',
-           'MSEMetric', 'Metric', 'GammaFactor', 'get_gamma_factor', 'firing_rate',
-           'Fitter', 'SpikeFitter', 'TraceFitter', 'OnlineTraceFitter',
-           ]
+           'MSEMetric', 'Metric', 'GammaFactor', 'FeatureMetric',
+           'get_gamma_factor', 'firing_rate',
+           'Fitter', 'SpikeFitter', 'TraceFitter', 'OnlineTraceFitter',]

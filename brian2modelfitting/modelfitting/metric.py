@@ -1,9 +1,10 @@
 import abc
+import efel
 from brian2 import Hz, second
 from brian2.units.fundamentalunits import check_units
-
 from numpy import (array, sum, square, reshape, abs, amin, digitize,
-                   rint, arange, atleast_2d, NaN, float64)
+                   rint, arange, atleast_2d, NaN, float64, split, shape,
+                   asarray)
 
 
 def firing_rate(spikes):
@@ -60,6 +61,22 @@ def get_gamma_factor(source, target, delta, dt):
     gamma = (coincidences - NCoincAvg)/(norm*(source_length + target_length))
 
     return gamma
+
+
+def calc_eFEL(traces, inp_times, feat_list):
+    out_traces = []
+    for i, trace in enumerate(traces):
+        time = arange(0, len(trace)/10, 0.1)
+        temp_trace = {}
+        temp_trace['T'] = time
+        temp_trace['V'] = trace
+        temp_trace['stim_start'] = [inp_times[i][0]]
+        temp_trace['stim_end'] = [inp_times[i][1]]
+        out_traces.append(temp_trace)
+
+    results = efel.getFeatureValues(out_traces, feat_list)
+
+    return results
 
 
 class Metric(metaclass=abc.ABCMeta):
@@ -128,13 +145,17 @@ class Metric(metaclass=abc.ABCMeta):
 class MSEMetric(Metric):
     __doc__ = "Mean Square Error between goal and calculated output." + \
               Metric.get_features.__doc__
+
     def __init__(self, **kwds):
-            """Initialize the metric."""
-            pass
+        """Initialize the metric."""
+        pass
 
     def get_features(self, traces, output, n_traces):
         mselist = []
         output = atleast_2d(output)
+        import matplotlib.pyplot as plt
+        plt.plot(traces.transpose())
+        # plt.show()
 
         for i in arange(n_traces):
             temp_out = output[i]
@@ -198,3 +219,76 @@ class GammaFactor(Metric):
         feat_arr = reshape(array(features), (n_traces,
                            int(len(features)/n_traces)))
         self.errors = feat_arr.mean(axis=0)
+
+
+class FeatureMetric(Metric):
+    def __init__(self, traces_times, feat_list, combine=None):
+        self.traces_times = traces_times
+        self.feat_list = feat_list
+
+        if combine is None:
+            def combine(x, y):
+                return x - y
+        self.combine = combine
+
+    def check_values(self, feat_list):
+        """Removes all the None values and checks for array features"""
+        for r in feat_list:
+            for k, v in r.items():
+                if v is None:
+                    # print('None for key:{}'.format(k))
+                    r[k] = array([99]) # WARNING HERE
+                if (len(r[k])) > 1:
+                    print('you can only use features that return one value') # ERROR HERE
+
+    def get_features(self, traces, output, n_traces):
+        import matplotlib.pyplot as plt
+        plt.plot(traces.transpose())
+        plt.show()
+
+        output = asarray(output) * 1000
+        traces = asarray(traces) * 1000
+
+        print('output', output)
+        print('traces', traces)
+        self.out_feat = calc_eFEL(output, self.traces_times, self.feat_list)
+        self.check_values(self.out_feat)
+
+        sl = int(shape(traces)[0]/n_traces)
+        feat = []
+        temp_traces = split(traces, sl)
+
+        for ii in arange(sl):
+            temp_trace = temp_traces[ii]
+            temp_feat = calc_eFEL(temp_trace, self.traces_times, self.feat_list)
+            self.check_values(temp_feat)
+            feat.append(temp_feat)
+
+        self.features = feat
+
+    def feat_to_err(self, d1, d2):
+        d = {}
+        err = 0
+        for key in d1.keys():
+            x = d1[key]
+            y = d2[key]
+            d[key] = self.combine(x, y)
+
+        for k, v in d.items():
+            err += sum(v)
+
+        return err
+
+    def get_errors(self, features, n_traces):
+        errors = []
+        for feat in features:
+            temp_errors = []
+            for i, F in enumerate(feat):
+                temp_err = self.feat_to_err(F, self.out_feat[i])
+                temp_errors.append(temp_err)
+
+            error = sum(abs(temp_errors))
+            errors.append(error)
+
+        print(errors)
+        self.errors = errors

@@ -188,8 +188,11 @@ class Fitter(metaclass=abc.ABCMeta):
             calculated errors
         """
         if param_init:
+            self.simulator.network.restore()
             for k, v in param_init.items():
-                self.network['neurons'].__setattr__(k, v)
+                self.simulator.network['neurons'].__setattr__(k, v)
+            self.simulator.network.store()
+
 
         parameters = optimizer.ask(n_samples=self.n_samples)
 

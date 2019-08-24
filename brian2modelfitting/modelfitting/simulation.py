@@ -92,7 +92,7 @@ class RuntimeSimulation(Simulation):
     def run(self, duration, params, params_names, name='neurons'):
         self.network.restore()
         self.network[name].set_states(params, units=False)
-        self.network.run(duration, namespace={})
+        self.network.run(duration)
 
 
 class CPPStandaloneSimulation(Simulation):
