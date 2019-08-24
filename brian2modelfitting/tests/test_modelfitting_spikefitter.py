@@ -5,7 +5,7 @@ import pytest
 import numpy as np
 from numpy.testing.utils import assert_equal
 from brian2 import (Equations, NeuronGroup, SpikeMonitor, TimedArray,
-                    NeuronGroup, nS, nF, mV, ms, nA, amp, start_scope, run)
+                    nS, nF, mV, ms, nA, amp, run)
 from brian2modelfitting import (NevergradOptimizer, SpikeFitter, GammaFactor,
                                 Simulation, Metric, Optimizer)
 from brian2modelfitting.modelfitting.modelfitting import get_spikes
@@ -14,7 +14,7 @@ from brian2.devices.device import reinit_devices
 dt_def = 0.01 * ms
 input_current = np.hstack([np.zeros(int(5*ms/dt_def)), np.ones(int(5*ms/dt_def)*5), np.zeros(5*int(5*ms/dt_def))])* 5 * nA
 inp_trace = np.array([input_current])
-output = [np.array([ 9.26, 13.54, 17.82, 22.1, 26.38])]
+output = [np.array([9.26, 13.54, 17.82, 22.1, 26.38])]
 
 EL = -70*mV
 VT = -50*mV
@@ -139,22 +139,23 @@ def test_spikefitter_fit(setup):
     assert_equal(results, sf.best_res)
 
 
-# def test_spikefitter_fit_param_init(setup):
-#     dt, sf = setup
-#     results, errors = sf.fit(n_rounds=2,
-#                              optimizer=n_opt,
-#                              metric=metric,
-#                              gL=[20*nS, 40*nS],
-#                              C=[0.5*nF, 1.5*nF],
-#                              param_init={'v':-60*mV})
-#
-#     with pytest.raises(ValueError):
-#         results, errors = sf.fit(n_rounds=2,
-#                                  optimizer=n_opt,
-#                                  metric=metric,
-#                                  gL=[20*nS, 40*nS],
-#                                  C=[0.5*nF, 1.5*nF],
-#                                  param_init={'Error':-60*mV})
+def test_spikefitter_param_init(setup):
+    dt, _ = setup
+    SpikeFitter(model=model, input_var='I', dt=dt,
+                input=inp_trace*amp, output=output,
+                n_samples=2,
+                threshold='v > -50*mV',
+                reset='v = -70*mV',
+                param_init={'v': -60*mV})
+
+    with pytest.raises(ValueError):
+        SpikeFitter(model=model, input_var='I', dt=dt,
+                    input=inp_trace*amp, output=output,
+                    n_samples=2,
+                    threshold='v > -50*mV',
+                    reset='v = -70*mV',
+                    param_init={'Error': -60*mV})
+
 
 def test_spikefitter_generate_spikes(setup):
     dt, sf = setup
