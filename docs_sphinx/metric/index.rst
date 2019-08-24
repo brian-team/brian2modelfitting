@@ -71,7 +71,7 @@ To get all of the eFEL features you can run the following code:
 
 .. note::
 
-  User is only allowed to use features that return array of more than one value.
+  User is only allowed to use features that return array of no more than one value.
 
 
 To define the :py:class:`~brian2modelfitting.modelfitting.metric.FeatureMetric`, user has to define following input parameters:
