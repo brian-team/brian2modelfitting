@@ -2,8 +2,7 @@ from brian2 import *
 from brian2modelfitting import *
 from brian2.devices import reinit_devices
 
-prefs.codegen.target = 'cython'  # weave is not multiprocess-safe!
-
+# Generate Traces
 # Parameters
 area = 20000*umetre**2
 Cm = 1*ufarad*cm**-2 * area
@@ -11,10 +10,9 @@ El = -65*mV
 EK = -90*mV
 ENa = 50*mV
 VT = -63*mV
-
 dt = 0.01*ms
 
-# Generate a step-current input and an "experimental" voltage trace
+## Generate a step-current input and an "experimental" voltage trace
 input_current = np.hstack([np.zeros(int(5*ms/dt)), np.ones(int(5*ms/dt)), np.zeros(int(5*ms/dt))])*nA
 
 params_correct = {'gl': float(5e-5*siemens*cm**-2 * area),
@@ -23,7 +21,7 @@ params_correct = {'gl': float(5e-5*siemens*cm**-2 * area),
 
 defaultclock.dt = dt
 
-# The model
+## The model
 eqsHH = Equations('''
 dv/dt = (gl*(El-v) - g_na*(m*m*m)*h*(v-ENa) - g_kd*(n*n*n*n)*(v-EK) + I(t))/Cm : volt
 dm/dt = 0.32*(mV**-1)*(13.*mV-v+VT)/
@@ -38,7 +36,6 @@ gl   : siemens (constant)
 ''')
 
 I = TimedArray(input_current, dt=dt)
-
 G = NeuronGroup(1, eqsHH, method='exponential_euler')
 G.v = El
 G.set_states(params_correct, units=False)
@@ -48,14 +45,12 @@ run(25*ms)
 voltage = mon.v[0]/mV
 voltage += np.random.randn(len(voltage))
 
-
 inp_trace = np.array([input_current])
 n0, n1 = inp_trace.shape
-
 out_trace = np.array(voltage[:n1])
 
-
-# Model for modelfitting
+# Model Fitting
+## Model definition
 eqs = Equations(
 '''
 dv/dt = (gl*(El-v) - g_na*(m*m*m)*h*(v-ENa) - g_kd*(n*n*n*n)*(v-EK) + I)/Cm : volt
@@ -71,12 +66,12 @@ gl   : siemens (constant)
 ''',
 Cm=1*ufarad*cm**-2 * area, El=-65*mV, EK=-90*mV, ENa=50*mV, VT=-63*mV)
 
+## start the standalone mode
 set_device('cpp_standalone', directory='parallel', clean=False)
 
 n_opt = NevergradOptimizer()
 metric = MSEMetric()
 
-# pass parameters to the NeuronGroup
 fitter = TraceFitter(model=eqs, input_var='I', output_var='v',
                      input=inp_trace * amp, output=[out_trace]*mV, dt=dt,
                      n_samples=5,
@@ -91,7 +86,6 @@ res, error = fitter.fit(n_rounds=2,
                         g_kd=[1*msiemens*cm**-2 * area, 1000*msiemens*cm**-2 * area],
                         )
 
-# give information to the optimizer
 print('correct:', params_correct, '\n output:', res)
 print('error', error)
 
