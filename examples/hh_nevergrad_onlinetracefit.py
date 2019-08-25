@@ -2,7 +2,7 @@ from brian2 import *
 from brian2modelfitting import *
 prefs.codegen.target = 'cython'  # weave is not multiprocess-safe!
 
-
+# INPUT GENERATION
 # Parameters
 area = 20000*umetre**2
 Cm = 1*ufarad*cm**-2 * area
@@ -74,6 +74,7 @@ inp_trace1 = np.array([input_current1])
 n0, n1 = inp_trace1.shape
 out_trace1 = np.array(voltage[:n1])
 
+# MODEL FITTING
 # Generate Proper Input Format for the Problem
 inp_trace = np.concatenate((inp_trace0, inp_trace1))
 out_trace = np.concatenate(([out_trace0], [out_trace1]))

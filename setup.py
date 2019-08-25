@@ -18,7 +18,7 @@ def readme():
 # figures out a version based on git tags
 setup(name='brian2modelfitting',
       url='https://github.com/brian-team/brian2modelfitting',
-      version='0.1',
+      version='0.2',
       packages=find_packages(),
       # package_data={},
       install_requires=['numpy',

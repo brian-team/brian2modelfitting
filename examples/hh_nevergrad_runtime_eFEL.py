@@ -2,7 +2,7 @@ from brian2 import *
 from brian2modelfitting import *
 prefs.codegen.target = 'cython'  # weave is not multiprocess-safe!
 
-
+# INPUT GENERATION
 # Parameters
 area = 20000*umetre**2
 Cm = 1*ufarad*cm**-2 * area
