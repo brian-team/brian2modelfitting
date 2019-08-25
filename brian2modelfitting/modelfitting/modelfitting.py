@@ -189,12 +189,6 @@ class Fitter(metaclass=abc.ABCMeta):
         errors: list
             calculated errors
         """
-        # if param_init:
-        #     self.simulator.network.restore()
-        #     for k, v in param_init.items():
-        #         self.simulator.network['neurons'].__setattr__(k, v)
-        #     self.simulator.network.store()
-
         parameters = optimizer.ask(n_samples=self.n_samples)
 
         d_param = get_param_dic(parameters, self.parameter_names,
@@ -247,11 +241,6 @@ class Fitter(metaclass=abc.ABCMeta):
         error: float
             error value for best parameter set
         """
-        # if param_init:
-        #     for param, val in param_init.items():
-        #         if not (param in self.model.identifiers or param in self.model.names):
-        #             raise ValueError("%s is not a model variable or an \
-        #                               identifier in the model")
         if not (isinstance(metric, Metric) or metric is None):
             raise TypeError("metric has to be a child of class Metric or None \
                              for OnlineTraceFitter")
