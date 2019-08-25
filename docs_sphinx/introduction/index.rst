@@ -6,3 +6,4 @@ Model Fitting
 
    introduction
    howitworks
+   tutorial_hh

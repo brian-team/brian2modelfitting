@@ -62,20 +62,20 @@ Ready to use elements
 ---------------------
 
 Alongside three optimization classes:
- - ``TraceFitter``
- - ``SpikeFitter``
- - ``OnlineTraceFitter``
+ - :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`
+ - :py:class:`~brian2modelfitting.modelfitting.modelfitting.SpikeFitter`
+ - :py:class:`~brian2modelfitting.modelfitting.modelfitting.OnlineTraceFitter`
 
 We also provide ready optimizers:
- - ``NevergradOptimizer``
- - ``SkoptOptimizer``
+ - :py:class:`~brian2modelfitting.modelfitting.optimizer.NevergradOptimizer`
+ - :py:class:`~brian2modelfitting.modelfitting.optimizer.SkoptOptimizer`
 
 and metrics:
- - ``MSEMetric`` (for ``TraceFitter``)
- - ``GammaFactor`` (for ``SpikeFitter``)
+ - :py:class:`~brian2modelfitting.modelfitting.metric.MSEMetric` (for :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`)
+ - :py:class:`~brian2modelfitting.modelfitting.metric.GammaFactor` (for :py:class:`~brian2modelfitting.modelfitting.modelfitting.SpikeFitter`)
 
 
-Example of ``TraceFitter()`` with all of the necessary arguments:
+Example of :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter` with all of the necessary arguments:
 
 .. code:: python
 
