@@ -2,13 +2,12 @@ import numpy as np
 from brian2 import *
 from brian2modelfitting import *
 
+# Generate Spikes To Fit into
 dt = 0.01 * ms
 defaultclock.dt = dt
 input_current = np.hstack([np.zeros(int(5*ms/dt)), np.ones(int(5*ms/dt)*5), np.zeros(5*int(5*ms/dt))])* 5 * nA
 I = TimedArray(input_current, dt=dt)
 
-# C = 1*nF
-# gL = 30*nS
 EL = -70*mV
 VT = -50*mV
 DeltaT = 2*mV
@@ -34,7 +33,7 @@ voltage = monitor.v[0]/mV
 out_spikes = getattr(smonitor, 't') / ms
 print(out_spikes)
 
-
+# Model Fitting
 start_scope()
 eqs_fit = Equations('''
     dv/dt = (gL*(EL-v)+gL*DeltaT*exp((v-VT)/DeltaT) + I)/C : volt
@@ -44,7 +43,6 @@ eqs_fit = Equations('''
     EL = -70*mV,
     VT = -50*mV,
     DeltaT = 2*mV,
-    # C=1*nF
     )
 
 n_opt = NevergradOptimizer()
