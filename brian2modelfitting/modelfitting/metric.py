@@ -284,5 +284,4 @@ class FeatureMetric(Metric):
             error = sum(abs(temp_errors))
             errors.append(error)
 
-        print(errors)
         self.errors = errors
