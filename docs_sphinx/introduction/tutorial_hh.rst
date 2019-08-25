@@ -66,7 +66,7 @@ Then, we have to define our and model with Equations object, in the following ma
 
 .. note::
 
-   You have to identify the parameters you want to optimizer, by adding them as constant variables to the equation
+   You have to identify the parameters you want to optimize, by adding them as constant variables to the equation.
 
 
 Optimizer and metric
