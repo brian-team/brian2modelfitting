@@ -27,6 +27,7 @@ To load the data, use following code:
   out_traces = df_out_traces.to_numpy()
   out_traces = out_traces[:, 1:]
 
+Then the multiple round optimization can be run with following code:
 
 .. code:: python
 
@@ -88,6 +89,9 @@ To load the data, use following code:
                           g_na = [2e-06*siemens, 2e-04*siemens],
                           g_kd = [6e-07*siemens, 6e-05*siemens],
                           Cm=[0.1*ufarad*cm**-2 * area, 2*ufarad*cm**-2 * area],)
+
+
+To get the results and traces:
 
 .. code:: python
 
