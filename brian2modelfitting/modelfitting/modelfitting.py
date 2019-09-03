@@ -174,7 +174,7 @@ class Fitter(metaclass=abc.ABCMeta):
         """
         pass
 
-    def optimization_iter(self, optimizer, metric,  *args):
+    def optimization_iter(self, optimizer, metric, param_init):
         """
         Function performs all operations required for one iteration of
         optimization. Drawing parameters, setting them to simulator and
@@ -188,6 +188,8 @@ class Fitter(metaclass=abc.ABCMeta):
             drawn parameters
         errors: list
             calculated errors
+        param_init: dict
+            values of parameters to be initialzed
         """
         parameters = optimizer.ask(n_samples=self.n_samples)
 
