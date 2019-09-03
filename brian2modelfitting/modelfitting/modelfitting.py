@@ -394,7 +394,7 @@ class TraceFitter(Fitter):
     def __init__(self, model=None, input_var=None, input=None,
                  output_var=None, output=None, dt=None, method=None,
                  reset=None, refractory=False, threshold=None,
-                 callback=None, n_samples=None, level=0, param_init=None):
+                 n_samples=None, level=0, param_init=None):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method)
@@ -456,7 +456,7 @@ class SpikeFitter(Fitter):
     def __init__(self, model=None, input_var='I', input=None,
                  output_var='v', output=None, dt=None, method=None,
                  reset=None, refractory=False, threshold=None,
-                 callback=None, n_samples=None, level=0, param_init=None):
+                 n_samples=None, level=0, param_init=None):
         """Initialize the fitter."""
         if method is None: method = 'exponential_euler'
         super().__init__(dt, model, input, output, input_var, output_var,
@@ -513,7 +513,7 @@ class OnlineTraceFitter(Fitter):
     def __init__(self, model=None, input_var=None, input=None,
                  output_var=None, output=None, dt=None, method=None,
                  reset=None, refractory=False, threshold=None,
-                 callback=None, n_samples=None, level=0, param_init=None):
+                 n_samples=None, level=0, param_init=None):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method)
