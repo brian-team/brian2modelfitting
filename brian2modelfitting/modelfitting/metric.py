@@ -85,11 +85,10 @@ class Metric(metaclass=abc.ABCMeta):
     To be used with modelfitting Fitters.
     """
     @abc.abstractmethod
-    def get_features(self, traces, output):
+    def get_features(self, traces, output, n_traces):
         """
         Function calculates features / errors for each of the traces and stores
         it in an attribute metric.features
-
 
         Parameters
         ----------
@@ -97,6 +96,8 @@ class Metric(metaclass=abc.ABCMeta):
             traces to be evaluated
         output: array
             goal traces
+        n_traces: int
+            number of input traces
         """
         pass
 
