@@ -137,10 +137,10 @@ class Metric(metaclass=abc.ABCMeta):
             weigheted/mean error for each set of parameters
 
         """
-        self.get_features(traces, output, n_traces)
-        self.get_errors(self.features, n_traces)
+        features = self.get_features(traces, output, n_traces)
+        errors = self.get_errors(features, n_traces)
 
-        return self.errors
+        return errors
 
 
 class MSEMetric(Metric):
@@ -163,12 +163,14 @@ class MSEMetric(Metric):
                 mse = sum(square(temp_out - trace))
                 mselist.append(mse)
 
-        self.features = mselist
+        return mselist
+
 
     def get_errors(self, features, n_traces):
         feat_arr = reshape(array(features), (n_traces,
                            int(len(features)/n_traces)))
-        self.errors = feat_arr.mean(axis=0)
+        errors = feat_arr.mean(axis=0)
+        return errors
 
 
 class GammaFactor(Metric):
@@ -211,12 +213,14 @@ class GammaFactor(Metric):
                 gf = get_gamma_factor(trace, temp_out, self.delta, self.dt)
                 gamma_factors.append(abs(1 - gf))
 
-        self.features = gamma_factors
+        return gamma_factors
+
 
     def get_errors(self, features, n_traces):
         feat_arr = reshape(array(features), (n_traces,
                            int(len(features)/n_traces)))
-        self.errors = feat_arr.mean(axis=0)
+        errors = feat_arr.mean(axis=0)
+        return errors
 
 
 class FeatureMetric(Metric):
@@ -262,7 +266,7 @@ class FeatureMetric(Metric):
         self.check_values(self.out_feat)
 
         sl = int(shape(traces)[0]/n_traces)
-        feat = []
+        features = []
         temp_traces = split(traces, sl)
 
         for ii in arange(sl):
@@ -270,9 +274,10 @@ class FeatureMetric(Metric):
             temp_feat = calc_eFEL(temp_trace, self.traces_times,
                                   self.feat_list)
             self.check_values(temp_feat)
-            feat.append(temp_feat)
+            features.append(temp_feat)
 
-        self.features = feat
+        return features
+
 
     def get_errors(self, features, n_traces):
         errors = []
@@ -285,4 +290,4 @@ class FeatureMetric(Metric):
             error = sum(abs(temp_errors))
             errors.append(error)
 
-        self.errors = errors
+        return errors
