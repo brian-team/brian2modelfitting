@@ -456,12 +456,12 @@ class TraceFitter(Fitter):
 
 class SpikeFitter(Fitter):
     def __init__(self, model=None, input_var='I', input=None,
-                 output_var='v', output=None, dt=None, method=None,
-                 reset=None, refractory=False, threshold=None,
+                 output=None, dt=None, method=None, reset=None,
+                 refractory=False, threshold=None,
                  n_samples=None, level=0, param_init=None):
         """Initialize the fitter."""
         if method is None: method = 'exponential_euler'
-        super().__init__(dt, model, input, output, input_var, output_var,
+        super().__init__(dt, model, input, output, input_var, 'v',
                          n_samples, threshold, reset, refractory, method)
 
         if input_var not in model.identifiers:
