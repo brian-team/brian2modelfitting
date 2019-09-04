@@ -174,7 +174,7 @@ class Fitter(metaclass=abc.ABCMeta):
         """
         pass
 
-    def optimization_iter(self, optimizer, metric, param_init):
+    def optimization_iter(self, optimizer, metric):
         """
         Function performs all operations required for one iteration of
         optimization. Drawing parameters, setting them to simulator and
@@ -188,8 +188,6 @@ class Fitter(metaclass=abc.ABCMeta):
             drawn parameters
         errors: list
             calculated errors
-        param_init: dict
-            values of parameters to be initialzed
         """
         parameters = optimizer.ask(n_samples=self.n_samples)
 
@@ -206,10 +204,9 @@ class Fitter(metaclass=abc.ABCMeta):
 
         return results, parameters, errors
 
-    def fit(self, optimizer=None, metric=None,
+    def fit(self, optimizer, metric=None,
             n_rounds=1,
             callback='text',
-            param_init=None,
             restart=False,
             **params):
         """
@@ -269,8 +266,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
         # Run Optimization Loop
         for k in range(n_rounds):
-            res, parameters, errors = self.optimization_iter(optimizer, metric,
-                                                             param_init)
+            res, parameters, errors = self.optimization_iter(optimizer, metric)
 
             # create output variables
             self.best_res = make_dic(self.parameter_names, res)
