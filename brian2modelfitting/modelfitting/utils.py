@@ -34,8 +34,8 @@ def callback_setup(set_type, n_rounds):
     elif type(set_type) is FunctionType:
         callback = set_type
     else:
-        raise TypeError("callback has to be a str ('text' or 'progressbar'),\
-                         callable or None")
+        raise TypeError("callback has to be a str ('text' or 'progressbar'), "
+                        "callable or None")
 
     return callback
 

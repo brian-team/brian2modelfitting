@@ -193,8 +193,8 @@ class GammaFactor(Metric):
         delta: time window [ms]
         """
         if delta is None:
-            raise AssertionError('delta (time window for gamma factor), \
-                                 has to be set to ms')
+            raise AssertionError("delta (time window for gamma factor), "
+                                 "has to be set to ms")
         self.delta = delta
         self.dt = dt
 
@@ -238,8 +238,8 @@ class FeatureMetric(Metric):
                     raise Warning('None for key:{}'.format(k))
                 if (len(r[k])) > 1:
                     # print(k, r[k])
-                    raise ValueError('you can only use features that return \
-                                      one value')
+                    raise ValueError("you can only use features that return "
+                                     "one value")
 
     def feat_to_err(self, d1, d2):
         d = {}

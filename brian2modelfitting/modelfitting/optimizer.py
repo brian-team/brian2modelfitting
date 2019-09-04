@@ -131,8 +131,8 @@ class NevergradOptimizer(Optimizer):
     def initialize(self, parameter_names, **params):
         for param in params.keys():
             if (param not in parameter_names):
-                raise Exception("Parameter %s must be defined as a parameter \
-                                 in the model" % param)
+                raise Exception("Parameter %s must be defined as a parameter"
+                                "in the model" % param)
 
         bounds = calc_bounds(parameter_names, **params)
 
@@ -159,8 +159,8 @@ class NevergradOptimizer(Optimizer):
 
     def tell(self, parameters, errors):
         if not(all(parameters == [list(v.args) for v in self.candidates])):
-            raise AssertionError("Parameters and Candidates don't have \
-                                  identical values")
+            raise AssertionError("Parameters and Candidates don't have"
+                                 "identical values")
 
         for i, candidate in enumerate(self.candidates):
             self.optim.tell(candidate, errors[i])
@@ -191,8 +191,8 @@ class SkoptOptimizer(Optimizer):
         super(Optimizer, self).__init__()
         if not(method.upper() in ["GP", "RF", "ET", "GBRT"] or
                isinstance(method, RegressorMixin)):
-            raise AssertionError("Provided method: {} is not an skopt \
-                                  optimization or a regressor".format(method))
+            raise AssertionError("Provided method: {} is not an skopt "
+                                 "optimization or a regressor".format(method))
 
         self.method = method
         self.kwds = kwds
@@ -200,8 +200,8 @@ class SkoptOptimizer(Optimizer):
     def initialize(self, parameter_names, **params):
         for param in params.keys():
             if (param not in parameter_names):
-                raise Exception("Parameter %s must be defined as a parameter \
-                                 in the model" % param)
+                raise Exception("Parameter %s must be defined as a parameter "
+                                "in the model" % param)
 
         bounds = calc_bounds(parameter_names, **params)
 
