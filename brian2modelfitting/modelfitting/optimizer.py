@@ -131,7 +131,7 @@ class NevergradOptimizer(Optimizer):
     def initialize(self, parameter_names, **params):
         for param in params.keys():
             if (param not in parameter_names):
-                raise Exception("Parameter %s must be defined as a parameter"
+                raise Exception("Parameter %s must be defined as a parameter "
                                 "in the model" % param)
 
         bounds = calc_bounds(parameter_names, **params)
@@ -159,7 +159,7 @@ class NevergradOptimizer(Optimizer):
 
     def tell(self, parameters, errors):
         if not(all(parameters == [list(v.args) for v in self.candidates])):
-            raise AssertionError("Parameters and Candidates don't have"
+            raise AssertionError("Parameters and Candidates don't have "
                                  "identical values")
 
         for i, candidate in enumerate(self.candidates):

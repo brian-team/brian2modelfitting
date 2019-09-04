@@ -487,7 +487,7 @@ class SpikeFitter(Fitter):
         if param_init:
             for param, val in param_init.items():
                 if not (param in self.model.identifiers or param in self.model.names):
-                    raise ValueError("%s is not a model variable or an"
+                    raise ValueError("%s is not a model variable or an "
                                      "identifier in the model" % param)
             for k, v in param_init.items():
                 self.network['neurons'].__setattr__(k, v)
