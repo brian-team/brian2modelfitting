@@ -117,7 +117,7 @@ class NevergradOptimizer(Optimizer):
         number of evaluations which will be run in parallel at once
     """
 
-    def __init__(self,  method='DE', popsize=30, **kwds):
+    def __init__(self,  method='DE', **kwds):
         super(Optimizer, self).__init__()
 
         if method not in list(registry.keys()):
@@ -125,10 +125,9 @@ class NevergradOptimizer(Optimizer):
                                  + method)
 
         self.method = method
-        self.popsize = popsize
         self.kwds = kwds
 
-    def initialize(self, parameter_names, **params):
+    def initialize(self, parameter_names, popsize, **params):
         for param in params.keys():
             if (param not in parameter_names):
                 raise Exception("Parameter %s must be defined as a parameter "
@@ -145,7 +144,7 @@ class NevergradOptimizer(Optimizer):
         self.optim = optimizerlib.registry[self.method](instrumentation=instrum,
                                                         **self.kwds)
 
-        self.optim._llambda = self.popsize  # TODO: more elegant way once possible
+        self.optim._llambda = popsize  # TODO: more elegant way once possible
 
     def ask(self, n_samples):
         self.candidates, parameters = [], []

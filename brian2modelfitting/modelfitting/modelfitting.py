@@ -257,7 +257,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
         if self.optimizer is None or restart is True:
             self.results_, self.errors = [], []
-            optimizer.initialize(self.parameter_names, **params)
+            optimizer.initialize(self.parameter_names, popsize=self.n_samples, **params)
 
         self.optimizer = optimizer
         self.metric = metric

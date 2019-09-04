@@ -42,10 +42,10 @@ Cm   : farad (constant)
 ## Optimization and Metric Choice
 n_opt = NevergradOptimizer()
 
-## Fitting
+## FittingNone
 fitter = OnlineTraceFitter(model=eqs, input_var='I', output_var='v',
                      input=inp_traces*amp, output=out_traces*mV, dt=dt,
-                     n_samples=20,
+                     n_samples=40,
                      param_init={'v': -65*mV},
                      method='exponential_euler',)
 

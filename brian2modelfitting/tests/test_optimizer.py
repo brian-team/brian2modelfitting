@@ -46,18 +46,18 @@ def test_calc_bounds():
 
 def test_initialize_nevergrad():
     n_opt = NevergradOptimizer()
-    n_opt.initialize({'g'}, g=[1, 30])
+    n_opt.initialize({'g'}, g=[1, 30], popsize=30)
     assert isinstance(n_opt.optim, NOptimzer)
     assert_equal(n_opt.optim.dimension, 1)
 
-    n_opt.initialize(['g', 'E'], g=[1, 30], E=[2, 20])
+    n_opt.initialize(['g', 'E'], g=[1, 30], E=[2, 20], popsize=30)
     assert isinstance(n_opt.optim, NOptimzer)
     assert_equal(n_opt.optim.dimension, 2)
 
-    assert_raises(AssertionError, n_opt.initialize, ['g'], g=[1])
-    assert_raises(AssertionError, n_opt.initialize, ['g'], g=[[1, 2]])
-    assert_raises(Exception, n_opt.initialize, ['g'], g=[1, 2], E=[1, 2])
-    assert_raises(Exception, n_opt.initialize, ['g', 'E'], g=[1, 2])
+    assert_raises(AssertionError, n_opt.initialize, ['g'], g=[1], popsize=30)
+    assert_raises(AssertionError, n_opt.initialize, ['g'], g=[[1, 2]], popsize=30)
+    assert_raises(Exception, n_opt.initialize, ['g'], g=[1, 2], E=[1, 2], popsize=30)
+    assert_raises(Exception, n_opt.initialize, ['g', 'E'], g=[1, 2], popsize=30)
 
 
 def test_initialize_skopt():
@@ -77,7 +77,7 @@ def test_initialize_skopt():
 
 def test_ask_nevergrad():
     n_opt = NevergradOptimizer()
-    n_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3])
+    n_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3], popsize=30)
 
     n_samples = np.random.randint(1, 30)
     params = n_opt.ask(n_samples)
@@ -103,7 +103,7 @@ def test_ask_skopt():
 
 def test_tell_nevergrad():
     n_opt = NevergradOptimizer()
-    n_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3])
+    n_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3], popsize=30)
 
     n_samples = np.random.randint(1, 30)
     data = np.random.rand(n_samples, 3)
@@ -136,7 +136,7 @@ def test_tell_skopt():
 
 def test_recommend_nevergrad():
     n_opt = NevergradOptimizer()
-    n_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3])
+    n_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3], popsize=30)
 
     n_samples = np.random.randint(1, 30)
     data = np.random.rand(n_samples, 3)
