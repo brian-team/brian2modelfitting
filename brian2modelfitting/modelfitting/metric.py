@@ -183,7 +183,7 @@ class GammaFactor(Metric):
     """ + Metric.get_features.__doc__
 
     @check_units(dt=second, delta=second)
-    def __init__(self, dt, delta=None):
+    def __init__(self, dt, delta):
         """
         Initialize the metric with time window delta and time step dt output
 

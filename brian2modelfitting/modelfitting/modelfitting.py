@@ -389,10 +389,9 @@ class Fitter(metaclass=abc.ABCMeta):
 
 class TraceFitter(Fitter):
     """Input nad output have to have the same dimensions."""
-    def __init__(self, model=None, input_var=None, input=None,
-                 output_var=None, output=None, dt=None, method=None,
-                 reset=None, refractory=False, threshold=None,
-                 n_samples=None, level=0, param_init=None):
+    def __init__(self, model, input_var, input, output_var, output, dt,
+                 n_samples=30, method=None, reset=None, refractory=False,
+                 threshold=None, level=0, param_init=None):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method)
@@ -451,10 +450,9 @@ class TraceFitter(Fitter):
 
 
 class SpikeFitter(Fitter):
-    def __init__(self, model=None, input_var='I', input=None,
-                 output=None, dt=None, method=None, reset=None,
-                 refractory=False, threshold=None,
-                 n_samples=None, level=0, param_init=None):
+    def __init__(self, model, input, output, dt, reset, threshold,
+                 input_var='I', refractory=False, n_samples=30,
+                 method=None, level=0, param_init=None):
         """Initialize the fitter."""
         if method is None: method = 'exponential_euler'
         super().__init__(dt, model, input, output, input_var, 'v',
@@ -508,10 +506,9 @@ class SpikeFitter(Fitter):
 
 class OnlineTraceFitter(Fitter):
     """Input nad output have to have the same dimensions."""
-    def __init__(self, model=None, input_var=None, input=None,
-                 output_var=None, output=None, dt=None, method=None,
-                 reset=None, refractory=False, threshold=None,
-                 n_samples=None, level=0, param_init=None):
+    def __init__(self, model, input_var, input, output_var, output, dt,
+                 n_samples=30,  method=None, reset=None, refractory=False,
+                 threshold=None, level=0, param_init=None):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method)
