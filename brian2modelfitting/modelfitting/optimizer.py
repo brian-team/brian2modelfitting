@@ -38,7 +38,7 @@ class Optimizer(metaclass=abc.ABCMeta):
     Fitter.
     """
     @abc.abstractmethod
-    def initialize(self, parameter_names, **params):
+    def initialize(self, parameter_names, popsize, **params):
         """
         Initialize the instrumentation for the optimization, based on
         parameters, creates bounds for variables and attaches them to the
@@ -48,6 +48,8 @@ class Optimizer(metaclass=abc.ABCMeta):
         ----------
         parameter_names: list
             list of parameter names in use
+        popsize: int
+            population size 
         **params:
             bounds for each parameter
         """
@@ -196,7 +198,7 @@ class SkoptOptimizer(Optimizer):
         self.method = method
         self.kwds = kwds
 
-    def initialize(self, parameter_names, **params):
+    def initialize(self, parameter_names, popsize, **params):
         for param in params.keys():
             if (param not in parameter_names):
                 raise Exception("Parameter %s must be defined as a parameter "
