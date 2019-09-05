@@ -105,6 +105,12 @@ class Fitter(metaclass=abc.ABCMeta):
                                 "to create new script")
         if dt is None:
             raise ValueError('dt (sampling frequency of the input) must be set')
+
+        if isinstance(model, str):
+            model = Equations(model)
+        if input_var not in model.identifiers:
+            raise Exception("%s is not an identifier in the model" % input_var)
+
         defaultclock.dt = dt
         self.dt = dt
 
@@ -125,16 +131,14 @@ class Fitter(metaclass=abc.ABCMeta):
         self.input = input
         self.output = output
         self.output_var = output_var
+        self.model = model
 
         # initialization of attributes used later
         self.best_res = None
         self.input_traces = None
-        self.model = None
         self.network = None
-
         self.optimizer = None
         self.metric = None
-
 
 
     def setup_neuron_group(self, n_neurons, namespace, name='neurons'):
@@ -396,10 +400,7 @@ class TraceFitter(Fitter):
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method)
 
-        if input_var not in model.identifiers:
-            raise Exception("%s is not an identifier in the model" % input_var)
-
-        if output_var not in model.names:
+        if output_var not in self.model.names:
             raise Exception("%s is not a model variable" % output_var)
         if output.shape != input.shape:
             raise Exception("Input and output must have the same size")
@@ -407,11 +408,10 @@ class TraceFitter(Fitter):
         # Replace input variable by TimedArray
         output_traces = TimedArray(output.transpose(), dt=dt)
         input_traces = TimedArray(input.transpose(), dt=dt)
-        model = model + Equations(input_var + '= input_var(t, i % n_traces) :\
+        self.model = self.model + Equations(input_var + '= input_var(t, i % n_traces) :\
                                   ' + "% s" % repr(input.dim))
 
         self.input_traces = input_traces
-        self.model = model
 
         # Setup NeuronGroup
         namespace = get_local_namespace(level=level+1)
@@ -458,16 +458,12 @@ class SpikeFitter(Fitter):
         super().__init__(dt, model, input, output, input_var, 'v',
                          n_samples, threshold, reset, refractory, method)
 
-        if input_var not in model.identifiers:
-            raise Exception("%s is not an identifier in the model" % input_var)
-
         # Replace input variable by TimedArray
         input_traces = TimedArray(input.transpose(), dt=dt)
-        model = model + Equations(input_var + '= input_var(t, i % n_traces) :\
+        self.model = self.model + Equations(input_var + '= input_var(t, i % n_traces) :\
                                    ' + "% s" % repr(input.dim))
 
         self.input_traces = input_traces
-        self.model = model
 
         # Setup NeuronGroup
         namespace = get_local_namespace(level=level+1)
@@ -513,10 +509,7 @@ class OnlineTraceFitter(Fitter):
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method)
 
-        if input_var not in model.identifiers:
-            raise Exception("%s is not an identifier in the model" % input_var)
-
-        if output_var not in model.names:
+        if output_var not in self.model.names:
             raise Exception("%s is not a model variable" % output_var)
         if output.shape != input.shape:
             raise Exception("Input and output must have the same size")
@@ -524,12 +517,11 @@ class OnlineTraceFitter(Fitter):
         # Replace input variable by TimedArray
         output_traces = TimedArray(output.transpose(), dt=dt)
         input_traces = TimedArray(input.transpose(), dt=dt)
-        model = model + Equations(input_var + '= input_var(t, i % n_traces) :\
+        self.model = self.model + Equations(input_var + '= input_var(t, i % n_traces) :\
                                   ' + "% s" % repr(input.dim))
-        model = model + Equations('total_error : %s' % repr(output.dim**2))
+        self.model = self.model + Equations('total_error : %s' % repr(output.dim**2))
 
         self.input_traces = input_traces
-        self.model = model
 
         # Setup NeuronGroup
         namespace = get_local_namespace(level=level+1)

@@ -27,6 +27,11 @@ model = Equations('''
     g : siemens (constant)
     ''')
 
+strmodel = '''
+    I = g*(v-E) : amp
+    g : siemens (constant)
+    '''
+
 n_opt = NevergradOptimizer()
 metric = MSEMetric()
 
@@ -54,7 +59,7 @@ def setup_online(request):
     dt = 0.01 * ms
 
     otf = OnlineTraceFitter(dt=dt,
-                            model=model,
+                            model=strmodel,
                             input_var='v',
                             output_var='I',
                             input=input_traces,
@@ -83,8 +88,6 @@ def test_get_param_dic():
     assert_equal(d, {'a': [1, 1, 2, 2], 'b': [3, 3, 4, 4]})
 
 
-
-
 def test_tracefitter_init(setup):
     dt, tf = setup
     attr_fitter = ['dt', 'results_', 'simulator', 'parameter_names', 'n_traces',
@@ -109,7 +112,6 @@ def test_tracefitter_init(setup):
     assert isinstance(tf.simulator, Simulation)
     assert isinstance(tf.input_traces, TimedArray)
     assert isinstance(tf.model, Equations)
-
 
 def test_tracefitter_init_errors(setup):
     dt, _ = setup

@@ -24,8 +24,7 @@ dt = 0.01*ms
 defaultclock.dt = dt
 
 ## Modle Definition
-eqs = Equations(
-'''
+eqs='''
 dv/dt = (gl*(El-v) - g_na*(m*m*m)*h*(v-ENa) - g_kd*(n*n*n*n)*(v-EK) + I)/Cm : volt
 dm/dt = 0.32*(mV**-1)*(13.*mV-v+VT)/
     (exp((13.*mV-v+VT)/(4.*mV))-1.)/ms*(1-m)-0.28*(mV**-1)*(v-VT-40.*mV)/
@@ -37,7 +36,7 @@ g_na : siemens (constant)
 g_kd : siemens (constant)
 gl   : siemens (constant)
 Cm   : farad (constant)
-''',)
+'''
 
 ## Optimization and Metric Choice
 n_opt = NevergradOptimizer()
