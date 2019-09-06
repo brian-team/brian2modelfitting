@@ -401,7 +401,7 @@ class TraceFitter(Fitter):
                          n_samples, threshold, reset, refractory, method)
 
         if output_var not in self.model.names:
-            raise Exception("%s is not a model variable" % output_var)
+            raise ValueError("%s is not a model variable" % output_var)
         if output.shape != input.shape:
             raise Exception("Input and output must have the same size")
 
@@ -510,7 +510,7 @@ class OnlineTraceFitter(Fitter):
                          n_samples, threshold, reset, refractory, method)
 
         if output_var not in self.model.names:
-            raise Exception("%s is not a model variable" % output_var)
+            raise ValueError("%s is not a model variable" % output_var)
         if output.shape != input.shape:
             raise Exception("Input and output must have the same size")
 
