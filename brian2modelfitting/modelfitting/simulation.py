@@ -51,7 +51,7 @@ class Simulation(metaclass=abc.ABCMeta):
     Simluation class created to perform a simulation for fit_traces
     """
     @abc.abstractmethod
-    def initialize(self, network):
+    def initialize(self, network, var_init, name):
         """
         Prepares the simulation for running
 
@@ -60,6 +60,10 @@ class Simulation(metaclass=abc.ABCMeta):
         network: Network initialized instance
             consisting of NeuronGroup named 'neurons' and a Monitor named
             'monitor'
+        var_init: dict
+            dictionary to initialize the variable states
+        name: str(optional)
+            name of the network
         """
         pass
 
@@ -82,26 +86,32 @@ class Simulation(metaclass=abc.ABCMeta):
 
 class RuntimeSimulation(Simulation):
     """Simulation class created for use with RuntimeDevice"""
-    def initialize(self, network, name='neurons'):
+    def initialize(self, network, var_init, name='neurons'):
         if network[name] is NeuronGroup:
             raise Exception("Network needs to have a NeuronGroup 'neurons'")
 
         self.network = network
+        self.var_init = var_init
         self.network.store()
 
     def run(self, duration, params, params_names, name='neurons'):
         self.network.restore()
         self.network[name].set_states(params, units=False)
-        self.network.run(duration)
+        if self.var_init is not None:
+            for k, v in self.var_init.items():
+                self.network[name].__setattr__(k, v)
+
+        self.network.run(duration, namespace={})
 
 
 class CPPStandaloneSimulation(Simulation):
     """Simulation class created for use with CPPStandaloneDevice"""
-    def initialize(self, network, name='neurons'):
+    def initialize(self, network, var_init, name='neurons'):
         if not network[name]:
             raise Exception("Network needs to have a NeuronGroup 'neurons'")
 
         self.network = network
+        self.var_init = var_init
 
     def run(self, duration, params, params_names, name='neurons'):
         """
@@ -112,7 +122,11 @@ class CPPStandaloneSimulation(Simulation):
             self.params_init = initialize_neurons(params_names,
                                                   self.network[name],
                                                   params)
-            self.network.run(duration)
+            if self.var_init is not None:
+                for k, v in self.var_init.items():
+                    self.network[name].__setattr__(k, v)
+
+            self.network.run(duration, namespace={})
 
         else:
             set_states(self.params_init, params)

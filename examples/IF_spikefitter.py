@@ -70,15 +70,12 @@ print('goal:', {'gL': 30*nS, 'C':1*nF})
 print('results:', result_dict['C']*farad, result_dict['gL']*siemens)
 
 # visualization of the results
-start_scope()
-
 EL = -70*mV
 VT = -50*mV
 DeltaT = 2*mV
 spikes = fitter.generate_spikes(params=None, param_init={'v': -70*mV})
 print('spike times:', spikes)
 
-start_scope()
 EL = -70*mV
 VT = -50*mV
 DeltaT = 2*mV

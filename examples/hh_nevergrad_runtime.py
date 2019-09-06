@@ -46,10 +46,10 @@ metric = MSEMetric()
 fitter = TraceFitter(model=eqs, input_var='I', output_var='v',
                      input=inp_traces*amp, output=out_traces*mV, dt=dt,
                      n_samples=20,
-                     param_init={'v': -65*mV},
+                     param_init={'v': 'VT'},
                      method='exponential_euler',)
 
-res, error = fitter.fit(n_rounds=10,
+res, error = fitter.fit(n_rounds=2,
                         optimizer=n_opt, metric=metric,
                         callback='text',
                         gl = [1e-09 *siemens, 1e-07 *siemens],

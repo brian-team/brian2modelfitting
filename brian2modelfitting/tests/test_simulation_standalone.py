@@ -61,10 +61,11 @@ def test_initialize_simulation_standalone():
     start_scope()
     sas = CPPStandaloneSimulation()
     assert_raises(TypeError, sas.initialize)
-    assert_raises(KeyError, sas.initialize, empty_net)
-    assert_raises(Exception, sas.initialize, wrong_net)
+    assert_raises(TypeError, sas.initialize, net)
+    assert_raises(KeyError, sas.initialize, empty_net, None)
+    assert_raises(Exception, sas.initialize, wrong_net, None)
 
-    sas.initialize(net)
+    sas.initialize(net, var_init=None)
     assert(isinstance(sas.network, Network))
 
 
@@ -80,7 +81,7 @@ def test_run_simulation_standalone(setup):
     device.activate()
     device.has_been_run = False
     sas = CPPStandaloneSimulation()
-    sas.initialize(net)
+    sas.initialize(net, var_init=None)
 
     sas.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
     I = getattr(sas.network['monitor'], 'I')

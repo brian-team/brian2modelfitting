@@ -75,7 +75,7 @@ metric = MSEMetric()
 fitter = TraceFitter(model=eqs, input_var='I', output_var='v',
                      input=inp_trace * amp, output=[out_trace]*mV, dt=dt,
                      n_samples=5,
-                     param_init={'v': -65*mV},
+                     param_init={'v': 'VT'},
                      method='exponential_euler',)
 
 res, error = fitter.fit(n_rounds=2,

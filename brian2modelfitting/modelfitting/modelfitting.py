@@ -139,6 +139,7 @@ class Fitter(metaclass=abc.ABCMeta):
         self.network = None
         self.optimizer = None
         self.metric = None
+        self.param_init = None
 
 
     def setup_neuron_group(self, n_neurons, namespace, name='neurons'):
@@ -374,13 +375,12 @@ class Fitter(metaclass=abc.ABCMeta):
             monitor = StateMonitor(self.neurons, output_var, record=True,
                                    name='monitor_')
         network = Network(self.neurons, monitor)
-        self.simulator.initialize(self.network)
 
         if param_init:
-            for k, v in param_init.items():
-                network['neurons_'].__setattr__(k, v)
+            self.simulator.initialize(network, param_init, name='neurons_')
+        else:
+            self.simulator.initialize(network, self.param_init, name='neurons_')
 
-        self.simulator.initialize(network, name='neurons_')
         self.simulator.run(self.duration, params, self.parameter_names, name='neurons_')
 
         if output_var == 'spikes':
@@ -428,10 +428,9 @@ class TraceFitter(Fitter):
                 if not (param in self.model.identifiers or param in self.model.names):
                     raise ValueError("%s is not a model variable or an "
                                      "identifier in the model" % param)
-            for k, v in param_init.items():
-                self.network['neurons'].__setattr__(k, v)
-
-        self.simulator.initialize(self.network)
+            self.param_init = param_init
+            
+        self.simulator.initialize(self.network, self.param_init)
 
     def calc_errors(self, metric):
         """
@@ -479,10 +478,9 @@ class SpikeFitter(Fitter):
                 if not (param in self.model.identifiers or param in self.model.names):
                     raise ValueError("%s is not a model variable or an "
                                      "identifier in the model" % param)
-            for k, v in param_init.items():
-                self.network['neurons'].__setattr__(k, v)
+            self.param_init = param_init
 
-        self.simulator.initialize(self.network)
+        self.simulator.initialize(self.network, self.param_init)
 
     def calc_errors(self, metric):
         """
@@ -543,10 +541,9 @@ class OnlineTraceFitter(Fitter):
                 if not (param in self.model.identifiers or param in self.model.names):
                     raise ValueError("%s is not a model variable or an "
                                      "identifier in the model" % param)
-            for k, v in param_init.items():
-                self.network['neurons'].__setattr__(k, v)
+            self.param_init = param_init
 
-        self.simulator.initialize(self.network)
+        self.simulator.initialize(self.network, self.param_init)
 
     def calc_errors(self, metric=None):
         """Calculates error in online fashion.To be used inside optim_iter."""
