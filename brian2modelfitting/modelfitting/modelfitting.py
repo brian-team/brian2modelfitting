@@ -1,5 +1,5 @@
 import abc
-from numpy import ones, array, arange, concatenate, mean
+from numpy import ones, array, arange, concatenate, mean, nanmin
 from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
                     StateMonitor, SpikeMonitor, ms, device, second,
                     get_local_namespace, Quantity)
@@ -274,7 +274,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
             # create output variables
             self.best_res = make_dic(self.parameter_names, res)
-            error = min(errors)
+            error = nanmin(self.errors)
 
             if callback(res, errors, parameters, k) is True:
                 break
