@@ -84,14 +84,14 @@ def test_spikefitter_init(setup):
     attr_fitter = ['dt', 'results_', 'simulator', 'parameter_names', 'n_traces',
                    'duration', 'n_neurons', 'n_samples', 'method', 'threshold',
                    'reset', 'refractory', 'input', 'output', 'output_var',
-                   'best_res', 'input_traces', 'model', 'network', 'optimizer',
+                   'best_params', 'input_traces', 'model', 'network', 'optimizer',
                    'metric']
     for attr in attr_fitter:
         assert hasattr(sf, attr)
 
     assert sf.metric is None
     assert sf.optimizer is None
-    assert sf.best_res is None
+    assert sf.best_params is None
 
     attr_spikefitter = ['input_traces', 'model', 'neurons', 'network',
                         'simulator']
@@ -123,7 +123,7 @@ def test_spikefitter_fit(setup):
                              gL=[20*nS, 40*nS],
                              C=[0.5*nF, 1.5*nF])
 
-    attr_fit = ['optimizer', 'metric', 'best_res']
+    attr_fit = ['optimizer', 'metric', 'best_params']
     for attr in attr_fit:
         assert hasattr(sf, attr)
 
@@ -136,7 +136,7 @@ def test_spikefitter_fit(setup):
     assert 'gL' in results.keys()
     assert 'C' in results.keys()
 
-    assert_equal(results, sf.best_res)
+    assert_equal(results, sf.best_params)
 
 
 def test_spikefitter_param_init(setup):

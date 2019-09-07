@@ -2,13 +2,15 @@ from tqdm.autonotebook import tqdm
 from types import FunctionType
 
 
-def callback_text(res, errors, parameters, k):
+def callback_text(params, errors, best_params, best_error, index):
     """Default callback print-out for Fitters"""
-    print("Round {}: fit {} with error: {}".format(k, res, min(errors)))
+    print("Round {}: fit {} with error: {}".format(index, best_params, best_error))
 
-def callback_none(res, errors, parameters, k):
+
+def callback_none(params, errors, best_params, best_error, index):
     """Non-verbose callback"""
     pass
+
 
 class ProgressBar(object):
     """Setup for tqdm progress bar in Fitter"""

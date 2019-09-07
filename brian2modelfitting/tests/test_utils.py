@@ -11,13 +11,13 @@ from numpy.testing.utils import assert_equal
 
 
 def test_callback_text(capsys):
-    callback_text({'a':1}, [1.2], [1, 2, 3], 3)
+    callback_text([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2)
     c, _ = capsys.readouterr()
-    assert_equal(c, "Round 3: fit {'a': 1} with error: 1.2\n")
+    assert_equal(c, "Round 2: fit {'a': 3} with error: 0.1\n")
 
 
 def test_callback_none():
-    c = callback_none({'a':1}, [1.2], [1, 2, 3], 3)
+    c = callback_none([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2)
     assert isinstance(c, type(None))
 
 
@@ -37,15 +37,15 @@ def test_callback_setup():
 
     c = callback_setup(None, 10)
     assert callable(c)
-    x = c({'a':1}, [1.2], [1, 2, 3], 3)
+    x = c([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2)
     assert x is None
 
-    def callback(res, errors, parameters, k):
-        return parameters
+    def callback(params, errors, best_params, best_error, index):
+        return params
 
     c = callback_setup(callback, 10)
     assert callable(c)
-    x = c({'a':1}, [1.2], [1, 2, 3], 3)
+    x = c([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2)
     assert_equal(x, [1, 2, 3])
 
 

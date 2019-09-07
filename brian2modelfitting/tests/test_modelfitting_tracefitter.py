@@ -93,14 +93,14 @@ def test_tracefitter_init(setup):
     attr_fitter = ['dt', 'results_', 'simulator', 'parameter_names', 'n_traces',
                    'duration', 'n_neurons', 'n_samples', 'method', 'threshold',
                    'reset', 'refractory', 'input', 'output', 'output_var',
-                   'best_res', 'input_traces', 'model', 'network', 'optimizer',
+                   'best_params', 'input_traces', 'model', 'network', 'optimizer',
                    'metric']
     for attr in attr_fitter:
         assert hasattr(tf, attr)
 
     assert tf.metric is None
     assert tf.optimizer is None
-    assert tf.best_res is None
+    assert tf.best_params is None
 
     attr_tracefitter = ['input_traces', 'model', 'neurons', 'network',
                         'simulator']
@@ -144,7 +144,7 @@ def test_fitter_fit(setup):
                              metric=metric,
                              g=[1*nS, 30*nS])
 
-    attr_fit = ['optimizer', 'metric', 'best_res']
+    attr_fit = ['optimizer', 'metric', 'best_params']
     for attr in attr_fit:
         assert hasattr(tf, attr)
 
@@ -156,7 +156,7 @@ def test_fitter_fit(setup):
     assert isinstance(errors, float)
     assert 'g' in results.keys()
 
-    assert_equal(results, tf.best_res)
+    assert_equal(results, tf.best_params)
 
 
 def test_fitter_fit_errors(setup):
@@ -248,7 +248,7 @@ def test_fitter_generate_traces(setup):
 
 def test_fitter_results(setup):
     dt, tf = setup
-    best_res, errors = tf.fit(n_rounds=2,
+    best_params, errors = tf.fit(n_rounds=2,
                               optimizer=n_opt,
                               metric=metric,
                               g=[1*nS, 30*nS],
@@ -286,14 +286,14 @@ def test_onlinetracefitter_init(setup_online):
     attr_fitter = ['dt', 'results_', 'simulator', 'parameter_names', 'n_traces',
                    'duration', 'n_neurons', 'n_samples', 'method', 'threshold',
                    'reset', 'refractory', 'input', 'output', 'output_var',
-                   'best_res', 'input_traces', 'model', 'network', 'optimizer',
+                   'best_params', 'input_traces', 'model', 'network', 'optimizer',
                    'metric']
     for attr in attr_fitter:
         assert hasattr(otf, attr)
 
     assert otf.metric is None
     assert otf.optimizer is None
-    assert otf.best_res is None
+    assert otf.best_params is None
 
     attr_tracefitter = ['input_traces', 'model', 'neurons', 'network',
                         'simulator']
@@ -338,7 +338,7 @@ def test_onlinetracefitter_fit(setup_online):
                               g=[1*nS, 30*nS],
                               restart=False,)
 
-    attr_fit = ['optimizer', 'metric', 'best_res']
+    attr_fit = ['optimizer', 'metric', 'best_params']
     for attr in attr_fit:
         assert hasattr(otf, attr)
 
@@ -350,4 +350,4 @@ def test_onlinetracefitter_fit(setup_online):
     assert isinstance(errors, float)
     assert 'g' in results.keys()
 
-    assert_equal(results, otf.best_res)
+    assert_equal(results, otf.best_params)

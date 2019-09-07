@@ -134,7 +134,7 @@ class Fitter(metaclass=abc.ABCMeta):
         self.model = model
 
         # initialization of attributes used later
-        self.best_res = None
+        self.best_params = None
         self.input_traces = None
         self.network = None
         self.optimizer = None
@@ -271,16 +271,16 @@ class Fitter(metaclass=abc.ABCMeta):
 
         # Run Optimization Loop
         for k in range(n_rounds):
-            res, parameters, errors = self.optimization_iter(optimizer, metric)
+            params, parameters, errors = self.optimization_iter(optimizer, metric)
 
             # create output variables
-            self.best_res = make_dic(self.parameter_names, res)
+            self.best_params = make_dic(self.parameter_names, params)
             error = nanmin(self.errors)
 
-            if callback(res, errors, parameters, k) is True:
+            if callback(parameters, errors, params, error, k) is True:
                 break
 
-        return self.best_res, error
+        return self.best_params, error
 
     def results(self, format='list'):
         """
@@ -357,7 +357,7 @@ class Fitter(metaclass=abc.ABCMeta):
                                 "in standalone mode, which will make you lose monitor data "
                                 "add: device.reinit() & device.activate()")
         if params is None:
-            params = self.best_res
+            params = self.best_params
 
         defaultclock.dt = self.dt
         Ntraces, Nsteps = self.input.shape
@@ -429,7 +429,7 @@ class TraceFitter(Fitter):
                     raise ValueError("%s is not a model variable or an "
                                      "identifier in the model" % param)
             self.param_init = param_init
-            
+
         self.simulator.initialize(self.network, self.param_init)
 
     def calc_errors(self, metric):

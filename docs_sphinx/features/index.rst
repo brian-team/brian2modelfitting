@@ -55,17 +55,20 @@ The 'callback' input provides few default options, updated in each round:
 as well as **customized feedback option**. User can provide
 a *callable* (i.e. function), that will provide an output or printout. If callback returns
 ``True`` the fitting execution is interrupted.
-User gets four arguments to customize over:
 
-``results, errors, parameters, index``
+User gets four arguments to customize over:
+ - ``params`` - set of parameters from current round
+ - ``errors`` - set of errors from current round
+ - ``best_params`` - best parameters globally, from all rounds
+ - ``best_error`` - best parameters globally, from all rounds
+ - ``index`` - index of current round
 
 An example function:
 
 .. code:: python
 
- def callback(results, errors, parameters, index):
-     print('index {} errors minimum: {}'.format(index, min(errors)) )
-
+ def callback(params, errors, best_params, best_error, index):
+    print('index {} errors minimum: {}'.format(index, min(errors)))
 
 .. code:: python
 
