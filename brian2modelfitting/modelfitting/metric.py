@@ -1,6 +1,6 @@
 import abc
 import efel
-from brian2 import Hz, second
+from brian2 import Hz, second, Quantity
 from brian2.units.fundamentalunits import check_units
 from numpy import (array, sum, square, reshape, abs, amin, digitize,
                    rint, arange, atleast_2d, NaN, float64, split, shape,
@@ -147,13 +147,30 @@ class MSEMetric(Metric):
     __doc__ = "Mean Square Error between goal and calculated output." + \
               Metric.get_features.__doc__
 
-    def __init__(self, **kwds):
-        """Initialize the metric."""
-        pass
+    def __init__(self, t_start=None, dt=None, **kwds):
+        """
+        Initialize the metric.
+
+        Parameters
+        ----------
+        t_start: beggining of time window [ms] (optional)
+        dt: time step [ms] (necessary with t_start)
+        """
+        self.t_start = t_start
+        self.dt = dt
+
 
     def get_features(self, traces, output, n_traces):
         mselist = []
         output = atleast_2d(output)
+
+        if self.t_start is not None:
+            if not isinstance(self.dt , Quantity):
+                raise TypeError("To specify time window you need to also "
+                                "specify dt as Quantity")
+            t_start = int(self.t_start/self.dt)
+            output = output[:, t_start:-1]
+            traces = traces[:, t_start:-1]
 
         for i in arange(n_traces):
             temp_out = output[i]
@@ -241,7 +258,6 @@ class FeatureMetric(Metric):
                     r[k] = array([99])
                     raise Warning('None for key:{}'.format(k))
                 if (len(r[k])) > 1:
-                    # print(k, r[k])
                     raise ValueError("you can only use features that return "
                                      "one value")
 

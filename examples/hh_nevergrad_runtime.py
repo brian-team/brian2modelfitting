@@ -40,7 +40,7 @@ Cm   : farad (constant)
 
 ## Optimization and Metric Choice
 n_opt = NevergradOptimizer()
-metric = MSEMetric()
+metric = MSEMetric(t_start=5*ms, dt=dt)
 
 ## Fitting
 fitter = TraceFitter(model=eqs, input_var='I', output_var='v',

@@ -46,6 +46,16 @@ def test_calc_mse():
     assert_equal(mse.calc(out, out, 2), [0.])
     assert(np.all(mse.calc(inp, out, 2) > 0))
 
+def test_calc_mse_t_start():
+    mse = MSEMetric(t_start=1*ms, dt=0.1*ms)
+    out = np.random.rand(2, 200)
+    inp = np.random.rand(10, 200)
+
+    errors = mse.calc(inp, out, 2)
+    assert_equal(np.shape(errors), (5,))
+    assert_equal(mse.calc(out, out, 2), [0.])
+    assert(np.all(mse.calc(inp, out, 2) > 0))
+
 
 def test_calc_gf():
     assert_raises(TypeError, GammaFactor)
@@ -68,6 +78,20 @@ def test_get_features_mse():
     mse = MSEMetric()
     out_mse = np.random.rand(2, 20)
     inp_mse = np.random.rand(6, 20)
+
+    features = mse.get_features(inp_mse, out_mse, 2)
+    assert_equal(np.shape(features), (6,))
+    assert(np.all(np.array(features) > 0))
+
+    features = mse.get_features(out_mse, out_mse, 2)
+    assert_equal(np.shape(features), (2,))
+    assert_equal(features, [0., 0.])
+
+
+def test_get_features_mse_t_start():
+    mse = MSEMetric(t_start=1*ms, dt=0.1*ms)
+    out_mse = np.random.rand(2, 200)
+    inp_mse = np.random.rand(6, 200)
 
     features = mse.get_features(inp_mse, out_mse, 2)
     assert_equal(np.shape(features), (6,))

@@ -287,13 +287,14 @@ def test_onlinetracefitter_init(setup_online):
                    'duration', 'n_neurons', 'n_samples', 'method', 'threshold',
                    'reset', 'refractory', 'input', 'output', 'output_var',
                    'best_params', 'input_traces', 'model', 'network', 'optimizer',
-                   'metric']
+                   'metric', 't_start']
     for attr in attr_fitter:
         assert hasattr(otf, attr)
 
     assert otf.metric is None
     assert otf.optimizer is None
     assert otf.best_params is None
+    assert_equal(otf.t_start, 0*ms)
 
     attr_tracefitter = ['input_traces', 'model', 'neurons', 'network',
                         'simulator']

@@ -502,7 +502,7 @@ class OnlineTraceFitter(Fitter):
     """Input nad output have to have the same dimensions."""
     def __init__(self, model, input_var, input, output_var, output, dt,
                  n_samples=30,  method=None, reset=None, refractory=False,
-                 threshold=None, level=0, param_init=None):
+                 threshold=None, level=0, param_init=None, t_start=0*second):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method)
