@@ -42,7 +42,8 @@ Cm   : farad (constant)
 ## Optimization and Metric Choice
 n_opt = NevergradOptimizer()
 
-traces_times = [[50, 100], [50, 100], [50, 100], [50, 100]]
+# traces_times = [[50, 100], [50, 100], [50, 100], [50, 100]]
+traces_times = [[50, 100]]
 feat_list = ['voltage_base', 'time_to_first_spike', 'Spikecount', ]
 metric = FeatureMetric(traces_times, feat_list)
 
@@ -64,7 +65,7 @@ res, error = fitter.fit(n_rounds=10,
 
 ## Show results
 all_output = fitter.results(format='dataframe')
-print(all_output)
+# print(all_output)
 
 ## Visualization of the results
 start_scope()

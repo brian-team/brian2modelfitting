@@ -270,14 +270,14 @@ class Fitter(metaclass=abc.ABCMeta):
         callback = callback_setup(callback, n_rounds)
 
         # Run Optimization Loop
-        for k in range(n_rounds):
-            params, parameters, errors = self.optimization_iter(optimizer, metric)
+        for index in range(n_rounds):
+            best_params, parameters, errors = self.optimization_iter(optimizer, metric)
 
             # create output variables
-            self.best_params = make_dic(self.parameter_names, params)
+            self.best_params = make_dic(self.parameter_names, best_params)
             error = nanmin(self.errors)
 
-            if callback(parameters, errors, params, error, k) is True:
+            if callback(parameters, errors, best_params, error, index) is True:
                 break
 
         return self.best_params, error

@@ -4,7 +4,8 @@ from types import FunctionType
 
 def callback_text(params, errors, best_params, best_error, index):
     """Default callback print-out for Fitters"""
-    print("Round {}: fit {} with error: {}".format(index, best_params, best_error))
+    print("Round {}: fit {} with error: {}".format(index, best_params,
+                                                   best_error))
 
 
 def callback_none(params, errors, best_params, best_error, index):
@@ -18,7 +19,7 @@ class ProgressBar(object):
         self.toolbar_width = toolbar_width
         self.t = tqdm(total=toolbar_width, **kwds)
 
-    def __call__(self, res, errors, parameters, k):
+    def __call__(self, params, errors, best_params, best_error, index):
         self.t.update(1)
 
 

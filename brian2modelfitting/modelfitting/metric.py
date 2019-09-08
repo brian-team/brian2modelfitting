@@ -1,5 +1,6 @@
 import abc
 import efel
+from itertools import repeat
 from brian2 import Hz, second, Quantity
 from brian2.units.fundamentalunits import check_units
 from numpy import (array, sum, square, reshape, abs, amin, digitize,
@@ -275,6 +276,16 @@ class FeatureMetric(Metric):
         return err
 
     def get_features(self, traces, output, n_traces):
+        n_times = shape(self.traces_times)[0]
+
+        if (n_times != (n_traces)):
+            if (n_times == 1):
+                self.traces_times = list(repeat(self.traces_times[0], n_traces))
+                print(self.traces_times)
+            else:
+                raise ValueError("Specify the traces_times variable of appropiate "
+                                 "size (same as number of traces or 1).")
+
         unit = output.get_best_unit()
         output = output/unit
         traces = traces/unit

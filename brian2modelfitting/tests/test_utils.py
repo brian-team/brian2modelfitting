@@ -25,7 +25,7 @@ def test_ProgressBar():
     pb = ProgressBar(toolbar_width=10)
     assert_equal(pb.toolbar_width, 10)
     assert isinstance(pb.t, tqdm._tqdm.tqdm)
-    pb({'a':1}, [1.2], [1, 2, 3], 3)
+    pb([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2)
 
 
 def test_callback_setup():
