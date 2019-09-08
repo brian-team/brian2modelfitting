@@ -80,12 +80,12 @@ def test_get_features_mse():
     inp_mse = np.random.rand(6, 20)
 
     features = mse.get_features(inp_mse, out_mse, 2)
-    assert_equal(np.shape(features), (6,))
+    assert_equal(np.shape(features), (2, 3))
     assert(np.all(np.array(features) > 0))
 
     features = mse.get_features(out_mse, out_mse, 2)
-    assert_equal(np.shape(features), (2,))
-    assert_equal(features, [0., 0.])
+    assert_equal(np.shape(features), (2, 1))
+    assert_equal(features, [[0.], [0.]])
 
 
 def test_get_features_mse_t_start():
@@ -94,21 +94,22 @@ def test_get_features_mse_t_start():
     inp_mse = np.random.rand(6, 200)
 
     features = mse.get_features(inp_mse, out_mse, 2)
-    assert_equal(np.shape(features), (6,))
+    assert_equal(np.shape(features), (2, 3))
     assert(np.all(np.array(features) > 0))
 
     features = mse.get_features(out_mse, out_mse, 2)
-    assert_equal(np.shape(features), (2,))
-    assert_equal(features, [0., 0.])
+    assert_equal(np.shape(features), (2, 1))
+    assert_equal(features, [[0.], [0.]])
 
 
 def test_get_errors_mse():
     mse = MSEMetric()
-    errors = mse.get_errors(np.random.rand(10, 1), 2)
+    errors = mse.get_errors(np.random.rand(10, 5))
+    print(errors)
     assert_equal(np.shape(errors), (5,))
     assert(np.all(np.array(errors) > 0))
 
-    errors = mse.get_errors(np.zeros((10, 1)), 5)
+    errors = mse.get_errors(np.zeros((10, 2)))
     assert_equal(np.shape(errors), (2,))
     assert_equal(errors, [0., 0.])
 
@@ -119,20 +120,20 @@ def test_get_features_gamma():
 
     gf = GammaFactor(delta=10*ms, dt=1*ms)
     features = gf.get_features(inp_gf, out_gf, 2)
-    assert_equal(np.shape(features), (6,))
+    assert_equal(np.shape(features), (2, 3))
     assert(np.all(np.array(features) > 0))
 
     features = gf.get_features(out_gf, out_gf, 2)
-    assert_equal(np.shape(features), (2,))
-    assert_almost_equal(features, [0., 0.])
+    assert_equal(np.shape(features), (2, 1))
+    assert_almost_equal(features, [[0.], [0.]])
 
 
 def test_get_errors_gamma():
     gf = GammaFactor(delta=10*ms, dt=1*ms)
-    errors = gf.get_errors(np.random.rand(10, 1), 2)
+    errors = gf.get_errors(np.random.rand(10, 5))
     assert_equal(np.shape(errors), (5,))
     assert(np.all(np.array(errors) > 0))
 
-    errors = gf.get_errors(np.zeros((10, 1)), 5)
+    errors = gf.get_errors(np.zeros((10, 2)))
     assert_equal(np.shape(errors), (2,))
     assert_almost_equal(errors, [0., 0.])

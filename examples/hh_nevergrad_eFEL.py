@@ -54,7 +54,7 @@ fitter = TraceFitter(model=eqs, input_var='I', output_var='v',
                      param_init={'v': -65*mV},
                      method='exponential_euler',)
 
-res, error = fitter.fit(n_rounds=10,
+res, error = fitter.fit(n_rounds=5,
                         optimizer=n_opt, metric=metric,
                         callback='progressbar',
                         gl = [1e-09 *siemens, 1e-07 *siemens],
@@ -65,7 +65,7 @@ res, error = fitter.fit(n_rounds=10,
 
 ## Show results
 all_output = fitter.results(format='dataframe')
-# print(all_output)
+print(all_output)
 
 ## Visualization of the results
 start_scope()

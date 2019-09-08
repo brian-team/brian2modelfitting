@@ -6,7 +6,7 @@ from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
 from brian2.input import TimedArray
 from brian2.equations.equations import Equations
 from .simulation import RuntimeSimulation, CPPStandaloneSimulation
-from .metric import Metric
+from .metric import Metric, SpikeMetric, TraceMetric
 from .optimizer import Optimizer
 from .utils import callback_setup, make_dic
 
@@ -209,11 +209,8 @@ class Fitter(metaclass=abc.ABCMeta):
 
         return results, parameters, errors
 
-    def fit(self, optimizer, metric=None,
-            n_rounds=1,
-            callback='text',
-            restart=False,
-            **params):
+    def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
+            restart=False, **params):
         """
         Run the optimization algorithm for given amount of rounds with given
         number of samples drawn. Return best set of parameters and
@@ -441,6 +438,15 @@ class TraceFitter(Fitter):
         errors = metric.calc(traces, self.output, self.n_traces)
         return errors
 
+    def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
+            restart=False, **params):
+        if not isinstance(metric, TraceMetric):
+            raise TypeError("You can only use TraceMetric child metric with "
+                            "TraceFitter")
+        self.best_params, error = super().fit(optimizer, metric, n_rounds,
+                                              callback, restart, **params)
+        return self.best_params, error
+
     def generate_traces(self, params=None, param_init=None, level=0):
         """Generates traces for best fit of parameters and all inputs"""
         fits = self.generate(params=params, output_var=self.output_var,
@@ -453,7 +459,8 @@ class SpikeFitter(Fitter):
                  input_var='I', refractory=False, n_samples=30,
                  method=None, level=0, param_init=None):
         """Initialize the fitter."""
-        if method is None: method = 'exponential_euler'
+        if method is None:
+            method = 'exponential_euler'
         super().__init__(dt, model, input, output, input_var, 'v',
                          n_samples, threshold, reset, refractory, method)
 
@@ -490,6 +497,16 @@ class SpikeFitter(Fitter):
         spikes = get_spikes(self.simulator.network['monitor'])
         errors = metric.calc(spikes, self.output, self.n_traces)
         return errors
+
+    def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
+            restart=False, **params):
+        if not isinstance(metric, SpikeMetric):
+            raise TypeError("You can only use SpikeMetric child metric with "
+                            "SpikeFitter")
+        self.best_params, error = super().fit(optimizer, metric, n_rounds,
+                                              callback, restart, **params)
+        return self.best_params, error
+
 
     def generate_spikes(self, params=None, param_init=None, level=0):
         """Generates traces for best fit of parameters and all inputs"""

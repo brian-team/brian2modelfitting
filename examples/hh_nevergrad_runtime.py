@@ -49,14 +49,13 @@ fitter = TraceFitter(model=eqs, input_var='I', output_var='v',
                      param_init={'v': 'VT'},
                      method='exponential_euler',)
 
-res, error = fitter.fit(n_rounds=2,
+res, error = fitter.fit(n_rounds=4,
                         optimizer=n_opt, metric=metric,
                         callback='text',
                         gl = [1e-09 *siemens, 1e-07 *siemens],
                         g_na = [2e-06*siemens, 2e-04*siemens],
                         g_kd = [6e-07*siemens, 6e-05*siemens],
-                        Cm=[0.1*ufarad*cm**-2 * area, 2*ufarad*cm**-2 * area],
-                        )
+                        Cm=[0.1*ufarad*cm**-2 * area, 2*ufarad*cm**-2 * area])
 
 ## Show results
 all_output = fitter.results(format='dataframe')

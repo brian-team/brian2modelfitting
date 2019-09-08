@@ -25,9 +25,13 @@ To be called in a following way:
   metric = MSEMetric()
 
 Additionally, :py:class:`~brian2modelfitting.modelfitting.metric.MSEMetric` accepts two optional input arguments
-start time ``t_start``, and time step ```dt``. The following have to always be provided together and have units
+start time ``t_start``, and time step `dt``. The following have to always be provided together and have units
 (be a :py:class:`~brian2.units.fundamentalunits.Quantity`). The start time allows the user to measure the error starting
 from the provided time (i.e. start of stimulation).
+
+.. code:: python
+
+  metric = MSEMetric(t_start=5*ms, dt=0.01*ms)
 
 
 In :py:class:`~brian2modelfitting.modelfitting.modelfitting.OnlineTraceFitter` mean square error gets calculated in online manner,
