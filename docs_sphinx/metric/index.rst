@@ -24,6 +24,11 @@ To be called in a following way:
 
   metric = MSEMetric()
 
+Additionally, :py:class:`~brian2modelfitting.modelfitting.metric.MSEMetric` accepts two optional input arguments
+start time ``t_start``, and time step ```dt``. The following have to always be provided together and have units
+(be a :py:class:`~brian2.units.fundamentalunits.Quantity`). The start time allows the user to measure the error starting
+from the provided time (i.e. start of stimulation).
+
 
 In :py:class:`~brian2modelfitting.modelfitting.modelfitting.OnlineTraceFitter` mean square error gets calculated in online manner,
 with no need of specifying a metric object.
@@ -87,6 +92,13 @@ Example code usage:
   traces_times = [[50, 100], [50, 100], [50, 100], [50, 100]]
   feat_list = ['voltage_base', 'time_to_first_spike', 'Spikecount']
   metric = FeatureMetric(traces_times, feat_list, combine=None)
+
+.. note::
+
+  If times of stimulation are same for all of the traces, user can specify a single list that will be replicated for
+  ``eFEL`` library: ``traces_times = [[50, 100]]``.
+
+
 
 
 Custom Metric
