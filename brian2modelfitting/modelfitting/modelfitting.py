@@ -101,8 +101,8 @@ class Fitter(metaclass=abc.ABCMeta):
 
         if get_device().__class__.__name__ == 'CPPStandaloneDevice':
             if device.has_been_run is True:
-                raise Exception("To run another fitter in standalone mode you need "
-                                "to create new script")
+                raise Exception("To run another fitter in standalone mode you "
+                                "need to create new script")
         if dt is None:
             raise ValueError('dt (sampling frequency of the input) must be set')
 
@@ -141,7 +141,6 @@ class Fitter(metaclass=abc.ABCMeta):
         self.metric = None
         self.param_init = None
 
-
     def setup_neuron_group(self, n_neurons, namespace, name='neurons'):
         """
         Setup neuron group, initialize required number of neurons, create
@@ -162,7 +161,8 @@ class Fitter(metaclass=abc.ABCMeta):
         """
         neurons = NeuronGroup(n_neurons, self.model, method=self.method,
                               threshold=self.threshold, reset=self.reset,
-                              refractory=self.refractory, name=name, namespace=namespace)
+                              refractory=self.refractory, name=name,
+                              namespace=namespace)
 
         return neurons
 
@@ -249,17 +249,18 @@ class Fitter(metaclass=abc.ABCMeta):
         if not (isinstance(optimizer, Optimizer)) or optimizer is None:
             raise TypeError("metric has to be a child of class Optimizer")
 
-        if not self.metric is None and restart is False:
-            if not metric is self.metric:
+        if self.metric is not None and restart is False:
+            if metric is not self.metric:
                 raise Exception("You can not change the metric between fits")
 
-        if not self.optimizer is None and restart is False:
-            if not optimizer is self.optimizer:
+        if self.optimizer is not None and restart is False:
+            if optimizer is not self.optimizer:
                 raise Exception("You can not change the optimizer between fits")
 
         if self.optimizer is None or restart is True:
             self.results_, self.errors = [], []
-            optimizer.initialize(self.parameter_names, popsize=self.n_samples, **params)
+            optimizer.initialize(self.parameter_names, popsize=self.n_samples,
+                                 **params)
 
         self.optimizer = optimizer
         self.metric = metric
@@ -268,7 +269,8 @@ class Fitter(metaclass=abc.ABCMeta):
 
         # Run Optimization Loop
         for index in range(n_rounds):
-            best_params, parameters, errors = self.optimization_iter(optimizer, metric)
+            best_params, parameters, errors = self.optimization_iter(optimizer,
+                                                                     metric)
 
             # create output variables
             self.best_params = make_dic(self.parameter_names, best_params)
@@ -312,7 +314,7 @@ class Fitter(metaclass=abc.ABCMeta):
                 temp_data = data[j]
                 res_dict = dict()
 
-                for i,n in enumerate(names[:-1]):
+                for i, n in enumerate(names[:-1]):
                     res_dict[n] = Quantity(temp_data[i], dim=dim[n])
                 res_dict[names[-1]] = temp_data[-1]
                 res_list.append(res_dict)
@@ -321,7 +323,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
         elif format == 'dict':
             res_dict = dict()
-            for i,n in enumerate(names[:-1]):
+            for i, n in enumerate(names[:-1]):
                 res_dict[n] = Quantity(data[:, i], dim=dim[n])
 
             res_dict[names[-1]] = data[:, -1]
@@ -350,9 +352,10 @@ class Fitter(metaclass=abc.ABCMeta):
 
         if get_device().__class__.__name__ == 'CPPStandaloneDevice':
             if device.has_been_run is True:
-                raise Exception("You need to reset the device before generating the traces "
-                                "in standalone mode, which will make you lose monitor data "
-                                "add: device.reinit() & device.activate()")
+                raise Exception("You need to reset the device before generating "
+                                "the traces in standalone mode, which will make "
+                                "you lose monitor data add: device.reinit() "
+                                "& device.activate()")
         if params is None:
             params = self.best_params
 
@@ -364,7 +367,8 @@ class Fitter(metaclass=abc.ABCMeta):
         namespace['input_var'] = self.input_traces
         namespace['n_traces'] = Ntraces
         namespace['output_var'] = output_var
-        self.neurons = self.setup_neuron_group(Ntraces, namespace, name='neurons_')
+        self.neurons = self.setup_neuron_group(Ntraces, namespace,
+                                               name='neurons_')
 
         if output_var == 'spikes':
             monitor = SpikeMonitor(self.neurons, record=True, name='monitor_')
@@ -376,9 +380,11 @@ class Fitter(metaclass=abc.ABCMeta):
         if param_init:
             self.simulator.initialize(network, param_init, name='neurons_')
         else:
-            self.simulator.initialize(network, self.param_init, name='neurons_')
+            self.simulator.initialize(network, self.param_init,
+                                      name='neurons_')
 
-        self.simulator.run(self.duration, params, self.parameter_names, name='neurons_')
+        self.simulator.run(self.duration, params, self.parameter_names,
+                           name='neurons_')
 
         if output_var == 'spikes':
             fits = get_spikes(self.simulator.network['monitor_'])
@@ -507,7 +513,6 @@ class SpikeFitter(Fitter):
                                               callback, restart, **params)
         return self.best_params, error
 
-
     def generate_spikes(self, params=None, param_init=None, level=0):
         """Generates traces for best fit of parameters and all inputs"""
         fits = self.generate(params=params, output_var='spikes',
@@ -548,7 +553,8 @@ class OnlineTraceFitter(Fitter):
         self.t_start = 0*second
         self.neurons.namespace['t_start'] = self.t_start
         self.neurons.run_regularly('total_error +=  (' + output_var + '-output_var\
-                                   (t,i % n_traces))**2 * int(t>=t_start)', when='end')
+                                   (t,i % n_traces))**2 * int(t>=t_start)',
+                                   when='end')
 
         monitor = StateMonitor(self.neurons, output_var, record=True,
                                name='monitor')

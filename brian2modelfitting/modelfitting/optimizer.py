@@ -49,7 +49,7 @@ class Optimizer(metaclass=abc.ABCMeta):
         parameter_names: list
             list of parameter names in use
         popsize: int
-            population size 
+            population size
         **params:
             bounds for each parameter
         """
@@ -220,7 +220,7 @@ class SkoptOptimizer(Optimizer):
         return self.optim.ask(n_points=n_samples)
 
     def tell(self, parameters, errors):
-        self.optim.tell(parameters, errors.tolist());
+        self.optim.tell(parameters, errors.tolist())
 
     def recommend(self):
         xi = self.optim.Xi
