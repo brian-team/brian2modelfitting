@@ -104,7 +104,7 @@ class Fitter(metaclass=abc.ABCMeta):
                 raise Exception("To run another fitter in standalone mode you "
                                 "need to create new script")
         if dt is None:
-            raise ValueError('dt (sampling frequency of the input) must be set')
+            raise ValueError("dt-sampling frequency of the input must be set")
 
         if isinstance(model, str):
             model = Equations(model)

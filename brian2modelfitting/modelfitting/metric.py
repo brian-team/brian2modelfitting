@@ -4,8 +4,7 @@ from itertools import repeat
 from brian2 import Hz, second, Quantity
 from brian2.units.fundamentalunits import check_units
 from numpy import (array, sum, square, reshape, abs, amin, digitize,
-                   rint, arange, atleast_2d, NaN, float64, split, shape,
-                   asarray)
+                   rint, arange, atleast_2d, NaN, float64, split, shape,)
 
 
 def firing_rate(spikes):
