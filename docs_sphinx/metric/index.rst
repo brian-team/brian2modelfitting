@@ -132,6 +132,7 @@ To create a new metric for :py:class:`~brian2modelfitting.modelfitting.modelfitt
 Input and output traces have to be shaped into 2D array.
 
 .. code:: python
+
   class NewTraceMetric(TraceMetric):
     def get_features():
       ...
