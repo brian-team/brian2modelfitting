@@ -158,8 +158,8 @@ class TraceMetric(Metric):
 
 class SpikeMetric(Metric):
     """
-    Input spikes contain a list of arrays (possibly of different lenghts)
-    in order to allow different lenghts of spike trains.
+    Output spikes contain a list of arrays (possibly of different lengths)
+    in order to allow different lengths of spike trains.
     Example: [array([1, 2, 3]), array([1, 2])]
     """
     pass

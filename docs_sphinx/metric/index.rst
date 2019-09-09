@@ -109,16 +109,43 @@ Custom Metric
 -------------
 
 User is not limited to the provided in the module metrics. Modularity applies
-here as well, with provided abstract class :py:class:`~brian2modelfitting.modelfitting.metric.Metric` prepared for different
-custom made metrics.
+here as well, with one of the two provided abstract classes :py:class:`~brian2modelfitting.modelfitting.metric.TraceMetric`
+and :py:class:`~brian2modelfitting.modelfitting.metric.SpikeMetric` prepared for different custom made metrics.
 
-New metric will need to be inherited from :py:class:`~brian2modelfitting.modelfitting.metric.Metric` and specify following
-functions:
+New metric will need to have specify following functions:
 
  - :py:func:`~brian2modelfitting.modelfitting.metric.Metric.get_features()`
     calculates features / errors for each of the traces and stores it in a :py:attr:`~brian2modelfitting.modelfitting.metric.Metric.metric.features` attribute
+    The output of the function has to take shape of (n_samples, n_traces) or (n_traces, n_samples).
 
  - :py:func:`~brian2modelfitting.modelfitting.metric.Metric.get_errors()`
     weights features/multiple errors into one final error per each set of parameters and inputs stored in :py:attr:`~brian2modelfitting.modelfitting.metric.Metric.metric.errors`
+    The output of the function has to take shape of (n_samples,).
+
  - :py:func:`~brian2modelfitting.modelfitting.metric.Metric.calc()`
-    performs the error calculation across simulation for all parameters of each round
+    performs the error calculation across simulation for all parameters of each round. Specified in the abstract class, can be reused.
+
+
+TraceMetric
+~~~~~~~~~~~
+To create a new metric for :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`, you have to inherit from :py:class:`~brian2modelfitting.modelfitting.metric.TraceMetric`.
+Input and output traces have to be shaped into 2D array.
+
+.. code:: python
+  class NewTraceMetric(TraceMetric):
+    def get_features():
+      ...
+
+    def get_errors():
+      ...
+
+SpikeMetric
+~~~~~~~~~~~
+To create a new metric for :py:class:`~brian2modelfitting.modelfitting.modelfitting.SpikeFitter`., you have to inherit from :py:class:`~brian2modelfitting.modelfitting.metric.SpikeMetric`.
+Inputs of the metric have to be 2D  array.
+Output spikes contain a list of arrays (possibly of different lengths) in order
+to allow different lengths of spike trains.
+
+.. code:: python
+
+  [array([1, 2, 3]), array([1, 2])]
