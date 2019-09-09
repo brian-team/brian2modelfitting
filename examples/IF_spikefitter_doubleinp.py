@@ -77,7 +77,7 @@ eqs_fit = Equations('''
     )
 
 n_opt = NevergradOptimizer('DE')
-metric = GammaFactor(dt, 60*ms)
+metric = GammaFactor(delta=60*ms)
 
 
 # pass parameters to the NeuronGroup

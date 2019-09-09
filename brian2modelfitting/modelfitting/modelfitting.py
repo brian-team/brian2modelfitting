@@ -441,7 +441,7 @@ class TraceFitter(Fitter):
         To be used inside optim_iter.
         """
         traces = getattr(self.simulator.network['monitor'], self.output_var)
-        errors = metric.calc(traces, self.output, self.n_traces)
+        errors = metric.calc(traces, self.output, self.n_traces, self.dt)
         return errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
@@ -501,7 +501,7 @@ class SpikeFitter(Fitter):
         To be used inside optim_iter.
         """
         spikes = get_spikes(self.simulator.network['monitor'])
-        errors = metric.calc(spikes, self.output, self.n_traces)
+        errors = metric.calc(spikes, self.output, self.n_traces, self.dt)
         return errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',

@@ -26,7 +26,7 @@ model = Equations('''
                   ''')
 
 n_opt = NevergradOptimizer()
-metric = GammaFactor(dt_def, 60*ms)
+metric = GammaFactor(60*ms)
 
 
 @pytest.fixture()

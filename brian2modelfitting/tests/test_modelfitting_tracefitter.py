@@ -209,7 +209,7 @@ def test_fit_restart_errors(setup):
                g=[1*nS, 30*nS],
                restart=False,)
 
-    metric2 = GammaFactor(dt, 40*ms)
+    metric2 = GammaFactor(40*ms)
     with pytest.raises(Exception):
         tf.fit(n_rounds=2,
                optimizer=n_opt,

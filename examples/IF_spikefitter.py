@@ -46,7 +46,7 @@ eqs_fit = Equations('''
     )
 
 n_opt = NevergradOptimizer()
-metric = GammaFactor(dt, 100*ms)
+metric = GammaFactor(100*ms)
 inp_trace = np.array([input_current])
 
 # pass parameters to the NeuronGroup

@@ -25,13 +25,13 @@ To be called in a following way:
   metric = MSEMetric()
 
 Additionally, :py:class:`~brian2modelfitting.modelfitting.metric.MSEMetric` accepts two optional input arguments
-start time ``t_start``, and time step `dt``. The following have to always be provided together and have units
+start time ``t_start``. Time steps gets passed from the fitter. The following have to always be provided together and have units
 (be a :py:class:`~brian2.units.fundamentalunits.Quantity`). The start time allows the user to measure the error starting
 from the provided time (i.e. start of stimulation).
 
 .. code:: python
 
-  metric = MSEMetric(t_start=5*ms, dt=0.01*ms)
+  metric = MSEMetric(t_start=5*ms)
 
 
 In :py:class:`~brian2modelfitting.modelfitting.modelfitting.OnlineTraceFitter` mean square error gets calculated in online manner,
@@ -58,9 +58,11 @@ For more details on the gamma factor, see
 Jolivet et al. 2008, “A benchmark test for a quantitative assessment of simple neuron models”, J. Neurosci. Methods.
 (https://www.ncbi.nlm.nih.gov/pubmed/18160135)
 
+Upon initialization user has to specify the delta as a :py:class:`~brian2.units.fundamentalunits.Quantity`:
+
 .. code:: python
 
-  metric = GammaFactor(delta=10*ms, dt=0.1*ms)
+  metric = GammaFactor(delta=10*ms)
 
 
 FeatureMetric

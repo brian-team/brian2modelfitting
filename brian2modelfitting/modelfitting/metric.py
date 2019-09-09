@@ -25,9 +25,9 @@ def get_gamma_factor(source, target, delta, dt):
         source trace, goal performance
     target: list/array
         target trace
-    delta: float * ms
+    delta: Quantity
         time window
-    dt: float * ms
+    dt: Quantity
         time step
 
     Returns
@@ -85,7 +85,7 @@ class Metric(metaclass=abc.ABCMeta):
     To be used with modelfitting Fitters.
     """
     @abc.abstractmethod
-    def get_features(self, traces, output, n_traces):
+    def get_features(self, traces, output, n_traces, dt):
         """
         Function calculates features / errors for each of the traces and stores
         it in an attribute metric.features.
@@ -101,6 +101,9 @@ class Metric(metaclass=abc.ABCMeta):
             goal traces
         n_traces: int
             number of input traces
+        dt: Quantity
+            time step
+
         """
         pass
 
@@ -122,7 +125,7 @@ class Metric(metaclass=abc.ABCMeta):
         """
         pass
 
-    def calc(self, traces, output, n_traces):
+    def calc(self, traces, output, n_traces, dt):
         """
         Perform the error calculation across all parameters,
         calculate error between each output trace and corresponding
@@ -134,8 +137,10 @@ class Metric(metaclass=abc.ABCMeta):
             traces to be evaluated
         output: array
             goal traces
-        n_traces:
+        n_traces: int
             number of input traces
+        dt: Quantity
+            time step
 
         Returns
         -------
@@ -143,7 +148,7 @@ class Metric(metaclass=abc.ABCMeta):
             weigheted/mean error for each set of parameters
 
         """
-        features = self.get_features(traces, output, n_traces)
+        features = self.get_features(traces, output, n_traces, dt)
         errors = self.get_errors(features)
 
         return errors
@@ -169,27 +174,26 @@ class MSEMetric(TraceMetric):
     __doc__ = "Mean Square Error between goal and calculated output." + \
               Metric.get_features.__doc__
 
-    def __init__(self, t_start=None, dt=None, **kwds):
+    @check_units(t_start=second)
+    def __init__(self, t_start=None, **kwds):
         """
         Initialize the metric.
 
         Parameters
         ----------
-        t_start: beggining of time window [ms] (optional)
-        dt: time step [ms] (necessary with t_start)
+        t_start: beggining of time window (Quantity) (optional)
         """
         self.t_start = t_start
-        self.dt = dt
 
-    def get_features(self, traces, output, n_traces):
+    def get_features(self, traces, output, n_traces, dt):
         mselist = []
         output = atleast_2d(output)
 
         if self.t_start is not None:
-            if not isinstance(self.dt, Quantity):
+            if not isinstance(dt, Quantity):
                 raise TypeError("To specify time window you need to also "
                                 "specify dt as Quantity")
-            t_start = int(self.t_start/self.dt)
+            t_start = int(self.t_start/dt)
             output = output[:, t_start:-1]
             traces = traces[:, t_start:-1]
 
@@ -245,7 +249,7 @@ class FeatureMetric(TraceMetric):
 
         return err
 
-    def get_features(self, traces, output, n_traces):
+    def get_features(self, traces, output, n_traces, dt):
         n_times = shape(self.traces_times)[0]
 
         if (n_times != (n_traces)):
@@ -299,23 +303,18 @@ class GammaFactor(SpikeMetric):
     Journal of Neuroscience Methods 169, no. 2 (2008): 417-424.
     """ + Metric.get_features.__doc__
 
-    @check_units(dt=second, delta=second)
-    def __init__(self, dt, delta):
+    @check_units(delta=second)
+    def __init__(self, delta):
         """
         Initialize the metric with time window delta and time step dt output
 
         Parameters
         ----------
-        dt: time step [ms]
-        delta: time window [ms]
+        delta: time window (Quantity)
         """
-        if delta is None:
-            raise AssertionError("delta (time window for gamma factor), "
-                                 "has to be set to ms")
         self.delta = delta
-        self.dt = dt
 
-    def get_features(self, traces, output, n_traces):
+    def get_features(self, traces, output, n_traces, dt):
         gamma_factors = []
         if type(output[0]) == float64:
             output = atleast_2d(output)
@@ -325,7 +324,7 @@ class GammaFactor(SpikeMetric):
             temp_traces = traces[i::n_traces]
 
             for trace in temp_traces:
-                gf = get_gamma_factor(trace, temp_out, self.delta, self.dt)
+                gf = get_gamma_factor(trace, temp_out, self.delta, dt)
                 gamma_factors.append(abs(1 - gf))
 
         feat_arr = reshape(array(gamma_factors), (n_traces,

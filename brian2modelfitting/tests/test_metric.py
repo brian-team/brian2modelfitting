@@ -31,9 +31,7 @@ def test_get_gamma_factor():
 
 def test_init():
     MSEMetric()
-    GammaFactor(10*ms, 0.1*ms)
-
-    assert_raises(AssertionError, GammaFactor, dt=0.1*ms, delta=None)
+    GammaFactor(10*ms)
 
 
 def test_calc_mse():
@@ -41,36 +39,34 @@ def test_calc_mse():
     out = np.random.rand(2, 20)
     inp = np.random.rand(10, 20)
 
-    errors = mse.calc(inp, out, 2)
+    errors = mse.calc(inp, out, 2, 0.01*ms)
     assert_equal(np.shape(errors), (5,))
-    assert_equal(mse.calc(out, out, 2), [0.])
-    assert(np.all(mse.calc(inp, out, 2) > 0))
+    assert_equal(mse.calc(out, out, 2, 0.1*ms), [0.])
+    assert(np.all(mse.calc(inp, out, 2, 0.1*ms) > 0))
 
 def test_calc_mse_t_start():
-    mse = MSEMetric(t_start=1*ms, dt=0.1*ms)
+    mse = MSEMetric(t_start=1*ms)
     out = np.random.rand(2, 200)
     inp = np.random.rand(10, 200)
 
-    errors = mse.calc(inp, out, 2)
+    errors = mse.calc(inp, out, 2, 0.1*ms)
     assert_equal(np.shape(errors), (5,))
-    assert_equal(mse.calc(out, out, 2), [0.])
-    assert(np.all(mse.calc(inp, out, 2) > 0))
+    assert_equal(mse.calc(out, out, 2, 0.1*ms), [0.])
+    assert(np.all(mse.calc(inp, out, 2, 0.1*ms) > 0))
 
 
 def test_calc_gf():
     assert_raises(TypeError, GammaFactor)
-    assert_raises(TypeError, GammaFactor, delta=10*ms)
-    assert_raises(DimensionMismatchError, GammaFactor, delta=10*ms, dt=0.01)
-    assert_raises(DimensionMismatchError, GammaFactor, delta=10, dt=0.01*ms)
+    assert_raises(DimensionMismatchError, GammaFactor, delta=10)
 
     inp_gf = np.round(np.sort(np.random.rand(10, 5) * 10), 2)
     out_gf = np.round(np.sort(np.random.rand(2, 5) * 10), 2)
 
-    gf = GammaFactor(delta=10*ms, dt=1*ms)
-    errors = gf.calc(inp_gf, out_gf, 2)
+    gf = GammaFactor(delta=10*ms)
+    errors = gf.calc(inp_gf, out_gf, 2, 0.1*ms)
     assert_equal(np.shape(errors), (5,))
     assert(np.all(errors > 0))
-    errors = gf.calc(out_gf, out_gf, 2)
+    errors = gf.calc(out_gf, out_gf, 2, 0.1*ms)
     assert_almost_equal(errors, [0.])
 
 
@@ -79,25 +75,25 @@ def test_get_features_mse():
     out_mse = np.random.rand(2, 20)
     inp_mse = np.random.rand(6, 20)
 
-    features = mse.get_features(inp_mse, out_mse, 2)
+    features = mse.get_features(inp_mse, out_mse, 2, 0.1*ms)
     assert_equal(np.shape(features), (2, 3))
     assert(np.all(np.array(features) > 0))
 
-    features = mse.get_features(out_mse, out_mse, 2)
+    features = mse.get_features(out_mse, out_mse, 2, 0.1*ms)
     assert_equal(np.shape(features), (2, 1))
     assert_equal(features, [[0.], [0.]])
 
 
 def test_get_features_mse_t_start():
-    mse = MSEMetric(t_start=1*ms, dt=0.1*ms)
+    mse = MSEMetric(t_start=1*ms)
     out_mse = np.random.rand(2, 200)
     inp_mse = np.random.rand(6, 200)
 
-    features = mse.get_features(inp_mse, out_mse, 2)
+    features = mse.get_features(inp_mse, out_mse, 2, 0.1*ms)
     assert_equal(np.shape(features), (2, 3))
     assert(np.all(np.array(features) > 0))
 
-    features = mse.get_features(out_mse, out_mse, 2)
+    features = mse.get_features(out_mse, out_mse, 2, 0.1*ms)
     assert_equal(np.shape(features), (2, 1))
     assert_equal(features, [[0.], [0.]])
 
@@ -118,18 +114,18 @@ def test_get_features_gamma():
     inp_gf = np.round(np.sort(np.random.rand(6, 5) * 10), 2)
     out_gf = np.round(np.sort(np.random.rand(2, 5) * 10), 2)
 
-    gf = GammaFactor(delta=10*ms, dt=1*ms)
-    features = gf.get_features(inp_gf, out_gf, 2)
+    gf = GammaFactor(delta=10*ms)
+    features = gf.get_features(inp_gf, out_gf, 2, 0.1*ms)
     assert_equal(np.shape(features), (2, 3))
     assert(np.all(np.array(features) > 0))
 
-    features = gf.get_features(out_gf, out_gf, 2)
+    features = gf.get_features(out_gf, out_gf, 2, 0.1*ms)
     assert_equal(np.shape(features), (2, 1))
     assert_almost_equal(features, [[0.], [0.]])
 
 
 def test_get_errors_gamma():
-    gf = GammaFactor(delta=10*ms, dt=1*ms)
+    gf = GammaFactor(delta=10*ms)
     errors = gf.get_errors(np.random.rand(10, 5))
     assert_equal(np.shape(errors), (5,))
     assert(np.all(np.array(errors) > 0))
