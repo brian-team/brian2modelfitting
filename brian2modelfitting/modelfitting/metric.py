@@ -14,17 +14,17 @@ def firing_rate(spikes):
     return (len(spikes) - 1) / (spikes[-1] - spikes[0])
 
 
-def get_gamma_factor(source, target, delta, dt):
+def get_gamma_factor(model, data, delta, time, dt):
     """
-    Calculate gamma factor between source and tagret spike trains,
+    Calculate gamma factor between model and tagret spike trains,
     with precision delta.
 
     Parameters
     ----------
-    source: list/array
-        source trace, goal performance
-    target: list/array
-        target trace
+    model: list/array
+        model trace, goal performance
+    data: list/array
+        data trace
     delta: Quantity
         time window
     dt: Quantity
@@ -34,31 +34,35 @@ def get_gamma_factor(source, target, delta, dt):
     -------
         gamma factor: float
     """
-    source = array(source)
-    target = array(target)
-    target_rate = firing_rate(target) * Hz
+    model = array(model)
+    data = array(data)
 
-    source = array(rint(source / dt), dtype=int)
-    target = array(rint(target / dt), dtype=int)
+    model = array(rint(model / dt), dtype=int)
+    data = array(rint(data / dt), dtype=int)
     delta_diff = int(rint(delta / dt))
 
-    source_length = len(source)
-    target_length = len(target)
+    model_length = len(model)
+    data_length = len(data)
+    # data_rate = firing_rate(data) * Hz
+    data_rate = data_length / time
 
-    if (source_length > 1):
-        bins = .5 * (source[1:] + source[:-1])
-        indices = digitize(target, bins)
-        diff = abs(target - source[indices])
+
+    if (model_length > 1):
+        bins = .5 * (model[1:] + model[:-1])
+        indices = digitize(data, bins)
+        diff = abs(data - model[indices])
         matched_spikes = (diff <= delta_diff)
         coincidences = sum(matched_spikes)
+    elif model_length == 0:
+        return 0
     else:
-        indices = [amin(abs(source - target[i])) <= delta_diff for i in arange(target_length)]
+        indices = [amin(abs(model - data[i])) <= delta_diff for i in arange(data_length)]
         coincidences = sum(indices)
 
     # Normalization of the coincidences count
-    NCoincAvg = 2 * delta * target_length * target_rate
-    norm = .5*(1 - 2 * target_rate * delta)
-    gamma = (coincidences - NCoincAvg)/(norm*(source_length + target_length))
+    NCoincAvg = 2 * delta * data_length * data_rate
+    norm = .5*(1 - 2 * data_rate * delta)
+    gamma = (coincidences - NCoincAvg)/(norm*(model_length + data_length))
 
     return gamma
 
@@ -303,16 +307,18 @@ class GammaFactor(SpikeMetric):
     Journal of Neuroscience Methods 169, no. 2 (2008): 417-424.
     """ + Metric.get_features.__doc__
 
-    @check_units(delta=second)
-    def __init__(self, delta):
+    @check_units(delta=second, time=second)
+    def __init__(self, delta, time):
         """
         Initialize the metric with time window delta and time step dt output
 
         Parameters
         ----------
         delta: time window (Quantity)
+        time: total lenght of experiment (Quantity)
         """
         self.delta = delta
+        self.time = time
 
     def get_features(self, traces, output, n_traces, dt):
         gamma_factors = []
@@ -324,7 +330,7 @@ class GammaFactor(SpikeMetric):
             temp_traces = traces[i::n_traces]
 
             for trace in temp_traces:
-                gf = get_gamma_factor(trace, temp_out, self.delta, dt)
+                gf = get_gamma_factor(trace, temp_out, self.delta, self.time, dt)
                 gamma_factors.append(abs(1 - gf))
 
         feat_arr = reshape(array(gamma_factors), (n_traces,

@@ -46,7 +46,7 @@ eqs_fit = Equations('''
     )
 
 n_opt = NevergradOptimizer()
-metric = GammaFactor(100*ms)
+metric = GammaFactor(delta=60*ms, time=60*ms)
 inp_trace = np.array([input_current])
 
 # pass parameters to the NeuronGroup
@@ -57,10 +57,10 @@ fitter = SpikeFitter(model=eqs_fit, input_var='I', dt=dt,
                      param_init={'v': -70*mV},
                      reset='v = -70*mV',)
 
-result_dict, error = fitter.fit(n_rounds=2,
+result_dict, error = fitter.fit(n_rounds=3,
                                 optimizer=n_opt,
                                 metric=metric,
-                                callback='progressbar',
+                                callback='text',
                                 gL=[20*nS, 40*nS],
                                 C = [0.5*nF, 1.5*nF])
 

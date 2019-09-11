@@ -19,9 +19,9 @@ def test_get_gamma_factor():
     src2 = [1, 2, 3] * ms
     trg = [0, 2, 4, 6, 8] * ms
 
-    gf0 = get_gamma_factor(trg, trg, delta=12*ms, dt=0.1*ms)
-    gf1 = get_gamma_factor(src2, trg, delta=12*ms, dt=0.1*ms)
-    gf2 = get_gamma_factor(src, src2, delta=5*ms, dt=0.1*ms)
+    gf0 = get_gamma_factor(trg, trg, delta=12*ms, time=12*ms, dt=0.1*ms)
+    gf1 = get_gamma_factor(src2, trg, delta=12*ms, time=12*ms, dt=0.1*ms)
+    gf2 = get_gamma_factor(src, src2, delta=5*ms, time=5*ms, dt=0.1*ms)
 
     assert_equal(gf0, 1.0)
     assert gf1 > 1.0
@@ -31,7 +31,7 @@ def test_get_gamma_factor():
 
 def test_init():
     MSEMetric()
-    GammaFactor(10*ms)
+    GammaFactor(10*ms, time=10*ms)
 
 
 def test_calc_mse():
@@ -58,11 +58,12 @@ def test_calc_mse_t_start():
 def test_calc_gf():
     assert_raises(TypeError, GammaFactor)
     assert_raises(DimensionMismatchError, GammaFactor, delta=10)
+    assert_raises(DimensionMismatchError, GammaFactor, time=10)
 
     inp_gf = np.round(np.sort(np.random.rand(10, 5) * 10), 2)
     out_gf = np.round(np.sort(np.random.rand(2, 5) * 10), 2)
 
-    gf = GammaFactor(delta=10*ms)
+    gf = GammaFactor(delta=10*ms, time=10*ms)
     errors = gf.calc(inp_gf, out_gf, 2, 0.1*ms)
     assert_equal(np.shape(errors), (5,))
     assert(np.all(errors > 0))
@@ -114,7 +115,7 @@ def test_get_features_gamma():
     inp_gf = np.round(np.sort(np.random.rand(6, 5) * 10), 2)
     out_gf = np.round(np.sort(np.random.rand(2, 5) * 10), 2)
 
-    gf = GammaFactor(delta=10*ms)
+    gf = GammaFactor(delta=10*ms, time=10*ms)
     features = gf.get_features(inp_gf, out_gf, 2, 0.1*ms)
     assert_equal(np.shape(features), (2, 3))
     assert(np.all(np.array(features) > 0))
@@ -125,7 +126,7 @@ def test_get_features_gamma():
 
 
 def test_get_errors_gamma():
-    gf = GammaFactor(delta=10*ms)
+    gf = GammaFactor(delta=10*ms, time=10*ms)
     errors = gf.get_errors(np.random.rand(10, 5))
     assert_equal(np.shape(errors), (5,))
     assert(np.all(np.array(errors) > 0))
