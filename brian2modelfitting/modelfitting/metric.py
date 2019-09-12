@@ -45,6 +45,7 @@ def get_gamma_factor(model, data, delta, time, dt):
     data_length = len(data)
     # data_rate = firing_rate(data) * Hz
     data_rate = data_length / time
+    model_rate = model_length / time
 
 
     if (model_length > 1):
@@ -64,13 +65,15 @@ def get_gamma_factor(model, data, delta, time, dt):
     norm = .5*(1 - 2 * data_rate * delta)
     gamma = (coincidences - NCoincAvg)/(norm*(model_length + data_length))
 
-    return gamma
+    corrected_gamma_factor = 2*abs((data_rate - model_rate)/data_rate - gamma)
+
+    return corrected_gamma_factor
 
 
-def calc_eFEL(traces, inp_times, feat_list):
+def calc_eFEL(traces, inp_times, feat_list, dt):
     out_traces = []
     for i, trace in enumerate(traces):
-        time = arange(0, len(trace)/10, 0.1)
+        time = arange(0, len(trace)*dt, dt)
         temp_trace = {}
         temp_trace['T'] = time
         temp_trace['V'] = trace
@@ -266,7 +269,7 @@ class FeatureMetric(TraceMetric):
         unit = output.get_best_unit()
         output = output/unit
         traces = traces/unit
-        self.out_feat = calc_eFEL(output, self.traces_times, self.feat_list)
+        self.out_feat = calc_eFEL(output, self.traces_times, self.feat_list, dt)
         self.check_values(self.out_feat)
 
         sl = int(shape(traces)[0]/n_traces)
@@ -331,7 +334,8 @@ class GammaFactor(SpikeMetric):
 
             for trace in temp_traces:
                 gf = get_gamma_factor(trace, temp_out, self.delta, self.time, dt)
-                gamma_factors.append(abs(1 - gf))
+                # gamma_factors.append(abs(1 - gf))
+                gamma_factors.append(gf)
 
         feat_arr = reshape(array(gamma_factors), (n_traces,
                            int(len(gamma_factors)/n_traces)))

@@ -23,10 +23,10 @@ def test_get_gamma_factor():
     gf1 = get_gamma_factor(src2, trg, delta=12*ms, time=12*ms, dt=0.1*ms)
     gf2 = get_gamma_factor(src, src2, delta=5*ms, time=5*ms, dt=0.1*ms)
 
-    assert_equal(gf0, 1.0)
+    assert_equal(gf0, 2.0)
     assert gf1 > 1.0
     assert gf2 > 1.0
-    assert gf1 > gf2
+    assert gf1 < gf2
 
 
 def test_init():
@@ -68,8 +68,7 @@ def test_calc_gf():
     assert_equal(np.shape(errors), (5,))
     assert(np.all(errors > 0))
     errors = gf.calc(out_gf, out_gf, 2, 0.1*ms)
-    assert_almost_equal(errors, [0.])
-
+    assert_almost_equal(errors, [2.])
 
 def test_get_features_mse():
     mse = MSEMetric()
@@ -122,7 +121,7 @@ def test_get_features_gamma():
 
     features = gf.get_features(out_gf, out_gf, 2, 0.1*ms)
     assert_equal(np.shape(features), (2, 1))
-    assert_almost_equal(features, [[0.], [0.]])
+    assert_almost_equal(features, [[2.], [2.]])
 
 
 def test_get_errors_gamma():
