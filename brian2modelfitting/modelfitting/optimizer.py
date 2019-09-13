@@ -1,5 +1,5 @@
 import abc
-from numpy import array, all
+from numpy import array, all, ndarray
 from brian2 import asarray
 
 from skopt.space import Real
@@ -220,7 +220,10 @@ class SkoptOptimizer(Optimizer):
         return self.optim.ask(n_points=n_samples)
 
     def tell(self, parameters, errors):
-        self.optim.tell(parameters, errors.tolist())
+        if type(errors) is ndarray:
+            errors = errors.tolist()
+
+        self.optim.tell(parameters, errors)
 
     def recommend(self):
         xi = self.optim.Xi
