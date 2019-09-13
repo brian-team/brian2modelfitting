@@ -87,7 +87,7 @@ To get all of the eFEL features you can run the following code:
 
 To define the :py:class:`~brian2modelfitting.modelfitting.metric.FeatureMetric`, user has to define following input parameters:
 
-- ``traces_times`` - list of times indicating start and end of input current, has to be specified for each of input traces
+- ``traces_times`` - list of times indicating start and end of input current, has to be specified for each of input traces, each value has to be a :py:class:`~brian2.units.fundamentalunits.Quantity`
 - ``feat_list`` - list of strings with names of features to be used
 - ``combine`` - function to be used to compare features between output and simulated traces, (for `combine=None`, subtracts the features)
 
@@ -95,14 +95,14 @@ Example code usage:
 
 .. code:: python
 
-  traces_times = [[50, 100], [50, 100], [50, 100], [50, 100]]
+  traces_times = [[50*ms, 100*ms], [50*ms, 100*ms], [50*ms, 100*ms], [50, 100*ms]]
   feat_list = ['voltage_base', 'time_to_first_spike', 'Spikecount']
   metric = FeatureMetric(traces_times, feat_list, combine=None)
 
 .. note::
 
   If times of stimulation are same for all of the traces, user can specify a single list that will be replicated for
-  ``eFEL`` library: ``traces_times = [[50, 100]]``.
+  ``eFEL`` library: ``traces_times = [[50*ms, 100*ms]]``.
 
 
 

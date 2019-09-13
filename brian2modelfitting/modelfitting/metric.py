@@ -1,8 +1,8 @@
 import abc
 import efel
 from itertools import repeat
-from brian2 import Hz, second, Quantity
-from brian2.units.fundamentalunits import check_units
+from brian2 import Hz, second, Quantity, ms, us
+from brian2.units.fundamentalunits import check_units, in_unit
 from numpy import (array, sum, square, reshape, abs, amin, digitize,
                    rint, arange, atleast_2d, NaN, float64, split, shape,)
 
@@ -73,7 +73,7 @@ def get_gamma_factor(model, data, delta, time, dt):
 def calc_eFEL(traces, inp_times, feat_list, dt):
     out_traces = []
     for i, trace in enumerate(traces):
-        time = arange(0, len(trace)*dt, dt)
+        time = arange(0, len(trace))*dt/ms
         temp_trace = {}
         temp_trace['T'] = time
         temp_trace['V'] = trace
@@ -82,7 +82,6 @@ def calc_eFEL(traces, inp_times, feat_list, dt):
         out_traces.append(temp_trace)
 
     results = efel.getFeatureValues(out_traces, feat_list)
-
     return results
 
 
@@ -257,6 +256,13 @@ class FeatureMetric(TraceMetric):
         return err
 
     def get_features(self, traces, output, n_traces, dt):
+        if self.traces_times[0][0] is Quantity:
+            for n, trace in enumerate(self.traces_times):
+                t_start, t_end = trace[0], trace[1]
+                t_start = t_start / ms
+                t_end = t_end / ms
+                self.traces_times[n] = [t_start, t_end]
+
         n_times = shape(self.traces_times)[0]
 
         if (n_times != (n_traces)):
@@ -279,7 +285,7 @@ class FeatureMetric(TraceMetric):
         for ii in arange(sl):
             temp_trace = temp_traces[ii]
             temp_feat = calc_eFEL(temp_trace, self.traces_times,
-                                  self.feat_list)
+                                  self.feat_list, dt)
             self.check_values(temp_feat)
             features.append(temp_feat)
 

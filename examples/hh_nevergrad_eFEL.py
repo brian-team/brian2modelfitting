@@ -42,8 +42,8 @@ Cm   : farad (constant)
 ## Optimization and Metric Choice
 n_opt = NevergradOptimizer()
 
-# traces_times = [[50, 100], [50, 100], [50, 100], [50, 100]]
-traces_times = [[50, 100]]
+# traces_times = [[5*ms, 10*ms]]
+traces_times = [[0.005*second, 0.010*second]]
 feat_list = ['voltage_base', 'time_to_first_spike', 'Spikecount', ]
 metric = FeatureMetric(traces_times, feat_list)
 
@@ -54,7 +54,7 @@ fitter = TraceFitter(model=eqs, input_var='I', output_var='v',
                      param_init={'v': -65*mV},
                      method='exponential_euler',)
 
-res, error = fitter.fit(n_rounds=5,
+res, error = fitter.fit(n_rounds=1,
                         optimizer=n_opt, metric=metric,
                         callback='progressbar',
                         gl = [1e-09 *siemens, 1e-07 *siemens],
@@ -70,10 +70,13 @@ print(all_output)
 ## Visualization of the results
 start_scope()
 fits = fitter.generate_traces(params=None, param_init={'v': -65*mV})
+trace = out_traces[0]
+time = arange(0, len(trace)*dt/ms, dt/ms)
+# print(time[-1])
 
 fig, ax = plt.subplots(ncols=4, figsize=(20,5))
-ax[0].plot(out_traces[0].transpose())
-ax[0].plot(fits[0].transpose()/mV)
+ax[0].plot(time, out_traces[0].transpose())
+ax[0].plot(time,fits[0].transpose()/mV)
 
 ax[1].plot(out_traces[1].transpose())
 ax[1].plot(fits[1].transpose()/mV)
