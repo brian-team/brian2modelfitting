@@ -222,7 +222,7 @@ class MSEMetric(TraceMetric):
 
 
 class FeatureMetric(TraceMetric):
-    def __init__(self, traces_times, feat_list, combine=None):
+    def __init__(self, traces_times, feat_list, weights=None, combine=None):
         self.traces_times = traces_times
         self.feat_list = feat_list
 
@@ -230,6 +230,15 @@ class FeatureMetric(TraceMetric):
             def combine(x, y):
                 return x - y
         self.combine = combine
+
+        if weights is None:
+            weights = {}
+            for key in feat_list:
+                weights[key] = 1
+        if type(weights) is not dict:
+            raise TypeError("Weights has to be a dictionary!")
+
+        self.weights = weights
 
     def check_values(self, feat_list):
         """Removes all the None values and checks for array features"""
@@ -248,15 +257,15 @@ class FeatureMetric(TraceMetric):
         for key in d1.keys():
             x = d1[key]
             y = d2[key]
-            d[key] = self.combine(x, y)
-
+            d[key] = self.combine(x, y) * self.weights[key]
+            
         for k, v in d.items():
             err += sum(v)
 
         return err
 
     def get_features(self, traces, output, n_traces, dt):
-        if self.traces_times[0][0] is Quantity:
+        if isinstance(self.traces_times[0][0], Quantity):
             for n, trace in enumerate(self.traces_times):
                 t_start, t_end = trace[0], trace[1]
                 t_start = t_start / ms
