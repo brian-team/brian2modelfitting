@@ -228,7 +228,7 @@ class FeatureMetric(TraceMetric):
 
         if combine is None:
             def combine(x, y):
-                return x - y
+                return abs(x - y)
         self.combine = combine
 
         if weights is None:
@@ -258,7 +258,7 @@ class FeatureMetric(TraceMetric):
             x = d1[key]
             y = d2[key]
             d[key] = self.combine(x, y) * self.weights[key]
-            
+
         for k, v in d.items():
             err += sum(v)
 
