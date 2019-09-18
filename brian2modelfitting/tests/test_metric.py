@@ -37,23 +37,26 @@ def test_init():
 def test_calc_mse():
     mse = MSEMetric()
     out = np.random.rand(2, 20)
-    inp = np.random.rand(10, 20)
+    inp = np.random.rand(5, 2, 20)
 
-    errors = mse.calc(inp, out, 2, 0.01*ms)
+    errors = mse.calc(inp, out, 0.01*ms)
     assert_equal(np.shape(errors), (5,))
-    assert_equal(mse.calc(out, out, 2, 0.1*ms), [0.])
-    assert(np.all(mse.calc(inp, out, 2, 0.1*ms) > 0))
+    assert_equal(mse.calc(np.tile(out, (5, 1, 1)), out, 0.1*ms),
+                 np.zeros(5))
+    assert(np.all(mse.calc(inp, out, 0.1*ms) > 0))
 
 def test_calc_mse_t_start():
     mse = MSEMetric(t_start=1*ms)
-    out = np.random.rand(2, 200)
-    inp = np.random.rand(10, 200)
+    out = np.random.rand(2, 20)
+    inp = np.random.rand(5, 2, 20)
 
-    errors = mse.calc(inp, out, 2, 0.1*ms)
+    errors = mse.calc(inp, out, 0.1*ms)
     assert_equal(np.shape(errors), (5,))
-    assert_equal(mse.calc(out, out, 2, 0.1*ms), [0.])
-    assert(np.all(mse.calc(inp, out, 2, 0.1*ms) > 0))
-
+    assert(np.all(errors > 0))
+    # Everything before 1ms should be ignored, so having the same values for
+    # the rest should give an error of 0
+    inp[:, :, 10:] = out[None, :, 10:]
+    assert_equal(mse.calc(inp, out, 0.1*ms), np.zeros(5))
 
 def test_calc_gf():
     assert_raises(TypeError, GammaFactor)
@@ -73,39 +76,25 @@ def test_calc_gf():
 def test_get_features_mse():
     mse = MSEMetric()
     out_mse = np.random.rand(2, 20)
-    inp_mse = np.random.rand(6, 20)
+    inp_mse = np.random.rand(5, 2, 20)
 
-    features = mse.get_features(inp_mse, out_mse, 2, 0.1*ms)
-    assert_equal(np.shape(features), (2, 3))
+    features = mse.get_features(inp_mse, out_mse, 0.1*ms)
+    assert_equal(np.shape(features), (5, 2))
     assert(np.all(np.array(features) > 0))
 
-    features = mse.get_features(out_mse, out_mse, 2, 0.1*ms)
-    assert_equal(np.shape(features), (2, 1))
-    assert_equal(features, [[0.], [0.]])
-
-
-def test_get_features_mse_t_start():
-    mse = MSEMetric(t_start=1*ms)
-    out_mse = np.random.rand(2, 200)
-    inp_mse = np.random.rand(6, 200)
-
-    features = mse.get_features(inp_mse, out_mse, 2, 0.1*ms)
-    assert_equal(np.shape(features), (2, 3))
-    assert(np.all(np.array(features) > 0))
-
-    features = mse.get_features(out_mse, out_mse, 2, 0.1*ms)
-    assert_equal(np.shape(features), (2, 1))
-    assert_equal(features, [[0.], [0.]])
+    features = mse.get_features(np.tile(out_mse, (5, 1, 1)), out_mse, 0.1*ms)
+    print(features)
+    assert_equal(np.shape(features), (5, 2))
+    assert_equal(features, np.zeros((5, 2)))
 
 
 def test_get_errors_mse():
     mse = MSEMetric()
-    errors = mse.get_errors(np.random.rand(10, 5))
-    print(errors)
+    errors = mse.get_errors(np.random.rand(5, 10))
     assert_equal(np.shape(errors), (5,))
     assert(np.all(np.array(errors) > 0))
 
-    errors = mse.get_errors(np.zeros((10, 2)))
+    errors = mse.get_errors(np.zeros((2, 10)))
     assert_equal(np.shape(errors), (2,))
     assert_equal(errors, [0., 0.])
 

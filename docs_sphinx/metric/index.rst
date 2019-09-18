@@ -24,10 +24,9 @@ To be called in a following way:
 
   metric = MSEMetric()
 
-Additionally, :py:class:`~brian2modelfitting.modelfitting.metric.MSEMetric` accepts two optional input arguments
-start time ``t_start``. Time steps gets passed from the fitter. The following have to always be provided together and have units
-(be a :py:class:`~brian2.units.fundamentalunits.Quantity`). The start time allows the user to measure the error starting
-from the provided time (i.e. start of stimulation).
+Additionally, :py:class:`~brian2modelfitting.modelfitting.metric.MSEMetric` accepts an optional input argument
+start time ``t_start`` (as a :py:class:`~brian2.units.fundamentalunits.Quantity`). The start time allows the user to
+ignore an initial period that will not be included in the error calculation.
 
 .. code:: python
 
@@ -117,12 +116,15 @@ and :py:class:`~brian2modelfitting.modelfitting.metric.SpikeMetric` prepared for
 New metric will need to have specify following functions:
 
  - :py:func:`~brian2modelfitting.modelfitting.metric.Metric.get_features()`
-    calculates features / errors for each of the traces and stores it in a :py:attr:`~brian2modelfitting.modelfitting.metric.Metric.metric.features` attribute
-    The output of the function has to take shape of (n_samples, n_traces) or (n_traces, n_samples).
+    calculates features / errors for each of the simulations. The traces are provided as a 3-dimensional `~.ndarray`
+    of shape ``(n_samples, n_traces, time steps)``, where ``n_samples`` are the number of different parameter
+    sets that have been evaluated, and `n_traces` the number of different stimuli that have been evaluated for each
+    parameter set. The output of the function has to take the shape of ``(n_samples, n_traces)``.
 
  - :py:func:`~brian2modelfitting.modelfitting.metric.Metric.get_errors()`
-    weights features/multiple errors into one final error per each set of parameters and inputs stored in :py:attr:`~brian2modelfitting.modelfitting.metric.Metric.metric.errors`
-    The output of the function has to take shape of (n_samples,).
+    weights features/multiple errors into one final error per each set of parameters and inputs. The features are
+    received as a 2-dimensional `~.ndarray` of shape ``(n_samples, n_traces)`` (see above). The output has to be an
+    array of length ``n_samples``, i.e. one value for each parameter set.
 
  - :py:func:`~brian2modelfitting.modelfitting.metric.Metric.calc()`
     performs the error calculation across simulation for all parameters of each round. Specified in the abstract class, can be reused.
@@ -131,7 +133,6 @@ New metric will need to have specify following functions:
 TraceMetric
 ~~~~~~~~~~~
 To create a new metric for :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`, you have to inherit from :py:class:`~brian2modelfitting.modelfitting.metric.TraceMetric`.
-Input and output traces have to be shaped into 2D array.
 
 .. code:: python
 

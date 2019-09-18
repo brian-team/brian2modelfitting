@@ -1,5 +1,5 @@
 import abc
-from numpy import ones, array, arange, concatenate, mean, nanmin
+from numpy import ones, array, arange, concatenate, mean, nanmin, reshape
 from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
                     StateMonitor, SpikeMonitor, ms, device, second,
                     get_local_namespace, Quantity)
@@ -129,7 +129,7 @@ class Fitter(metaclass=abc.ABCMeta):
         self.refractory = refractory
 
         self.input = input
-        self.output = output
+        self.output = array(output)
         self.output_var = output_var
         self.model = model
 
@@ -440,8 +440,13 @@ class TraceFitter(Fitter):
         Returns errors after simulation with StateMonitor.
         To be used inside optim_iter.
         """
-        traces = getattr(self.simulator.network['monitor'], self.output_var)
-        errors = metric.calc(traces, self.output, self.n_traces, self.dt)
+        traces = getattr(self.simulator.network['monitor'],
+                         self.output_var+'_')
+        # Reshape traces for easier calculation of error
+        traces = reshape(traces, (traces.shape[0]//self.n_traces,
+                                  self.n_traces,
+                                  -1))
+        errors = metric.calc(traces, self.output, self.dt)
         return errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',

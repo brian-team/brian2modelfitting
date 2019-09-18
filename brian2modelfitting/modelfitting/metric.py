@@ -90,6 +90,19 @@ class Metric(metaclass=abc.ABCMeta):
     Metic abstract class to define functions required for a custom metric
     To be used with modelfitting Fitters.
     """
+
+    @check_units(t_start=second)
+    def __init__(self, t_start=0*second, **kwds):
+        """
+        Initialize the metric.
+
+        Parameters
+        ----------
+        t_start: Quantity, optional
+            Start of time window considered for calculating the fit error.
+        """
+        self.t_start = t_start
+
     @abc.abstractmethod
     def get_features(self, traces, output, n_traces, dt):
         """
@@ -131,40 +144,45 @@ class Metric(metaclass=abc.ABCMeta):
         """
         pass
 
-    def calc(self, traces, output, n_traces, dt):
-        """
-        Perform the error calculation across all parameters,
-        calculate error between each output trace and corresponding
-        simulation. You can also access metric.features, metric.errors.
-
-        Parameters
-        ----------
-        traces: 2D array
-            traces to be evaluated
-        output: array
-            goal traces
-        n_traces: int
-            number of input traces
-        dt: Quantity
-            time step
-
-        Returns
-        -------
-        errors: array
-            weigheted/mean error for each set of parameters
-
-        """
-        features = self.get_features(traces, output, n_traces, dt)
-        errors = self.get_errors(features)
-
-        return errors
-
 
 class TraceMetric(Metric):
     """
     Input traces have to be shaped into 2D array.
     """
-    pass
+
+    def calc(self, model_traces, data_traces, dt):
+        """
+        Perform the error calculation across all parameters,
+        calculate error between each output trace and corresponding
+        simulation.
+
+        Parameters
+        ----------
+        model_traces: ndarray
+            Traces that should be evaluated and compared to the target data.
+            Provided as an `.ndarray` of shape (samples, traces, time steps),
+            where "samples" are the different parameter values that have been
+            evaluated, and "traces" are the responses of the model to the
+            different input stimuli.
+        data_traces: array
+            The target traces to which the model should be compared. An
+            `ndarray` of shape (traces, time steps).
+        dt: Quantity
+            The length of a single time step.
+
+        Returns
+        -------
+        errors: ndarray
+            Total error for each set of parameters.
+
+        """
+        start_steps = int(round(self.t_start/dt))
+        features = self.get_features(model_traces[:, :, start_steps:],
+                                     data_traces[:, start_steps:],
+                                     dt)
+        errors = self.get_errors(features)
+
+        return errors
 
 
 class SpikeMetric(Metric):
@@ -180,45 +198,11 @@ class MSEMetric(TraceMetric):
     __doc__ = "Mean Square Error between goal and calculated output." + \
               Metric.get_features.__doc__
 
-    @check_units(t_start=second)
-    def __init__(self, t_start=None, **kwds):
-        """
-        Initialize the metric.
-
-        Parameters
-        ----------
-        t_start: beggining of time window (Quantity) (optional)
-        """
-        self.t_start = t_start
-
-    def get_features(self, traces, output, n_traces, dt):
-        mselist = []
-        output = atleast_2d(output)
-
-        if self.t_start is not None:
-            if not isinstance(dt, Quantity):
-                raise TypeError("To specify time window you need to also "
-                                "specify dt as Quantity")
-            t_start = int(self.t_start/dt)
-            output = output[:, t_start:-1]
-            traces = traces[:, t_start:-1]
-
-        for i in arange(n_traces):
-            temp_out = output[i]
-            temp_traces = traces[i::n_traces]
-
-            for trace in temp_traces:
-                mse = sum(square(temp_out - trace))
-                mselist.append(mse)
-
-        feat_arr = reshape(array(mselist), (n_traces,
-                           int(len(mselist)/n_traces)))
-
-        return feat_arr
+    def get_features(self, model_traces, data_traces, dt):
+        return sum((model_traces - data_traces)**2, axis=2)
 
     def get_errors(self, features):
-        errors = features.mean(axis=0)
-        return errors
+        return features.mean(axis=1)
 
 
 class FeatureMetric(TraceMetric):
