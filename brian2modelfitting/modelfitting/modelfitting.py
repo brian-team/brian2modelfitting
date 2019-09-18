@@ -22,18 +22,21 @@ def get_param_dic(params, param_names, n_traces, n_samples):
     return d
 
 
-def get_spikes(monitor):
+def get_spikes(monitor, n_samples, n_traces):
     """
     Get spikes from spike monitor change format from dict to a list,
     remove units.
     """
     spike_trains = monitor.spike_trains()
-
+    assert len(spike_trains) == n_samples*n_traces
     spikes = []
-    for i in arange(len(spike_trains)):
-        spike_list = spike_trains[i] / ms
-        spikes.append(spike_list)
-
+    i = -1
+    for sample in range(n_samples):
+        sample_spikes = []
+        for trace in range(n_traces):
+            i += 1
+            sample_spikes.append(array(spike_trains[i], copy=False))
+        spikes.append(sample_spikes)
     return spikes
 
 
@@ -387,7 +390,8 @@ class Fitter(metaclass=abc.ABCMeta):
                            name='neurons_')
 
         if output_var == 'spikes':
-            fits = get_spikes(self.simulator.network['monitor_'])
+            fits = get_spikes(self.simulator.network['monitor_'],
+                              1, self.n_traces)[0]  # a single "sample"
         else:
             fits = getattr(self.simulator.network['monitor_'], output_var)
 
@@ -505,8 +509,9 @@ class SpikeFitter(Fitter):
         Returns errors after simulation with SpikeMonitor.
         To be used inside optim_iter.
         """
-        spikes = get_spikes(self.simulator.network['monitor'])
-        errors = metric.calc(spikes, self.output, self.n_traces, self.dt)
+        spikes = get_spikes(self.simulator.network['monitor'],
+                            self.n_samples, self.n_traces)
+        errors = metric.calc(spikes, self.output, self.dt)
         return errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
