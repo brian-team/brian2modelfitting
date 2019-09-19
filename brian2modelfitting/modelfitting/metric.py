@@ -1,3 +1,4 @@
+import warnings
 import abc
 import efel
 from itertools import repeat
@@ -235,7 +236,9 @@ class MSEMetric(TraceMetric):
 
 
 class FeatureMetric(TraceMetric):
-    def __init__(self, traces_times, feat_list, weights=None, combine=None):
+    def __init__(self, traces_times, feat_list, weights=None, combine=None,
+                 t_start=0*second):
+        super(FeatureMetric, self).__init__(t_start=t_start)
         self.traces_times = traces_times
         if isinstance(self.traces_times[0][0], Quantity):
             for n, trace in enumerate(self.traces_times):
@@ -245,12 +248,6 @@ class FeatureMetric(TraceMetric):
                 self.traces_times[n] = [t_start, t_end]
         n_times = shape(self.traces_times)[0]
 
-        if (n_times != (n_traces)):
-            if (n_times == 1):
-                self.traces_times = list(repeat(self.traces_times[0], n_traces))
-            else:
-                raise ValueError("Specify the traces_times variable of appropiate "
-                                 "size (same as number of traces or 1).")
         self.feat_list = feat_list
 
         if combine is None:
@@ -273,7 +270,7 @@ class FeatureMetric(TraceMetric):
             for k, v in r.items():
                 if v is None:
                     r[k] = array([99])
-                    raise Warning('None for key:{}'.format(k))
+                    warnings.warn('None for key:{}'.format(k))
                 if (len(r[k])) > 1:
                     raise ValueError("you can only use features that return "
                                      "one value")
@@ -292,16 +289,20 @@ class FeatureMetric(TraceMetric):
         return err
 
     def get_features(self, traces, output, dt):
+        n_samples, n_traces, _ = traces.shape
+        if len(self.traces_times) != n_traces:
+            if len(self.traces_times) == 1:
+                self.traces_times = list(repeat(self.traces_times[0], n_traces))
+            else:
+                raise ValueError("Specify the traces_times variable of appropiate "
+                                 "size (same as number of traces or 1).")
+
         self.out_feat = calc_eFEL(output, self.traces_times, self.feat_list, dt)
         self.check_values(self.out_feat)
 
-        sl = int(shape(traces)[0]/n_traces)
         features = []
-        temp_traces = split(traces, sl)
-
-        for ii in arange(sl):
-            temp_trace = temp_traces[ii]
-            temp_feat = calc_eFEL(temp_trace, self.traces_times,
+        for one_sample in traces:
+            temp_feat = calc_eFEL(one_sample, self.traces_times,
                                   self.feat_list, dt)
             self.check_values(temp_feat)
             features.append(temp_feat)
