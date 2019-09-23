@@ -14,7 +14,7 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
 
-needs_sphinx = '1.7'
+needs_sphinx = '2.0'
 
 
 brian2modelfitting_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
@@ -56,6 +56,9 @@ source_suffix = '.rst'
 
 # The master toctree document.
 master_doc = 'index'
+
+# autodoc configuration
+autodoc_default_options = {'inherited-members': True}
 
 # -- Options for HTML output -------------------------------------------------
 # on_rtd is whether we are on readthedocs.org, this line of code grabbed from docs.readthedocs.org
