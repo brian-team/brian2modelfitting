@@ -15,9 +15,9 @@ def calc_bounds(parameter_names, **params):
 
     Parameters
     ----------
-    parameter_names: list
+    parameter_names: list[str]
         list of parameter names in use
-    **params:
+    **params
         bounds for each parameter
     """
     for param in parameter_names:
@@ -46,11 +46,11 @@ class Optimizer(metaclass=abc.ABCMeta):
 
         Parameters
         ----------
-        parameter_names: list
+        parameter_names: list[str]
             list of parameter names in use
         popsize: int
             population size
-        **params:
+        **params
             bounds for each parameter
         """
         pass
@@ -81,7 +81,7 @@ class Optimizer(metaclass=abc.ABCMeta):
         ----------
         parameters: list
             list of parameters [n_samples x n_params]
-        errors:
+        errors: list
             list of errors [n_samples]
         """
         pass
@@ -89,7 +89,7 @@ class Optimizer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def recommend(self):
         """
-        Returns best recomentation provided by the method
+        Returns best recommendation provided by the method
 
         Returns
         -------
@@ -106,14 +106,14 @@ class NevergradOptimizer(Optimizer):
 
     Parameters
     ----------
-    parameter_names : `list` or `dict`
+    parameter_names: `list` or `dict`
         List/Dict of strings with parameters to be used as instruments.
-    bounds : `list`
-        List with appropiate bounds for each parameter.
-    method : `str`, optional
+    bounds: `list`
+        List with appropriate bounds for each parameter.
+    method: `str`, optional
         The optimization method. By default differential evolution, can be
         chosen from any method in Nevergrad registry
-    budget: int/None
+    budget: int or None
         number of allowed evaluations
     num_workers: int
         number of evaluations which will be run in parallel at once
@@ -178,15 +178,15 @@ class SkoptOptimizer(Optimizer):
 
     Parameters
     ----------
-    parameter_names : (list, dict)
-        List/Dict of strings with parameters to be used as instruments.
-    bounds : (list)
+    parameter_names: list[str]
+        Parameters to be used as instruments.
+    bounds : list
         List with appropiate bounds for each parameter.
-    method : (str), optional
+    method : `str`, optional
         The optimization method. Possibilities: "GP", "RF", "ET", "GBRT" or
         sklearn regressor, default="GP"
-    n_calls: (int, default=100)
-        Number of calls to `func`.
+    n_calls: `int`
+        Number of calls to ``func``. Defaults to 100.
     """
     def __init__(self, method='GP', **kwds):
         super(Optimizer, self).__init__()

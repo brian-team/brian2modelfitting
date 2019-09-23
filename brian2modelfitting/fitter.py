@@ -69,37 +69,45 @@ class Fitter(metaclass=abc.ABCMeta):
 
     Parameters
     ----------
-    dt : time step
-    model : `~brian2.equations.Equations` or string
+    dt : `~brian2.units.fundamentalunits.Quantity`
+        The size of the time step.
+    model : `~brian2.equations.equations.Equations` or str
         The equations describing the model.
-    input : input data as a 2D array
-    output : output data as a 2D array
-    input_var : string
-        Input variable name.
-    output_var : string
-        Output variable name.
+    input : `~numpy.ndarray` or `~brian2.units.fundamentalunits.Quantity`
+        A 2D array of shape ``(n_traces, time steps)`` given the input that will
+        be fed into the model.
+    output : `~numpy.ndarray` or `~brian2.units.fundamentalunits.Quantity` or list
+        Recorded output of the model that the model should reproduce. Should
+        be a 2D array of the same shape as the input when fitting traces with
+        `TraceFitter`, a list of spike times when fitting spike trains with
+        `SpikeFitter`.
+    input_var : str
+        The name of the input variable in the model. Note that this variable
+        should be *used* in the model (e.g. a variable ``I`` that is added as
+        a current in the membrane potential equation), but not *defined*.
+    output_var : str
+        The name of the output variable in the model. Only needed when fitting
+        traces with `.TraceFitter`.
     n_samples: int
-        Number of parameter samples to be optimized over.
-    threshold: str, optional
-        The condition which produces spikes. Should be a single line boolean
-        expression.
-    reset: str, optional
+        Number of parameter samples to be optimized over in a single iteration.
+    threshold: `str`, optional
+        The condition which produces spikes. Should be a boolean expression as
+        a string.
+    reset: `str`, optional
         The (possibly multi-line) string with the code to execute on reset.
-    refractory: {str, 'Quantity'}, optional
+    refractory: `str` or `~brian2.units.fundamentalunits.Quantity`, optional
         Either the length of the refractory period (e.g. 2*ms), a string
         expression that evaluates to the length of the refractory period after
         each spike (e.g. '(1 + rand())*ms'), or a string expression evaluating
         to a boolean value, given the condition under which the neuron stays
         refractory after a spike (e.g. 'v > -20*mV')
-    method: string, optional
+    method: `str`, optional
         Integration method
-    level : int, optional
-        How much farther to go down in the stack to find the namespace.
-    param_init: dict
+    param_init: `dict`, optional
         Dictionary of variables to be initialized with respective values
     """
     def __init__(self, dt, model, input, output, input_var, output_var,
-                 n_samples, threshold, reset, refractory, method, level=0):
+                 n_samples, threshold, reset, refractory, method, param_init):
         """Initialize the fitter."""
 
         if get_device().__class__.__name__ == 'CPPStandaloneDevice':
@@ -142,23 +150,30 @@ class Fitter(metaclass=abc.ABCMeta):
         self.network = None
         self.optimizer = None
         self.metric = None
-        self.param_init = None
+        if not param_init:
+            param_init = {}
+        for param, val in param_init.items():
+            if not (param in self.model.diff_eq_names or
+                    param in self.model.parameter_names):
+                raise ValueError("%s is not a model variable or a "
+                                 "parameter in the model" % param)
+        self.param_init = param_init
 
     def setup_neuron_group(self, n_neurons, namespace, name='neurons'):
         """
         Setup neuron group, initialize required number of neurons, create
-        namespace and initite the parameters.
+        namespace and initialize the parameters.
 
         Parameters
         ----------
         n_neurons: int
             number of required neurons
-        **namespace :
+        **namespace
             arguments to be added to NeuronGroup namespace
 
         Returns
         -------
-        neurons : object ~brian2.groups.neurongroup.NeuronGroup
+        neurons : ~brian2.groups.neurongroup.NeuronGroup
             group of neurons
 
         """
@@ -192,7 +207,7 @@ class Fitter(metaclass=abc.ABCMeta):
         -------
         results : list
             recommended parameters
-        parameters: 2D list
+        parameters: list of list
             drawn parameters
         errors: list
             calculated errors
@@ -228,14 +243,15 @@ class Fitter(metaclass=abc.ABCMeta):
         n_rounds: int
             Number of rounds to optimize over (feedback provided over each
             round).
-        callback: str('text' or 'progressbar') or callable
-            For strings outputs default feedback or a progressbar. Provide
-            custom feedback function func(results, errors, parameters, index)
-            If callback returns True the fitting execution is interrupted.
-        restart bool
+        callback: `str` or `~typing.Callable`
+            Either the name of a provided callback function (``text`` or
+            ``progressbar``), or a custom feedback function
+            ``func(results, errors, parameters, index)``. If this function
+            returns ``True`` the fitting execution is interrupted.
+        restart: bool
             Flag that reinitializes the Fitter to reset the optimization.
             With restart True user is allowed to change optimizer/metric.
-        **params:
+        **params
             bounds for each parameter
 
         Returns
@@ -271,6 +287,7 @@ class Fitter(metaclass=abc.ABCMeta):
         callback = callback_setup(callback, n_rounds)
 
         # Run Optimization Loop
+        error = None
         for index in range(n_rounds):
             best_params, parameters, errors = self.optimization_iter(optimizer,
                                                                      metric)
@@ -291,13 +308,14 @@ class Fitter(metaclass=abc.ABCMeta):
 
         Parameters
         ----------
-        format: string ('dataframe', 'list', 'dict')
-            string with output format
+        format: str
+            The desired output format. Currently supported: ``dataframe``,
+            ``list``, or ``dict``.
 
         Returns
         -------
-        results:
-            'dataframe': returns pandas `DataFrame` without units
+        object
+            'dataframe': returns pandas `~pandas.DataFrame` without units
             'list': list of dictionaries
             'dict': dictionary of lists
         """
@@ -349,7 +367,7 @@ class Fitter(metaclass=abc.ABCMeta):
             Name of the output variable to be monitored.
         param_init: dict
             Dictionary of initial values for the model.
-        level : int, optional
+        level : `int`, optional
             How much farther to go down in the stack to find the namespace.
         """
 
@@ -405,7 +423,8 @@ class TraceFitter(Fitter):
                  threshold=None, level=0, param_init=None):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
-                         n_samples, threshold, reset, refractory, method)
+                         n_samples, threshold, reset, refractory, method,
+                         param_init)
 
         if output_var not in self.model.names:
             raise ValueError("%s is not a model variable" % output_var)
@@ -430,12 +449,6 @@ class TraceFitter(Fitter):
         monitor = StateMonitor(self.neurons, output_var, record=True,
                                name='monitor')
         self.network = Network(self.neurons, monitor)
-        if param_init:
-            for param, val in param_init.items():
-                if not (param in self.model.identifiers or param in self.model.names):
-                    raise ValueError("%s is not a model variable or an "
-                                     "identifier in the model" % param)
-            self.param_init = param_init
 
         self.simulator.initialize(self.network, self.param_init)
 
@@ -477,7 +490,8 @@ class SpikeFitter(Fitter):
         if method is None:
             method = 'exponential_euler'
         super().__init__(dt, model, input, output, input_var, 'v',
-                         n_samples, threshold, reset, refractory, method)
+                         n_samples, threshold, reset, refractory, method,
+                         param_init)
 
         # Replace input variable by TimedArray
         input_traces = TimedArray(input.transpose(), dt=dt)
@@ -537,7 +551,8 @@ class OnlineTraceFitter(Fitter):
                  threshold=None, level=0, param_init=None, t_start=0*second):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
-                         n_samples, threshold, reset, refractory, method)
+                         n_samples, threshold, reset, refractory, method,
+                         param_init)
 
         if output_var not in self.model.names:
             raise ValueError("%s is not a model variable" % output_var)

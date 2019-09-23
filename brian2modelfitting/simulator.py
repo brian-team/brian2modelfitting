@@ -5,7 +5,7 @@ from brian2 import device, NeuronGroup
 
 
 def initialize_parameter(variableview, value):
-    """initliazie parameter variable in static file, returns Dummy device"""
+    """initialize parameter variable in static file, returns Dummy device"""
     variable = variableview.variable
     array_name = device.get_array_name(variable)
     static_array_name = device.static_array(array_name, value)
@@ -57,12 +57,12 @@ class Simulator(metaclass=abc.ABCMeta):
 
         Parameters
         ----------
-        network: Network initialized instance
-            consisting of NeuronGroup named 'neurons' and a Monitor named
-            'monitor'
+        network: `~brian2.core.network.Network`
+            Network consisting of a `~brian2.groups.neurongroup.NeuronGroup`
+            named ``neurons`` and a monitor named ``monitor``.
         var_init: dict
             dictionary to initialize the variable states
-        name: str(optional)
+        name: `str`, optional
             name of the network
         """
         pass
@@ -75,10 +75,11 @@ class Simulator(metaclass=abc.ABCMeta):
 
         Parameters
         ----------
-        duration: simulation duration [ms]
+        duration: `~brian2.units.fundamentalunits.Quantity`
+            Simulation duration
         params: dict
             parameters to be set
-        params_names: list strings
+        params_names: list[str]
             names of parameters to set the dictionary
         """
         pass

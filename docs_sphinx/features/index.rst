@@ -87,8 +87,8 @@ To simulate and visualize the traces or spikes for the parameters of choice.
 For a quick access to best fitted set of parameters Fitter classes provided
 ready to use functions:
 
- - `~brian2modelfitting.TraceFitter.generate_traces` inside `~brian2modelfitting.fitter.TraceFitter`
- - `~brian2modelfitting.SpikeFitter.generate_spikes` inside `~brian2modelfitting.fitter.SpikeFitter`
+ - `~brian2modelfitting.fitter.TraceFitter.generate_traces` inside `~brian2modelfitting.fitter.TraceFitter`
+ - `~brian2modelfitting.fitter.SpikeFitter.generate_spikes` inside `~brian2modelfitting.fitter.SpikeFitter`
 
 Functions can be called after fitting in the following manner, without
 any input arguments:
@@ -149,7 +149,7 @@ Results can be returned in one of the following formats:
 
  - ``'list'`` (default) returns a list of dictionaries with corresponding parameters (including units) and errors
  - ``'dict'`` returns a dictionary of arrays with corresponding parameters (including units) and errors
- - ``'dataframe'`` returns `pandas dataframe` (without units)
+ - ``'dataframe'`` returns a `~pandas.DataFrame` (without units)
 
 
 Example output:

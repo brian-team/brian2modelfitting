@@ -21,8 +21,9 @@ Each optimization works with a following scheme:
 The proposed solution is developed using a modular approach, where both the optimization
 method and metric to be optimized can be easily swapped out by a custom implementation.
 
-``Fitter`` objects require 'model' defined as ``Equation`` object, that has parameters that will be
-optimized specified as constants in a following way:
+`~.Fitter` objects require 'model' defined as an
+`~brian2.equations.equations.Equations` object or as a string, that has
+parameters that will be optimized specified as constants in the following way:
 
 .. code:: python
 
@@ -41,8 +42,6 @@ Initialization of Fitter requires:
   - ``output_var`` - name of the output trace variable (string)
   - ``n_samples`` - number of samples to draw in each round (limited by method)
   - ``reset``, and ``threshold`` in case of spiking neurons (can take refractory as well)
-
-
 
 Additionally, upon call of `~brian2modelfitting.fitter.Fitter.fit()`,
 object requires:
@@ -72,10 +71,10 @@ We also provide ready optimizers:
 
 and metrics:
  - `~brian2modelfitting.metric.MSEMetric` (for `~brian2modelfitting.fitter.TraceFitter`)
- - `~brian2modelfitting.metric.GammaFactor` (for `~brian2modelfitting..modelfitting.SpikeFitter`)
+ - `~brian2modelfitting.metric.GammaFactor` (for `~brian2modelfitting.fitter.SpikeFitter`)
 
 
-Example of `~brian2modelfitting.fitter.modelfitting.TraceFitter` with all of the necessary arguments:
+Example of `~brian2modelfitting.fitter.TraceFitter` with all of the necessary arguments:
 
 .. code:: python
 
