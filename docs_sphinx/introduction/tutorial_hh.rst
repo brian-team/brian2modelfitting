@@ -1,7 +1,7 @@
 Tutorial: TraceFitter
 =====================
 
-In following documentation we will explain how to get started with using :py:class:`~brian2modelfitting.modelfitting.TraceFitter`.
+In following documentation we will explain how to get started with using :py:class:`~brian2modelfitting.fitter.TraceFitter`.
 Here we will optimize conductances for Hodgkin-Huxley cell model.
 
 
@@ -88,7 +88,7 @@ For simplicity we will use :py:class:`~brian2modelfitting.optimizer.NevergradOpt
 Fitter Initiation
 ~~~~~~~~~~~~~~~~~
 
-Since we are going to optimize over traces produced by the model, we need to initiate the fitter :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`:
+Since we are going to optimize over traces produced by the model, we need to initiate the fitter :py:class:`~brian2modelfitting.fitter.modelfitting.TraceFitter`:
 The minimum set of input parameters for the fitter, includes the ``model`` definition, ``input`` and ``output`` variable names and traces,
 time step ``dt``, number of samples we want to draw in each optimization round.
 
@@ -111,7 +111,7 @@ and we specify the initial value of integrated ``v``, by using the option: ``par
 Fit
 ~~~
 
-We are now ready to perform the optimization, by calling :py:meth:`~brian2modelfitting.modelfitting.TraceFitter.fit`.
+We are now ready to perform the optimization, by calling :py:meth:`~brian2modelfitting.fitter.TraceFitter.fit`.
 We need to pass the ``optimizer``, ``metric`` and pick a number of rounds (``n_rounds``).
 
 .. note::
@@ -144,7 +144,7 @@ Default print of this optimization will tell us the best score in each round of 
 
 Generating traces
 ~~~~~~~~~~~~~~~~~
-To generate the traces that correspond to the new best fit parameters of the model, use :py:meth:`~brian2modelfitting.modelfitting.TraceFitter.generate_traces`
+To generate the traces that correspond to the new best fit parameters of the model, use :py:meth:`~brian2modelfitting.fitter.TraceFitter.generate_traces`
 method. For which you also have to specify the initial value of ``v``.
 
 

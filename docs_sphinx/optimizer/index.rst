@@ -64,7 +64,7 @@ and focuses on bayesian methods. Algorithms are based on scikit-learn minimize f
  - Sequential optimisation using decision trees [``'ET'``]
  - Random forest regressor [``'RF'``]
 
-User can also provide a custom made `sklearn regressor`. :py:class:`~brian2modelfitting.modelfitting.metric.SkoptOptimizer` can be specified in the following way:
+User can also provide a custom made `sklearn regressor`. :py:class:`~brian2modelfitting.fitter.metric.SkoptOptimizer` can be specified in the following way:
 
 
 Parameters:
