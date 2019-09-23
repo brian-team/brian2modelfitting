@@ -1,30 +1,27 @@
 Tutorial: TraceFitter
 =====================
 
-In following documentation we will explain how to get started with using :py:class:`~brian2modelfitting.fitter.TraceFitter`.
-Here we will optimize conductances for Hodgkin-Huxley cell model.
+In following documentation we will explain how to get started with using
+`~brian2modelfitting.fitter.TraceFitter`. Here we will optimize conductances for
+a Hodgkin-Huxley cell model.
 
-
-We start by importing brian2 and brian2modelfitting:
+We start by importing ``brian2`` and ``brian2modelfitting``:
 
 .. code:: python
 
   from brian2 import *
   from brian2modelfitting import *
 
-
-
 Problem description
 -------------------
+We have 2 step input currents of different amplitude and two "data samples"
+recorded from the model with goal parameters. The goal of this exercise is to
+optimize the conductances of the model ``gl``, ``g_na``, ``g_kd``, for which we
+know the expected ranges.
 
-We have 2 step input currents of different amplitude and two "data samples" recorded
-from the model with goal parameters. The goal of this exercise is to optimize the
-conductances of the model ``gl``, ``g_na``, ``g_kd``, for which we know the expected
-ranges.
 
-
-Visualization of input currents and corresponding output traces for which we will
-optimize:
+Visualization of input currents and corresponding output traces which we will
+try to fit:
 
 .. image:: ../_static/hh_tutorial_input.png
 
@@ -45,12 +42,11 @@ We have to specify all of the constants for the model
   ENa=50*mV
   VT=-63*mV
 
-Then, we have to define our and model with Equations object, in the following manner:
+Then, we have to define our model:
 
 .. code:: python
 
-  model = Equations(
-  '''
+  model = '''
   dv/dt = (gl*(El-v) - g_na*(m*m*m)*h*(v-ENa) - g_kd*(n*n*n*n)*(v-EK) + I)/Cm : volt
   dm/dt = 0.32*(mV**-1)*(13.*mV-v+VT)/
     (exp((13.*mV-v+VT)/(4.*mV))-1.)/ms*(1-m)-0.28*(mV**-1)*(v-VT-40.*mV)/
@@ -61,23 +57,23 @@ Then, we have to define our and model with Equations object, in the following ma
   g_na : siemens (constant)
   g_kd : siemens (constant)
   gl   : siemens (constant)
-  ''',)
-
+  '''
 
 .. note::
 
-   You have to identify the parameters you want to optimize, by adding them as constant variables to the equation.
+   You have to identify the parameters you want to optimize by adding them as
+   constant variables to the equation.
 
 
 Optimizer and metric
 ~~~~~~~~~~~~~~~~~~~~
-
 Once we know our model and parameters, it's time to pick an optimizing algorithm
 and a metric that will be used as a measure.
 
-For simplicity we will use :py:class:`~brian2modelfitting.optimizer.NevergradOptimizer` default method
-(`Differential Evolution`) and Mean Square Error :py:class:`~brian2modelfitting.metric.MSEMetric`:
-
+For simplicity we will use the default method provided by the
+`~brian2modelfitting.optimizer.NevergradOptimizer`, i.e.
+"Differential Evolution", and the `~brian2modelfitting.metric.MSEMetric`,
+calculating the mean squared error between simulated and data traces:
 
 .. code:: python
 
@@ -88,8 +84,10 @@ For simplicity we will use :py:class:`~brian2modelfitting.optimizer.NevergradOpt
 Fitter Initiation
 ~~~~~~~~~~~~~~~~~
 
-Since we are going to optimize over traces produced by the model, we need to initiate the fitter :py:class:`~brian2modelfitting.fitter.modelfitting.TraceFitter`:
-The minimum set of input parameters for the fitter, includes the ``model`` definition, ``input`` and ``output`` variable names and traces,
+Since we are going to optimize over traces produced by the model, we need to
+initiate the fitter `~brian2modelfitting.fitter.TraceFitter`:
+The minimum set of input parameters for the fitter, includes the ``model``
+definition, ``input`` and ``output`` variable names and traces,
 time step ``dt``, number of samples we want to draw in each optimization round.
 
 .. code:: python
@@ -104,15 +102,15 @@ time step ``dt``, number of samples we want to draw in each optimization round.
                        method='exponential_euler',
                        param_init={'v': -65*mV})
 
-Additionally, in this example, we pick the integration method to be ``'exponential_euler'``,
-and we specify the initial value of integrated ``v``, by using the option: ``param_init={'v': -65*mV},``
-
+Additionally, in this example, we pick the integration method to be
+``'exponential_euler'``, and we specify the initial value of the state variable
+``v``, by using the option: ``param_init={'v': -65*mV}``.
 
 Fit
 ~~~
-
-We are now ready to perform the optimization, by calling :py:meth:`~brian2modelfitting.fitter.TraceFitter.fit`.
-We need to pass the ``optimizer``, ``metric`` and pick a number of rounds (``n_rounds``).
+We are now ready to perform the optimization, by calling the
+`~brian2modelfitting.fitter.TraceFitter.fit` method. We need to pass the
+``optimizer``, ``metric`` and pick a number of rounds(``n_rounds``).
 
 .. note::
 
@@ -133,26 +131,25 @@ Output:
  - ``error``: corresponding error
 
 
-Default print of this optimization will tell us the best score in each round of optimization and corresponding error:
+The default output during the optimization run will tell us the best parameters
+in each round of optimization and the corresponding error:
 
 .. code:: python
 
   Round 0: fit (4.222867177282197e-05, 7.504100120635022e-08, 4.772988880219001e-05) with error: 0.5165218259614359
   Round 1: fit (2.676589777337801e-05, 1.482336088690629e-07, 0.0001772869243329754) with error: 0.1665320942433037
 
-
-
 Generating traces
 ~~~~~~~~~~~~~~~~~
-To generate the traces that correspond to the new best fit parameters of the model, use :py:meth:`~brian2modelfitting.fitter.TraceFitter.generate_traces`
-method. For which you also have to specify the initial value of ``v``.
-
+To generate the traces that correspond to the new best fit parameters of the
+model, you can use the `~brian2modelfitting.fitter.TraceFitter.generate_traces`
+method.
 
 .. code:: python
 
-  traces = fitter.generate_traces(param_init={'v': -65*mV})
+  traces = fitter.generate_traces()
 
 
-The following ``fit`` traces in comparison to our goal data:
+The following plot shows the fit traces in comparison to our target data:
 
 .. image:: ../_static/hh_best_fit.png

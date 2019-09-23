@@ -57,6 +57,9 @@ source_suffix = '.rst'
 # The master toctree document.
 master_doc = 'index'
 
+# Make `...` link to Python classes/functions/methods/...
+default_role = 'py:obj'
+
 # autodoc configuration
 autodoc_default_options = {'inherited-members': True}
 
@@ -92,4 +95,4 @@ intersphinx_mapping = {'python': ('https://docs.python.org/', None),
                        'matplotlib': ('http://matplotlib.org/', None),
                        'numpy': ('http://docs.scipy.org/doc/numpy/', None),
                        'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
-                       'mayavi': ('http://docs.enthought.com/mayavi/mayavi/', None)}
+                       'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None)}

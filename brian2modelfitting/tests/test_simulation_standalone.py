@@ -7,9 +7,9 @@ from numpy.testing.utils import assert_equal, assert_raises
 from brian2 import (Equations, NeuronGroup, StateMonitor, Network, ms,
                     device, start_scope)
 from brian2.devices.device import Dummy
-from brian2modelfitting import Simulation, CPPStandaloneSimulation
-from brian2modelfitting.simulation import (initialize_neurons,
-                                           initialize_parameter)
+from brian2modelfitting.simulator import (initialize_neurons,
+                                          initialize_parameter,
+                                          Simulator, CPPStandaloneSimulator)
 from brian2.devices.device import reinit_devices
 
 
@@ -41,8 +41,8 @@ def setup(request):
 
 
 def test_init():
-    sts = CPPStandaloneSimulation()
-    assert isinstance(sts, Simulation)
+    sts = CPPStandaloneSimulator()
+    assert isinstance(sts, Simulator)
 
 
 def test_initialize_parameter():
@@ -59,7 +59,7 @@ def test_initialize_neurons():
 
 def test_initialize_simulation_standalone():
     start_scope()
-    sas = CPPStandaloneSimulation()
+    sas = CPPStandaloneSimulator()
     assert_raises(TypeError, sas.initialize)
     assert_raises(TypeError, sas.initialize, net)
     assert_raises(KeyError, sas.initialize, empty_net, None)
@@ -80,7 +80,7 @@ def test_run_simulation_standalone(setup):
     device.reinit()
     device.activate()
     device.has_been_run = False
-    sas = CPPStandaloneSimulation()
+    sas = CPPStandaloneSimulator()
     sas.initialize(net, var_init=None)
 
     sas.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])

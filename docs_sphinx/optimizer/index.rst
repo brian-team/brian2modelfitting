@@ -17,7 +17,7 @@ Nevergrad
 .. _Nevergrad: https://github.com/facebookresearch/nevergrad
 
 Offers an extensive collection of algorithms that do not require gradient computation.
-:py:class:`~brian2modelfitting.metric.NevergradOptimizer` can be specified in the following way:
+`~brian2modelfitting.optimizer.NevergradOptimizer` can be specified in the following way:
 
 .. code:: python
 
@@ -32,22 +32,13 @@ where method input is a string with specific optimization algorithm.
  - Sequential quadratic programming.[``'SQP'``]
 
 
-Nevergrad is not yet documented, to check all available methods use following code:
+Nevergrad is still poorly documented, to check all the available methods use the
+following code:
 
 .. code:: python
 
   from nevergrad.optimization import registry
   print(sorted(registry.keys()))
-
-
-Important notes:
- - number of samples per round in Nevergrad optimization methods is limited to 30,
-   to increase it user has to specify a popsize upon initialization of NevergradOptimizer
-
-.. code:: python
-
-     opt = NevergradOptimizer(method='DE', popsize=60)
-
 
 
 Scikit-Optimize_ (skopt)
@@ -64,7 +55,8 @@ and focuses on bayesian methods. Algorithms are based on scikit-learn minimize f
  - Sequential optimisation using decision trees [``'ET'``]
  - Random forest regressor [``'RF'``]
 
-User can also provide a custom made `sklearn regressor`. :py:class:`~brian2modelfitting.fitter.metric.SkoptOptimizer` can be specified in the following way:
+User can also provide a custom made sklearn regressor.
+`~brian2modelfitting.optimizer.SkoptOptimizer` can be specified in the following way:
 
 
 Parameters:
@@ -81,23 +73,19 @@ For more detail check Optimizer documentation. https://scikit-optimize.github.io
 
    opt = SkoptOptimizer(method='GP', acq_func='LCB')
 
-
-
 Custom Optimizer
 ----------------
 
 To use a different back-end optimization library, user can provide a
-custom class that inherits from provided abstract class :py:class:`~brian2modelfitting.metric.Optimizer`
+custom class that inherits from provided abstract class `~brian2modelfitting.optimizer.Optimizer`
 
-Follows `ask()/tell()` interface
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-User can plug in different optimization tool, as long as it follows ```ask() / tell```
-interface. Abstract class :py:class:`~brian2modelfitting.metric.Optimizer` prepared for different back-end libraries.
-All of the optimizer specific arguments have to be provided upon
-optimizers initialization.
+User can plug in different optimization tool, as long as it follows an ``ask() / tell``
+interface. The abstract class `~brian2modelfitting.optimizer.Optimizer` is
+prepared for different back-end libraries. All of the optimizer specific
+arguments have to be provided upon optimizers initialization.
 
 
-```ask() / tell``` interface in optimizer class:
+The ``ask() / tell`` interface is used as follows:
 
 .. code:: python
 

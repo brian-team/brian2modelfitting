@@ -9,7 +9,7 @@ from brian2 import (zeros, Equations, NeuronGroup, StateMonitor, TimedArray,
                     nS, mV, volt, ms, Quantity)
 from brian2 import have_same_dimensions
 from brian2modelfitting import (NevergradOptimizer, TraceFitter, MSEMetric,
-                                OnlineTraceFitter, Simulation, Metric,
+                                OnlineTraceFitter, Simulator, Metric,
                                 Optimizer, GammaFactor)
 from brian2.devices.device import reinit_devices
 from brian2modelfitting.fitter import get_param_dic
@@ -109,7 +109,7 @@ def test_tracefitter_init(setup):
 
     assert isinstance(tf.network['neurons'], NeuronGroup)
     assert isinstance(tf.network['monitor'], StateMonitor)
-    assert isinstance(tf.simulator, Simulation)
+    assert isinstance(tf.simulator, Simulator)
     assert isinstance(tf.input_traces, TimedArray)
     assert isinstance(tf.model, Equations)
 
@@ -150,7 +150,7 @@ def test_fitter_fit(setup):
 
     assert isinstance(tf.metric, Metric)
     assert isinstance(tf.optimizer, Optimizer)
-    assert isinstance(tf.simulator, Simulation)
+    assert isinstance(tf.simulator, Simulator)
 
     assert isinstance(results, dict)
     assert isinstance(errors, float)
@@ -303,7 +303,7 @@ def test_onlinetracefitter_init(setup_online):
 
     assert isinstance(otf.network['neurons'], NeuronGroup)
     assert isinstance(otf.network['monitor'], StateMonitor)
-    assert isinstance(otf.simulator, Simulation)
+    assert isinstance(otf.simulator, Simulator)
     assert isinstance(otf.input_traces, TimedArray)
     assert isinstance(otf.model, Equations)
 
@@ -345,7 +345,7 @@ def test_onlinetracefitter_fit(setup_online):
 
     assert otf.metric is None
     assert isinstance(otf.optimizer, Optimizer)
-    assert isinstance(otf.simulator, Simulation)
+    assert isinstance(otf.simulator, Simulator)
 
     assert isinstance(results, dict)
     assert isinstance(errors, float)

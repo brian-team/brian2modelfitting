@@ -21,8 +21,9 @@ Each optimization works with a following scheme:
 The proposed solution is developed using a modular approach, where both the optimization
 method and metric to be optimized can be easily swapped out by a custom implementation.
 
-``Fitter`` objects require 'model' defined as ``Equation`` object, that has parameters that will be
-optimized specified as constants in a following way:
+`~.Fitter` objects require 'model' defined as an
+`~brian2.equations.equations.Equations` object or as a string, that has
+parameters that will be optimized specified as constants in the following way:
 
 .. code:: python
 
@@ -42,9 +43,7 @@ Initialization of Fitter requires:
   - ``n_samples`` - number of samples to draw in each round (limited by method)
   - ``reset``, and ``threshold`` in case of spiking neurons (can take refractory as well)
 
-
-
-Additionally, upon call of :py:func:`~brian2modelfitting.fitter.Fitter.fit()`,
+Additionally, upon call of `~brian2modelfitting.fitter.Fitter.fit()`,
 object requires:
 
  - ``n_rounds`` - number of rounds to optimize over
@@ -62,20 +61,20 @@ Ready to use elements
 ---------------------
 
 Alongside three optimization classes:
- - :py:class:`~brian2modelfitting.fitter.TraceFitter`
- - :py:class:`~brian2modelfitting.fitter.SpikeFitter`
- - :py:class:`~brian2modelfitting.fitter.OnlineTraceFitter`
+ - `~brian2modelfitting.fitter.TraceFitter`
+ - `~brian2modelfitting.fitter.SpikeFitter`
+ - `~brian2modelfitting.fitter.OnlineTraceFitter`
 
 We also provide ready optimizers:
- - :py:class:`~brian2modelfitting.optimizer.NevergradOptimizer`
- - :py:class:`~brian2modelfitting.optimizer.SkoptOptimizer`
+ - `~brian2modelfitting.optimizer.NevergradOptimizer`
+ - `~brian2modelfitting.optimizer.SkoptOptimizer`
 
 and metrics:
- - :py:class:`~brian2modelfitting.metric.MSEMetric` (for :py:class:`~brian2modelfitting.fitter.TraceFitter`)
- - :py:class:`~brian2modelfitting.metric.GammaFactor` (for :py:class:`~brian2modelfitting..modelfitting.SpikeFitter`)
+ - `~brian2modelfitting.metric.MSEMetric` (for `~brian2modelfitting.fitter.TraceFitter`)
+ - `~brian2modelfitting.metric.GammaFactor` (for `~brian2modelfitting.fitter.SpikeFitter`)
 
 
-Example of :py:class:`~brian2modelfitting.fitter.modelfitting.TraceFitter` with all of the necessary arguments:
+Example of `~brian2modelfitting.fitter.TraceFitter` with all of the necessary arguments:
 
 .. code:: python
 
@@ -95,11 +94,11 @@ Example of :py:class:`~brian2modelfitting.fitter.modelfitting.TraceFitter` with 
 Remarks
 -------
  - After performing first fitting, user can continue the optimization
-   with another :py:func:`~brian2modelfitting.fitter.Fitter.fit()` run.
+   with another `~brian2modelfitting.fitter.Fitter.fit()` run.
 
- - Number of samples can not be changed between rounds or :py:func:`~brian2modelfitting.fitter.Fitter.fit()`
+ - Number of samples can not be changed between rounds or `~brian2modelfitting.fitter.Fitter.fit()`
    calls, due to parallelization of the simulations.
 
 .. warning::
-  User is not allowed to change the optimizer or metric between :py:func:`~brian2modelfitting.fitter.Fitter.fit()`
+  User is not allowed to change the optimizer or metric between `~brian2modelfitting.fitter.Fitter.fit()`
   calls.
