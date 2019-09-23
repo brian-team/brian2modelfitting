@@ -14,8 +14,8 @@ provide their own metric.
 Mean Square Error
 -----------------
 
-:py:class:`~brian2modelfitting.modelfitting.metric.MSEMetric` is provided for
-use with :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`.
+:py:class:`~brian2modelfitting.metric.MSEMetric` is provided for
+use with :py:class:`~brian2modelfitting.fitter.TraceFitter`.
 It calculates the mean squared difference between the data and the simulated
 trace according to the well known formula:
 
@@ -28,7 +28,7 @@ It can be initialized in the following way:
 
   metric = MSEMetric()
 
-Additionally, :py:class:`~brian2modelfitting.modelfitting.metric.MSEMetric`
+Additionally, :py:class:`~brian2modelfitting.metric.MSEMetric`
 accepts an optional input argument start time ``t_start`` (as a
 :py:class:`~brian2.units.fundamentalunits.Quantity`). The start time allows the
 user to ignore an initial period that will not be included in the error
@@ -39,15 +39,15 @@ calculation.
   metric = MSEMetric(t_start=5*ms)
 
 
-In :py:class:`~brian2modelfitting.modelfitting.modelfitting.OnlineTraceFitter`,
+In :py:class:`~brian2modelfitting.fitter.OnlineTraceFitter`,
 the mean square error gets calculated in online manner, with no need of
 specifying a metric object.
 
 
 GammaFactor
 -----------
-:py:class:`~brian2modelfitting.modelfitting.metric.GammaFactor` is provided for
-use with :py:class:`~brian2modelfitting.modelfitting.modelfitting.SpikeFitter`
+:py:class:`~brian2modelfitting.metric.GammaFactor` is provided for
+use with :py:class:`~brian2modelfitting.fitter.SpikeFitter`
 and measures the coincidence between spike times in the simulated and the target
 trace. It is calculcated according to:
 
@@ -79,8 +79,8 @@ the maximal tolerance for spikes to be considered coincident:
 
 FeatureMetric
 -------------
-:py:class:`~brian2modelfitting.modelfitting.metric.FeatureMetric` is provided
-for use with :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`.
+:py:class:`~brian2modelfitting.metric.FeatureMetric` is provided
+for use with :py:class:`~brian2modelfitting.fitter.TraceFitter`.
 This metric allows the user to optimize the match of certain features between
 the simulated and the target trace. The features get calculated by Electrophys
 Feature Extract Library (eFEL) library, for which the documentation is
@@ -101,7 +101,7 @@ To get a list of all the available eFEL features, you can run the following code
   spikes).
 
 
-To use the :py:class:`~brian2modelfitting.modelfitting.metric.FeatureMetric`,
+To use the :py:class:`~brian2modelfitting.metric.FeatureMetric`,
 you have to provide the following input parameters:
 
 - ``traces_times`` - a list of times indicating start and end of the stimulus
@@ -132,24 +132,24 @@ Custom Metric
 
 Users are not limited to the metrics provided in the toolbox. If needed, they
 can provide their own metric based on one of the abstract classes
-:py:class:`~brian2modelfitting.modelfitting.metric.TraceMetric`
-and :py:class:`~brian2modelfitting.modelfitting.metric.SpikeMetric`.
+:py:class:`~brian2modelfitting.metric.TraceMetric`
+and :py:class:`~brian2modelfitting.metric.SpikeMetric`.
 
 A new metric will need to specify the following functions:
 
- - :py:func:`~brian2modelfitting.modelfitting.metric.Metric.get_features()`
+ - :py:func:`~brian2modelfitting.metric.Metric.get_features()`
     calculates features / errors for each of the simulations. The representation
     of the model results and the target data depend on whether traces or spikes
     are fitted, see below.
 
- - :py:func:`~brian2modelfitting.modelfitting.metric.Metric.get_errors()`
+ - :py:func:`~brian2modelfitting.metric.Metric.get_errors()`
     weights features/multiple errors into one final error per each set of
     parameters and inputs. The features are received as a 2-dimensional
     :py:class:`~numpy.ndarray` of shape ``(n_samples, n_traces)`` The output has
     to be an array of length ``n_samples``, i.e. one value for each parameter
     set.
 
- - :py:func:`~brian2modelfitting.modelfitting.metric.Metric.calc()`
+ - :py:func:`~brian2modelfitting.metric.Metric.calc()`
     performs the error calculation across simulation for all parameters of each
     round. Already implemented in the abstract class and therefore does not
     need to be reimplemented necessarily.
@@ -157,8 +157,8 @@ A new metric will need to specify the following functions:
 TraceMetric
 ~~~~~~~~~~~
 To create a new metric for
-:py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`, you have
-to inherit from :py:class:`~brian2modelfitting.modelfitting.metric.TraceMetric`
+:py:class:`~brian2modelfitting.fitter.TraceFitter`, you have
+to inherit from :py:class:`~brian2modelfitting.metric.TraceMetric`
 and overwrite the :py:meth:`~.TraceMetric.get_features` and/or
 :py:meth:`~.TraceMetric.get_errors` method. The model traces for the
 :py:meth:`~.TraceMetric.get_features` function are provided as a 3-dimensional
@@ -181,8 +181,8 @@ shape of ``(n_samples, n_traces)``. This array is the input to the
 SpikeMetric
 ~~~~~~~~~~~
 To create a new metric for
-:py:class:`~brian2modelfitting.modelfitting.modelfitting.SpikeFitter`, you have
-to inherit from :py:class:`~brian2modelfitting.modelfitting.metric.SpikeMetric`.
+:py:class:`~brian2modelfitting.fitter.SpikeFitter`, you have
+to inherit from :py:class:`~brian2modelfitting.metric.SpikeMetric`.
 Inputs of the metric in :py:meth:`~.SpikeMetric.get_features` are a nested list
 structure for the spikes generated by the model: a list where each element
 contains the results for a single parameter set. Each of these results is a list

@@ -5,9 +5,9 @@ The ``brian2modelfitting`` offers model fitting package, that allows for data dr
 models.
 
 Model provides three optimization classes:
- - :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`
- - :py:class:`~brian2modelfitting.modelfitting.modelfitting.SpikeFitter`
- - :py:class:`~brian2modelfitting.modelfitting.modelfitting.OnlineTraceFitter`
+ - :py:class:`~brian2modelfitting.fitter.TraceFitter`
+ - :py:class:`~brian2modelfitting.fitter.SpikeFitter`
+ - :py:class:`~brian2modelfitting.fitter.OnlineTraceFitter`
 
 The class accepts a model and data as an input and returns best fit of parameters
 and corresponding error. Proposed solution can accept multiple traces to optimize over

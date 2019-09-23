@@ -106,11 +106,11 @@ class NevergradOptimizer(Optimizer):
 
     Parameters
     ----------
-    parameter_names : (list, dict)
+    parameter_names : `list` or `dict`
         List/Dict of strings with parameters to be used as instruments.
-    bounds : (list)
+    bounds : `list`
         List with appropiate bounds for each parameter.
-    method : (str), optional
+    method : `str`, optional
         The optimization method. By default differential evolution, can be
         chosen from any method in Nevergrad registry
     budget: int/None
