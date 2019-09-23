@@ -51,7 +51,7 @@ inp_trace = np.array([input_current])
 
 # pass parameters to the NeuronGroup
 fitter = SpikeFitter(model=eqs_fit, input_var='I', dt=dt,
-                     input=inp_trace * amp, output=out_spikes,
+                     input=inp_trace * amp, output=[out_spikes],
                      n_samples=30,
                      threshold='v > -50*mV',
                      param_init={'v': -70*mV},

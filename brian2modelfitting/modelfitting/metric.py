@@ -1,3 +1,4 @@
+import warnings
 import abc
 import efel
 from itertools import repeat
@@ -8,7 +9,7 @@ from numpy import (array, sum, square, reshape, abs, amin, digitize,
 
 
 def firing_rate(spikes):
-    """Raturns rate of the spike train"""
+    """Returns rate of the spike train"""
     if len(spikes) < 2:
         return NaN
     return (len(spikes) - 1) / (spikes[-1] - spikes[0])
@@ -16,7 +17,7 @@ def firing_rate(spikes):
 
 def get_gamma_factor(model, data, delta, time, dt):
     """
-    Calculate gamma factor between model and tagret spike trains,
+    Calculate gamma factor between model and target spike trains,
     with precision delta.
 
     Parameters
@@ -47,8 +48,7 @@ def get_gamma_factor(model, data, delta, time, dt):
     data_rate = data_length / time
     model_rate = model_length / time
 
-
-    if (model_length > 1):
+    if model_length > 1:
         bins = .5 * (model[1:] + model[:-1])
         indices = digitize(data, bins)
         diff = abs(data - model[indices])
@@ -90,26 +90,25 @@ class Metric(metaclass=abc.ABCMeta):
     Metic abstract class to define functions required for a custom metric
     To be used with modelfitting Fitters.
     """
-    @abc.abstractmethod
-    def get_features(self, traces, output, n_traces, dt):
-        """
-        Function calculates features / errors for each of the traces and stores
-        it in an attribute metric.features.
 
-        The output of the function has to take shape of (n_samples, n_traces)
-        or (n_traces, n_samples).
+    @check_units(t_start=second)
+    def __init__(self, t_start=0*second, **kwds):
+        """
+        Initialize the metric.
 
         Parameters
         ----------
-        traces: 2D array
-            traces to be evaluated
-        output: array
-            goal traces
-        n_traces: int
-            number of input traces
-        dt: Quantity
-            time step
+        t_start: Quantity, optional
+            Start of time window considered for calculating the fit error.
+        """
+        self.t_start = t_start
 
+    @abc.abstractmethod
+    def get_features(self, model_results, target_results, dt):
+        """
+        Function calculates features / errors for each of the input traces.
+
+        The output of the function has to take shape of (n_samples, n_traces).
         """
         pass
 
@@ -117,7 +116,7 @@ class Metric(metaclass=abc.ABCMeta):
     def get_errors(self, features, n_traces):
         """
         Function weights features/multiple errors into one final error per each
-        set of parameters and inputs stored metric.errors.
+        set of parameters.
 
         The output of the function has to take shape of (n_samples,).
 
@@ -131,99 +130,179 @@ class Metric(metaclass=abc.ABCMeta):
         """
         pass
 
-    def calc(self, traces, output, n_traces, dt):
-        """
-        Perform the error calculation across all parameters,
-        calculate error between each output trace and corresponding
-        simulation. You can also access metric.features, metric.errors.
-
-        Parameters
-        ----------
-        traces: 2D array
-            traces to be evaluated
-        output: array
-            goal traces
-        n_traces: int
-            number of input traces
-        dt: Quantity
-            time step
-
-        Returns
-        -------
-        errors: array
-            weigheted/mean error for each set of parameters
-
-        """
-        features = self.get_features(traces, output, n_traces, dt)
-        errors = self.get_errors(features)
-
-        return errors
-
 
 class TraceMetric(Metric):
     """
     Input traces have to be shaped into 2D array.
     """
-    pass
+
+    def calc(self, model_traces, data_traces, dt):
+        """
+        Perform the error calculation across all parameters,
+        calculate error between each output trace and corresponding
+        simulation.
+
+        Parameters
+        ----------
+        model_traces: ndarray
+            Traces that should be evaluated and compared to the target data.
+            Provided as an `.ndarray` of shape (samples, traces, time steps),
+            where "samples" are the different parameter values that have been
+            evaluated, and "traces" are the responses of the model to the
+            different input stimuli.
+        data_traces: array
+            The target traces to which the model should be compared. An
+            `ndarray` of shape (traces, time steps).
+        dt: Quantity
+            The length of a single time step.
+
+        Returns
+        -------
+        errors: ndarray
+            Total error for each set of parameters.
+
+        """
+        start_steps = int(round(self.t_start/dt))
+        features = self.get_features(model_traces[:, :, start_steps:],
+                                     data_traces[:, start_steps:],
+                                     dt)
+        errors = self.get_errors(features)
+
+        return errors
+
+    @abc.abstractmethod
+    def get_features(self, model_traces, data_traces, dt):
+        """
+        Calculate the features/errors for each simulated trace, by comparing
+        it to the corresponding data trace.
+
+        Parameters
+        ----------
+        model_traces: ndarray
+            Traces that should be evaluated and compared to the target data.
+            Provided as an :py:class:`~numpy.ndarray` of shape
+            ``(n_samples, n_traces, time steps)``,
+            where ``n_samples`` are the number of different parameter sets that
+            have been evaluated, and ``n_traces`` are the number of input
+            stimuli.
+        data_traces: array
+            The target traces to which the model should be compared. An
+            :py:class:`~numpy.ndarray` of shape ``(n_traces, time steps)``.
+        dt: Quantity
+            The length of a single time step.
+
+        Returns
+        -------
+        features: ndarray
+            An :py:class:`~numpy.ndarray` of shape ``(n_samples, n_traces)``
+            returning the error/feature value for each simulated trace.
+        """
+        pass
 
 
 class SpikeMetric(Metric):
     """
-    Output spikes contain a list of arrays (possibly of different lengths)
-    in order to allow different lengths of spike trains.
-    Example: [array([1, 2, 3]), array([1, 2])]
+    A metric for comparing the spike trains.
     """
-    pass
 
-
-class MSEMetric(TraceMetric):
-    __doc__ = "Mean Square Error between goal and calculated output." + \
-              Metric.get_features.__doc__
-
-    @check_units(t_start=second)
-    def __init__(self, t_start=None, **kwds):
+    def calc(self, model_spikes, data_spikes, dt):
         """
-        Initialize the metric.
+        Perform the error calculation across all parameters,
+        calculate error between each output trace and corresponding
+        simulation.
 
         Parameters
         ----------
-        t_start: beggining of time window (Quantity) (optional)
+        model_spikes: list of list of arrays
+            A nested list structure for the spikes generated by the model: a
+            list where each element contains the results for a single parameter
+            set. Each of these results is a list for each of the input traces,
+            where the elements of this list are numpy arrays of spike times
+            (without units, i.e. in seconds).
+        data_spikes: list of arrays
+            The target spikes for the fitting, represented in the same way as
+            ``model_spikes``, i.e. as a list of spike times for each input
+            stimulus.
+        dt: Quantity
+            The length of a single time step.
+
+        Returns
+        -------
+        errors: ndarray
+            Total error for each set of parameters.
+
         """
-        self.t_start = t_start
+        if self.t_start > 0*second:
+            relevant_data_spikes = []
+            for one_stim in data_spikes:
+                relevant_data_spikes.append(one_stim[one_stim>float(self.t_start)])
+            relevant_model_spikes = []
+            for one_sample in model_spikes:
+                sample_spikes = []
+                for one_stim in one_sample:
+                    sample_spikes.append(one_stim[one_stim>float(self.t_start)])
+                relevant_model_spikes.append(sample_spikes)
+            model_spikes = relevant_model_spikes
+            data_spikes = relevant_data_spikes
+        features = self.get_features(model_spikes, data_spikes, dt)
+        errors = self.get_errors(features)
 
-    def get_features(self, traces, output, n_traces, dt):
-        mselist = []
-        output = atleast_2d(output)
+        return errors
 
-        if self.t_start is not None:
-            if not isinstance(dt, Quantity):
-                raise TypeError("To specify time window you need to also "
-                                "specify dt as Quantity")
-            t_start = int(self.t_start/dt)
-            output = output[:, t_start:-1]
-            traces = traces[:, t_start:-1]
+    @abc.abstractmethod
+    def get_features(self, model_spikes, data_spikes, dt):
+        """
+        Calculate the features/errors for each simulated spike train by
+        comparing it to the corresponding data spike train.
 
-        for i in arange(n_traces):
-            temp_out = output[i]
-            temp_traces = traces[i::n_traces]
+        Parameters
+        ----------
+        model_spikes: list of list of arrays
+            A nested list structure for the spikes generated by the model: a
+            list where each element contains the results for a single parameter
+            set. Each of these results is a list for each of the input traces,
+            where the elements of this list are numpy arrays of spike times
+            (without units, i.e. in seconds).
+        data_spikes: list of arrays
+            The target spikes for the fitting, represented in the same way as
+            ``model_spikes``, i.e. as a list of spike times for each input
+            stimulus.
+        dt: Quantity
+            The length of a single time step.
 
-            for trace in temp_traces:
-                mse = sum(square(temp_out - trace))
-                mselist.append(mse)
+        Returns
+        -------
+        features: ndarray
+            An :py:class:`~numpy.ndarray` of shape ``(n_samples, n_traces)``
+            returning the error/feature value for each simulated trace.
+        """
 
-        feat_arr = reshape(array(mselist), (n_traces,
-                           int(len(mselist)/n_traces)))
 
-        return feat_arr
+class MSEMetric(TraceMetric):
+    """
+    Mean Square Error between goal and calculated output.
+    """
+
+    def get_features(self, model_traces, data_traces, dt):
+        return sum((model_traces - data_traces)**2, axis=2)
 
     def get_errors(self, features):
-        errors = features.mean(axis=0)
-        return errors
+        return features.mean(axis=1)
 
 
 class FeatureMetric(TraceMetric):
-    def __init__(self, traces_times, feat_list, weights=None, combine=None):
+    def __init__(self, traces_times, feat_list, weights=None, combine=None,
+                 t_start=0*second):
+        super(FeatureMetric, self).__init__(t_start=t_start)
         self.traces_times = traces_times
+        if isinstance(self.traces_times[0][0], Quantity):
+            for n, trace in enumerate(self.traces_times):
+                t_start, t_end = trace[0], trace[1]
+                t_start = t_start / ms
+                t_end = t_end / ms
+                self.traces_times[n] = [t_start, t_end]
+        n_times = shape(self.traces_times)[0]
+
         self.feat_list = feat_list
 
         if combine is None:
@@ -246,7 +325,7 @@ class FeatureMetric(TraceMetric):
             for k, v in r.items():
                 if v is None:
                     r[k] = array([99])
-                    raise Warning('None for key:{}'.format(k))
+                    warnings.warn('None for key:{}'.format(k))
                 if (len(r[k])) > 1:
                     raise ValueError("you can only use features that return "
                                      "one value")
@@ -264,36 +343,21 @@ class FeatureMetric(TraceMetric):
 
         return err
 
-    def get_features(self, traces, output, n_traces, dt):
-        if isinstance(self.traces_times[0][0], Quantity):
-            for n, trace in enumerate(self.traces_times):
-                t_start, t_end = trace[0], trace[1]
-                t_start = t_start / ms
-                t_end = t_end / ms
-                self.traces_times[n] = [t_start, t_end]
-
-        n_times = shape(self.traces_times)[0]
-
-        if (n_times != (n_traces)):
-            if (n_times == 1):
+    def get_features(self, traces, output, dt):
+        n_samples, n_traces, _ = traces.shape
+        if len(self.traces_times) != n_traces:
+            if len(self.traces_times) == 1:
                 self.traces_times = list(repeat(self.traces_times[0], n_traces))
             else:
                 raise ValueError("Specify the traces_times variable of appropiate "
                                  "size (same as number of traces or 1).")
 
-        unit = output.get_best_unit()
-        output = output/unit
-        traces = traces/unit
         self.out_feat = calc_eFEL(output, self.traces_times, self.feat_list, dt)
         self.check_values(self.out_feat)
 
-        sl = int(shape(traces)[0]/n_traces)
         features = []
-        temp_traces = split(traces, sl)
-
-        for ii in arange(sl):
-            temp_trace = temp_traces[ii]
-            temp_feat = calc_eFEL(temp_trace, self.traces_times,
+        for one_sample in traces:
+            temp_feat = calc_eFEL(one_sample, self.traces_times,
                                   self.feat_list, dt)
             self.check_values(temp_feat)
             features.append(temp_feat)
@@ -315,7 +379,7 @@ class FeatureMetric(TraceMetric):
 
 
 class GammaFactor(SpikeMetric):
-    __doc__ = """
+    """
     Calculate gamma factors between goal and calculated spike trains, with
     precision delta.
 
@@ -323,10 +387,10 @@ class GammaFactor(SpikeMetric):
     R. Jolivet et al., 'A benchmark test for a quantitative assessment of
     simple neuron models',
     Journal of Neuroscience Methods 169, no. 2 (2008): 417-424.
-    """ + Metric.get_features.__doc__
+    """
 
-    @check_units(delta=second, time=second)
-    def __init__(self, delta, time):
+    @check_units(delta=second, time=second, t_start=0*second)
+    def __init__(self, delta, time, t_start=0*second):
         """
         Initialize the metric with time window delta and time step dt output
 
@@ -335,28 +399,21 @@ class GammaFactor(SpikeMetric):
         delta: time window (Quantity)
         time: total lenght of experiment (Quantity)
         """
+        super(GammaFactor, self).__init__(t_start=t_start)
         self.delta = delta
         self.time = time
 
-    def get_features(self, traces, output, n_traces, dt):
-        gamma_factors = []
-        if type(output[0]) == float64:
-            output = atleast_2d(output)
-
-        for i in arange(n_traces):
-            temp_out = output[i]
-            temp_traces = traces[i::n_traces]
-
-            for trace in temp_traces:
-                gf = get_gamma_factor(trace, temp_out, self.delta, self.time, dt)
-                # gamma_factors.append(abs(1 - gf))
-                gamma_factors.append(gf)
-
-        feat_arr = reshape(array(gamma_factors), (n_traces,
-                           int(len(gamma_factors)/n_traces)))
-
-        return feat_arr
+    def get_features(self, traces, output, dt):
+        all_gf = []
+        for one_sample in traces:
+            gf_for_sample = []
+            for model_response, target_response in zip(one_sample, output):
+                gf = get_gamma_factor(model_response, target_response,
+                                      self.delta, self.time, dt)
+                gf_for_sample.append(gf)
+            all_gf.append(gf_for_sample)
+        return array(all_gf)
 
     def get_errors(self, features):
-        errors = features.mean(axis=0)
+        errors = features.mean(axis=1)
         return errors

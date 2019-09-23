@@ -66,17 +66,17 @@ def setup_spikes(request):
     group.v = -70 * mV
     spike_mon = SpikeMonitor(group)
     run(60*ms)
-    spikes = getattr(spike_mon, 't') / ms
+    spikes = getattr(spike_mon, 't_')
 
     return spike_mon, spikes
 
 
 def test_get_spikes(setup_spikes):
     spike_mon, spikes = setup_spikes
-    gs = get_spikes(spike_mon)
+    gs = get_spikes(spike_mon, 1, 1)
     assert isinstance(gs, list)
-    assert isinstance(gs[0], np.ndarray)
-    assert_equal(gs, [np.array(spikes)])
+    assert isinstance(gs[0][0], np.ndarray)
+    assert_equal(gs, [[np.array(spikes)]])
 
 
 def test_spikefitter_init(setup):
