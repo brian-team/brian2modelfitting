@@ -77,7 +77,7 @@ def calc_eFEL(traces, inp_times, feat_list, dt):
         time = arange(0, len(trace))*dt/ms
         temp_trace = {}
         temp_trace['T'] = time
-        temp_trace['V'] = trace
+        temp_trace['V'] = array(trace, copy=False)
         temp_trace['stim_start'] = [inp_times[i][0]]
         temp_trace['stim_end'] = [inp_times[i][1]]
         out_traces.append(temp_trace)
@@ -368,7 +368,7 @@ class FeatureMetric(TraceMetric):
         for key in d1.keys():
             x = d1[key]
             y = d2[key]
-            d[key] = self.combine(x, y) * self.weights[key]
+            d[key] = self.combine(x, y)
 
         for k, v in d.items():
             err += sum(v)
@@ -384,28 +384,30 @@ class FeatureMetric(TraceMetric):
                 raise ValueError("Specify the traces_times variable of appropiate "
                                  "size (same as number of traces or 1).")
 
-        self.out_feat = calc_eFEL(output, self.traces_times, self.feat_list, dt)
-        self.check_values(self.out_feat)
+        out_feat = calc_eFEL(output, self.traces_times, self.feat_list, dt)
+        self.check_values(out_feat)
 
         features = []
         for one_sample in traces:
-            temp_feat = calc_eFEL(one_sample, self.traces_times,
+            sample_features = []
+            sample_feat = calc_eFEL(one_sample, self.traces_times,
                                   self.feat_list, dt)
-            self.check_values(temp_feat)
-            features.append(temp_feat)
-
+            self.check_values(sample_feat)
+            for one_trace_feat, one_out in zip(sample_feat, out_feat):
+                sample_features.append(self.feat_to_err(one_trace_feat,
+                                                        one_out))
+            features.append(sample_features)
         return features
 
     def get_errors(self, features):
         errors = []
-        for feat in features:
-            temp_errors = []
-            for i, F in enumerate(feat):
-                temp_err = self.feat_to_err(F, self.out_feat[i])
-                temp_errors.append(temp_err)
-
-            error = sum(abs(temp_errors))
-            errors.append(error)
+        for one_sample in features:
+            sample_error = 0
+            for feature, values in one_sample.items():
+                # sum over the traces
+                total = sum(values) * self.weights[feature]
+                sample_error += total
+            errors.append(sample_error)
 
         return errors
 

@@ -112,7 +112,7 @@ you have to provide the following input parameters:
   for details).
 - ``feat_list`` - list of strings with names of features to be used
 - ``combine`` - function to be used to compare features between output and
-  simulated traces, (for ``combine=None``, subtracts the feature values)
+  simulated traces (uses the absolute difference between the values by default).
 
 Example code usage:
 
