@@ -14,8 +14,8 @@ provide their own metric.
 Mean Square Error
 -----------------
 
-:py:class:`~brian2modelfitting.modelfitting.metric.MSEMetric` is provided for
-use with :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`.
+:py:class:`~brian2modelfitting.metric.MSEMetric` is provided for
+use with :py:class:`~brian2modelfitting.fitter.TraceFitter`.
 It calculates the mean squared difference between the data and the simulated
 trace according to the well known formula:
 
@@ -28,7 +28,7 @@ It can be initialized in the following way:
 
   metric = MSEMetric()
 
-Additionally, :py:class:`~brian2modelfitting.modelfitting.metric.MSEMetric`
+Additionally, :py:class:`~brian2modelfitting.metric.MSEMetric`
 accepts an optional input argument start time ``t_start`` (as a
 :py:class:`~brian2.units.fundamentalunits.Quantity`). The start time allows the
 user to ignore an initial period that will not be included in the error
@@ -39,15 +39,15 @@ calculation.
   metric = MSEMetric(t_start=5*ms)
 
 
-In :py:class:`~brian2modelfitting.modelfitting.modelfitting.OnlineTraceFitter`,
+In :py:class:`~brian2modelfitting.modelfitting.OnlineTraceFitter`,
 the mean square error gets calculated in online manner, with no need of
 specifying a metric object.
 
 
 GammaFactor
 -----------
-:py:class:`~brian2modelfitting.modelfitting.metric.GammaFactor` is provided for
-use with :py:class:`~brian2modelfitting.modelfitting.modelfitting.SpikeFitter`
+:py:class:`~brian2modelfitting.metric.GammaFactor` is provided for
+use with :py:class:`~brian2modelfitting.fitter.SpikeFitter`
 and measures the coincidence between spike times in the simulated and the target
 trace. It is calculcated according to:
 
@@ -79,8 +79,8 @@ the maximal tolerance for spikes to be considered coincident:
 
 FeatureMetric
 -------------
-:py:class:`~brian2modelfitting.modelfitting.metric.FeatureMetric` is provided
-for use with :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`.
+:py:class:`~brian2modelfitting.metric.FeatureMetric` is provided
+for use with :py:class:`~brian2modelfitting.fitter.TraceFitter`.
 This metric allows the user to optimize the match of certain features between
 the simulated and the target trace. The features get calculated by Electrophys
 Feature Extract Library (eFEL) library, for which the documentation is
@@ -101,7 +101,7 @@ To get a list of all the available eFEL features, you can run the following code
   spikes).
 
 
-To use the :py:class:`~brian2modelfitting.modelfitting.metric.FeatureMetric`,
+To use the :py:class:`~brian2modelfitting.metric.FeatureMetric`,
 you have to provide the following input parameters:
 
 - ``traces_times`` - a list of times indicating start and end of the stimulus
