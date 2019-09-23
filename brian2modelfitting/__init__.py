@@ -4,7 +4,7 @@ Tools for use with the Brian 2 simulator.
 import os
 
 from .tests import run as run_test
-from .modelfitting import *
+from .fitter import *
 from .optimizer import *
 from .metric import *
 from .simulation import *

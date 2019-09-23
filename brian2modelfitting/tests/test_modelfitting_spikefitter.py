@@ -8,7 +8,7 @@ from brian2 import (Equations, NeuronGroup, SpikeMonitor, TimedArray,
                     nS, nF, mV, ms, nA, amp, run)
 from brian2modelfitting import (NevergradOptimizer, SpikeFitter, GammaFactor,
                                 Simulation, Metric, Optimizer)
-from brian2modelfitting.modelfitting import get_spikes
+from brian2modelfitting.fitter import get_spikes
 from brian2.devices.device import reinit_devices
 
 dt_def = 0.01 * ms
