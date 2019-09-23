@@ -7,9 +7,9 @@ from numpy.testing.utils import assert_equal, assert_raises
 from brian2 import (Equations, NeuronGroup, StateMonitor, Network, ms,
                     start_scope, mV)
 from brian2.devices.device import Dummy
-from brian2modelfitting import Simulation, RuntimeSimulation
-from brian2modelfitting.simulation import (initialize_neurons,
-                                           initialize_parameter)
+from brian2modelfitting.simulator import (initialize_neurons,
+                                          initialize_parameter,
+                                          Simulator, RuntimeSimulator)
 from brian2.devices.device import reinit_devices
 
 
@@ -51,8 +51,8 @@ def setup(request):
 
 
 def test_init():
-    rts = RuntimeSimulation()
-    assert isinstance(rts, Simulation)
+    rts = RuntimeSimulator()
+    assert isinstance(rts, Simulator)
 
 
 def test_initialize_parameter():
@@ -69,7 +69,7 @@ def test_initialize_neurons():
 
 def test_initialize_simulation_runtime():
     start_scope()
-    rts = RuntimeSimulation()
+    rts = RuntimeSimulator()
     assert_raises(TypeError, rts.initialize)
 
     rts.initialize(net, var_init=None)
@@ -87,7 +87,7 @@ def test_run_simulation_runtime(setup):
     monitor = StateMonitor(neurons, 'I', record=True, name='monitor')
     net = Network(neurons, monitor)
 
-    rts = RuntimeSimulation()
+    rts = RuntimeSimulator()
     rts.initialize(net, var_init=None)
 
     rts.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
@@ -103,7 +103,7 @@ def test_run_simulation_runtime_var_init(setup):
     monitor = StateMonitor(neurons, 'v', record=True, name='monitor')
     net = Network(neurons, monitor)
 
-    rts = RuntimeSimulation()
+    rts = RuntimeSimulator()
     rts.initialize(net, var_init={'v': -60*mV})
 
     rts.run(duration, {'gL': 100, 'C': 10}, ['gL', 'C'])

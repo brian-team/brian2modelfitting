@@ -46,7 +46,7 @@ def set_states(init_dict, values):
         set_parameter_value(init_dict[obj_name], obj_values)
 
 
-class Simulation(metaclass=abc.ABCMeta):
+class Simulator(metaclass=abc.ABCMeta):
     """
     Simluation class created to perform a simulation for fit_traces
     """
@@ -84,7 +84,7 @@ class Simulation(metaclass=abc.ABCMeta):
         pass
 
 
-class RuntimeSimulation(Simulation):
+class RuntimeSimulator(Simulator):
     """Simulation class created for use with RuntimeDevice"""
     def initialize(self, network, var_init, name='neurons'):
         if network[name] is NeuronGroup:
@@ -104,7 +104,7 @@ class RuntimeSimulation(Simulation):
         self.network.run(duration, namespace={})
 
 
-class CPPStandaloneSimulation(Simulation):
+class CPPStandaloneSimulator(Simulator):
     """Simulation class created for use with CPPStandaloneDevice"""
     def initialize(self, network, var_init, name='neurons'):
         if not network[name]:

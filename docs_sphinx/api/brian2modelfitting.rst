@@ -16,5 +16,5 @@ Submodules
    brian2modelfitting.metric
    brian2modelfitting.fitter
    brian2modelfitting.optimizer
-   brian2modelfitting.simulation
+   brian2modelfitting.simulator
    brian2modelfitting.utils

@@ -7,7 +7,7 @@ from numpy.testing.utils import assert_equal
 from brian2 import (Equations, NeuronGroup, SpikeMonitor, TimedArray,
                     nS, nF, mV, ms, nA, amp, run)
 from brian2modelfitting import (NevergradOptimizer, SpikeFitter, GammaFactor,
-                                Simulation, Metric, Optimizer)
+                                Simulator, Metric, Optimizer)
 from brian2modelfitting.fitter import get_spikes
 from brian2.devices.device import reinit_devices
 
@@ -100,7 +100,7 @@ def test_spikefitter_init(setup):
 
     assert isinstance(sf.network['neurons'], NeuronGroup)
     assert isinstance(sf.network['monitor'], SpikeMonitor)
-    assert isinstance(sf.simulator, Simulation)
+    assert isinstance(sf.simulator, Simulator)
     assert isinstance(sf.input_traces, TimedArray)
     assert isinstance(sf.model, Equations)
 
@@ -129,7 +129,7 @@ def test_spikefitter_fit(setup):
 
     assert isinstance(sf.metric, Metric)
     assert isinstance(sf.optimizer, Optimizer)
-    assert isinstance(sf.simulator, Simulation)
+    assert isinstance(sf.simulator, Simulator)
 
     assert isinstance(results, dict)
     assert isinstance(errors, float)

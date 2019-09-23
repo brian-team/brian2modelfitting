@@ -95,4 +95,4 @@ intersphinx_mapping = {'python': ('https://docs.python.org/', None),
                        'matplotlib': ('http://matplotlib.org/', None),
                        'numpy': ('http://docs.scipy.org/doc/numpy/', None),
                        'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
-                       'mayavi': ('http://docs.enthought.com/mayavi/mayavi/', None)}
+                       'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None)}

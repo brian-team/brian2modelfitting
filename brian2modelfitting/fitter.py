@@ -5,7 +5,7 @@ from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
                     get_local_namespace, Quantity)
 from brian2.input import TimedArray
 from brian2.equations.equations import Equations
-from .simulation import RuntimeSimulation, CPPStandaloneSimulation
+from .simulator import RuntimeSimulator, CPPStandaloneSimulator
 from .metric import Metric, SpikeMetric, TraceMetric
 from .optimizer import Optimizer
 from .utils import callback_setup, make_dic
@@ -47,11 +47,11 @@ def setup_fit():
 
     Returns
     -------
-    simulator : object `.~Simulator`
+    simulator : .Simulator
     """
     simulators = {
-        'CPPStandaloneDevice': CPPStandaloneSimulation(),
-        'RuntimeDevice': RuntimeSimulation()
+        'CPPStandaloneDevice': CPPStandaloneSimulator(),
+        'RuntimeDevice': RuntimeSimulator()
     }
 
     return simulators[get_device().__class__.__name__]
