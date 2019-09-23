@@ -47,7 +47,7 @@ def setup_fit():
 
     Returns
     -------
-    simulator : object :py:class:`.~Simulator`
+    simulator : object `.~Simulator`
     """
     simulators = {
         'CPPStandaloneDevice': CPPStandaloneSimulation(),
@@ -177,7 +177,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
         Parameters
         ----------
-        metric: :py:class:`~.Metric` children
+        metric: `~.Metric` children
             Child of Metric class, specifies optimization metric
         """
         pass
@@ -221,9 +221,9 @@ class Fitter(metaclass=abc.ABCMeta):
 
         Parameters
         ----------
-        optimizer: :py:class:`~.Optimizer` children
+        optimizer: `~.Optimizer` children
             Child of Optimizer class, specific for each library.
-        metric: :py:class:`~.Metric` children
+        metric: `~.Metric` children
             Child of Metric class, specifies optimization metric
         n_rounds: int
             Number of rounds to optimize over (feedback provided over each

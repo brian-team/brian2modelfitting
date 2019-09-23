@@ -57,6 +57,9 @@ source_suffix = '.rst'
 # The master toctree document.
 master_doc = 'index'
 
+# Make `...` link to Python classes/functions/methods/...
+default_role = 'py:obj'
+
 # autodoc configuration
 autodoc_default_options = {'inherited-members': True}
 

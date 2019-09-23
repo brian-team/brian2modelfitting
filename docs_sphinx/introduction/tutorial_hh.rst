@@ -1,7 +1,7 @@
 Tutorial: TraceFitter
 =====================
 
-In following documentation we will explain how to get started with using :py:class:`~brian2modelfitting.fitter.TraceFitter`.
+In following documentation we will explain how to get started with using `~brian2modelfitting.fitter.TraceFitter`.
 Here we will optimize conductances for Hodgkin-Huxley cell model.
 
 
@@ -75,8 +75,8 @@ Optimizer and metric
 Once we know our model and parameters, it's time to pick an optimizing algorithm
 and a metric that will be used as a measure.
 
-For simplicity we will use :py:class:`~brian2modelfitting.optimizer.NevergradOptimizer` default method
-(`Differential Evolution`) and Mean Square Error :py:class:`~brian2modelfitting.metric.MSEMetric`:
+For simplicity we will use `~brian2modelfitting.optimizer.NevergradOptimizer` default method
+(`Differential Evolution`) and Mean Square Error `~brian2modelfitting.metric.MSEMetric`:
 
 
 .. code:: python
@@ -88,7 +88,7 @@ For simplicity we will use :py:class:`~brian2modelfitting.optimizer.NevergradOpt
 Fitter Initiation
 ~~~~~~~~~~~~~~~~~
 
-Since we are going to optimize over traces produced by the model, we need to initiate the fitter :py:class:`~brian2modelfitting.fitter.modelfitting.TraceFitter`:
+Since we are going to optimize over traces produced by the model, we need to initiate the fitter `~brian2modelfitting.fitter.modelfitting.TraceFitter`:
 The minimum set of input parameters for the fitter, includes the ``model`` definition, ``input`` and ``output`` variable names and traces,
 time step ``dt``, number of samples we want to draw in each optimization round.
 
@@ -111,7 +111,7 @@ and we specify the initial value of integrated ``v``, by using the option: ``par
 Fit
 ~~~
 
-We are now ready to perform the optimization, by calling :py:meth:`~brian2modelfitting.fitter.TraceFitter.fit`.
+We are now ready to perform the optimization, by calling `~brian2modelfitting.fitter.TraceFitter.fit`.
 We need to pass the ``optimizer``, ``metric`` and pick a number of rounds (``n_rounds``).
 
 .. note::
@@ -144,7 +144,7 @@ Default print of this optimization will tell us the best score in each round of 
 
 Generating traces
 ~~~~~~~~~~~~~~~~~
-To generate the traces that correspond to the new best fit parameters of the model, use :py:meth:`~brian2modelfitting.fitter.TraceFitter.generate_traces`
+To generate the traces that correspond to the new best fit parameters of the model, use `~brian2modelfitting.fitter.TraceFitter.generate_traces`
 method. For which you also have to specify the initial value of ``v``.
 
 

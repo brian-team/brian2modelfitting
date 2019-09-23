@@ -1,7 +1,7 @@
 Advanced Features
 =================
 
-This part of documentation list other features provided alongside or inside :py:class:`~brian2modelfitting.fitter.Fitter`
+This part of documentation list other features provided alongside or inside `~brian2modelfitting.fitter.Fitter`
 objects, to help the user with easier and more flexible applications.
 
 .. contents::
@@ -11,11 +11,11 @@ objects, to help the user with easier and more flexible applications.
 Parameters initialization
 -------------------------
 
-Whilst running :py:class:`~brian2modelfitting.fitter.Fitter` user can specify values with which model evaluation
+Whilst running `~brian2modelfitting.fitter.Fitter` user can specify values with which model evaluation
 of differential equations start.
 
 The fitting functions accept additional dictionary input to address that. To do so,
-dictionary argument has to be added to :py:class:`~brian2modelfitting.fitter.Fitter` initialization:
+dictionary argument has to be added to `~brian2modelfitting.fitter.Fitter` initialization:
 
 .. code:: python
 
@@ -29,10 +29,10 @@ dictionary argument has to be added to :py:class:`~brian2modelfitting.fitter.Fit
 
 Restart
 -------
-By default any :py:class:`~brian2modelfitting.fitter.Fitter` works in continuous optimization mode between run, where all of the
+By default any `~brian2modelfitting.fitter.Fitter` works in continuous optimization mode between run, where all of the
 parameters drawn are being evaluated.
 
-Through changing the input flag in :py:func:`~brian2modelfitting.fitter.Fitter.fit()`: ``restart`` to ``True``, user can reset the optimizer and
+Through changing the input flag in `~brian2modelfitting.fitter.Fitter.fit()`: ``restart`` to ``True``, user can reset the optimizer and
 start the optimization from scratch.
 
 Used by Fitter optimizer and metric can only be changed when the flat is `True`.
@@ -44,7 +44,7 @@ Callback function
 -----------------
 
 To visualize the progress of the optimization we provided few possibilities of feedback
-inside :py:class:`~brian2modelfitting.fitter.Fitter`.
+inside `~brian2modelfitting.fitter.Fitter`.
 
 
 The 'callback' input provides few default options, updated in each round:
@@ -80,15 +80,15 @@ An example function:
 Generate Traces
 ---------------
 
-With the same :py:class:`~brian2modelfitting.fitter.Fitter` class user can also generate the traces with newly
+With the same `~brian2modelfitting.fitter.Fitter` class user can also generate the traces with newly
 optimized parameters.
 
 To simulate and visualize the traces or spikes for the parameters of choice.
 For a quick access to best fitted set of parameters Fitter classes provided
 ready to use functions:
 
- - :py:func:`~brian2modelfitting.TraceFitter.generate_traces` inside :py:class:`~brian2modelfitting.fitter.TraceFitter`
- - :py:func:`~brian2modelfitting.SpikeFitter.generate_spikes` inside :py:class:`~brian2modelfitting.fitter.SpikeFitter`
+ - `~brian2modelfitting.TraceFitter.generate_traces` inside `~brian2modelfitting.fitter.TraceFitter`
+ - `~brian2modelfitting.SpikeFitter.generate_spikes` inside `~brian2modelfitting.fitter.SpikeFitter`
 
 Functions can be called after fitting in the following manner, without
 any input arguments:
@@ -110,7 +110,7 @@ Custom generate
 ~~~~~~~~~~~~~~~
 
 To create traces for other parameters, or generate traces after spike
-train fitting, user can call the - :py:func:`~brian2modelfitting.fitter.Fitter.generate` call, that takes in following
+train fitting, user can call the - `~brian2modelfitting.fitter.Fitter.generate` call, that takes in following
 arguments:
 
 .. code:: python
@@ -129,7 +129,7 @@ Results
 -------
 
 Fitter class stores all of the parameters examined by the optimizer as well
-as the corresponding error. To retrieve them you can call the - :py:func:`~brian2modelfitting.fitter.Fitter.results`.
+as the corresponding error. To retrieve them you can call the - `~brian2modelfitting.fitter.Fitter.results`.
 
 
 .. code:: python
@@ -202,11 +202,11 @@ Important notes:
 ~~~~~~~~~~~~~~~~
 
 .. warning::
-    In standlone mode one script can not be used to contain multiple - :py:class:`~brian2modelfitting.fitter.Fitter`, use separate scripts!
+    In standlone mode one script can not be used to contain multiple - `~brian2modelfitting.fitter.Fitter`, use separate scripts!
 
 
 Before generation of traces, you have to  reinitialize the device add additional
-piece of code before calling :py:func:`~brian2modelfitting.fitter.Fitter.generate`:
+piece of code before calling `~brian2modelfitting.fitter.Fitter.generate`:
 
 .. code:: python
 
@@ -225,10 +225,10 @@ piece of code before calling :py:func:`~brian2modelfitting.fitter.Fitter.generat
 OnlineTraceFitter
 -----------------
 
-:py:class:`~brian2modelfitting.fitter.OnlineTraceFitter` was created to work with long traces or big optimization.
-This :py:class:`~brian2modelfitting.fitter.Fitter` uses online Mean Square Error as a metric.
-When :py:func:`~brian2modelfitting.fitter.Fitter.fit()` is called there is no need of specifying a metric, that is by
-default set to None. Instead the errors are calculated with use of brian's :py:meth:`~brian2.groups.group.Group.run_regularly`,
+`~brian2modelfitting.fitter.OnlineTraceFitter` was created to work with long traces or big optimization.
+This `~brian2modelfitting.fitter.Fitter` uses online Mean Square Error as a metric.
+When `~brian2modelfitting.fitter.Fitter.fit()` is called there is no need of specifying a metric, that is by
+default set to None. Instead the errors are calculated with use of brian's `~brian2.groups.group.Group.run_regularly`,
 with each simulation.
 
 .. code:: python

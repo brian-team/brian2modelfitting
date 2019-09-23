@@ -180,21 +180,21 @@ class TraceMetric(Metric):
         ----------
         model_traces: ndarray
             Traces that should be evaluated and compared to the target data.
-            Provided as an :py:class:`~numpy.ndarray` of shape
+            Provided as an `~numpy.ndarray` of shape
             ``(n_samples, n_traces, time steps)``,
             where ``n_samples`` are the number of different parameter sets that
             have been evaluated, and ``n_traces`` are the number of input
             stimuli.
         data_traces: array
             The target traces to which the model should be compared. An
-            :py:class:`~numpy.ndarray` of shape ``(n_traces, time steps)``.
+            `~numpy.ndarray` of shape ``(n_traces, time steps)``.
         dt: Quantity
             The length of a single time step.
 
         Returns
         -------
         features: ndarray
-            An :py:class:`~numpy.ndarray` of shape ``(n_samples, n_traces)``
+            An `~numpy.ndarray` of shape ``(n_samples, n_traces)``
             returning the error/feature value for each simulated trace.
         """
         pass
@@ -273,7 +273,7 @@ class SpikeMetric(Metric):
         Returns
         -------
         features: ndarray
-            An :py:class:`~numpy.ndarray` of shape ``(n_samples, n_traces)``
+            An `~numpy.ndarray` of shape ``(n_samples, n_traces)``
             returning the error/feature value for each simulated trace.
         """
 
