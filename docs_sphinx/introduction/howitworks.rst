@@ -44,7 +44,7 @@ Initialization of Fitter requires:
 
 
 
-Additionally, upon call of :py:func:`~brian2modelfitting.modelfitting.modelfitting.Fitter.fit()`,
+Additionally, upon call of :py:func:`~brian2modelfitting.modelfitting.Fitter.fit()`,
 object requires:
 
  - ``n_rounds`` - number of rounds to optimize over
@@ -62,17 +62,17 @@ Ready to use elements
 ---------------------
 
 Alongside three optimization classes:
- - :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`
- - :py:class:`~brian2modelfitting.modelfitting.modelfitting.SpikeFitter`
- - :py:class:`~brian2modelfitting.modelfitting.modelfitting.OnlineTraceFitter`
+ - :py:class:`~brian2modelfitting.modelfitting.TraceFitter`
+ - :py:class:`~brian2modelfitting.modelfitting.SpikeFitter`
+ - :py:class:`~brian2modelfitting.modelfitting.OnlineTraceFitter`
 
 We also provide ready optimizers:
- - :py:class:`~brian2modelfitting.modelfitting.optimizer.NevergradOptimizer`
- - :py:class:`~brian2modelfitting.modelfitting.optimizer.SkoptOptimizer`
+ - :py:class:`~brian2modelfitting.optimizer.NevergradOptimizer`
+ - :py:class:`~brian2modelfitting.optimizer.SkoptOptimizer`
 
 and metrics:
- - :py:class:`~brian2modelfitting.modelfitting.metric.MSEMetric` (for :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`)
- - :py:class:`~brian2modelfitting.modelfitting.metric.GammaFactor` (for :py:class:`~brian2modelfitting.modelfitting.modelfitting.SpikeFitter`)
+ - :py:class:`~brian2modelfitting.metric.MSEMetric` (for :py:class:`~brian2modelfitting.modelfitting.TraceFitter`)
+ - :py:class:`~brian2modelfitting.metric.GammaFactor` (for :py:class:`~brian2modelfitting..modelfitting.SpikeFitter`)
 
 
 Example of :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter` with all of the necessary arguments:
@@ -95,11 +95,11 @@ Example of :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`
 Remarks
 -------
  - After performing first fitting, user can continue the optimization
-   with another :py:func:`~brian2modelfitting.modelfitting.modelfitting.Fitter.fit()` run.
+   with another :py:func:`~brian2modelfitting.modelfitting.Fitter.fit()` run.
 
- - Number of samples can not be changed between rounds or :py:func:`~brian2modelfitting.modelfitting.modelfitting.Fitter.fit()`
+ - Number of samples can not be changed between rounds or :py:func:`~brian2modelfitting.modelfitting.Fitter.fit()`
    calls, due to parallelization of the simulations.
 
 .. warning::
-  User is not allowed to change the optimizer or metric between :py:func:`~brian2modelfitting.modelfitting.modelfitting.Fitter.fit()`
+  User is not allowed to change the optimizer or metric between :py:func:`~brian2modelfitting.modelfitting.Fitter.fit()`
   calls.

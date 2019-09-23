@@ -8,8 +8,8 @@ from brian2 import (Equations, NeuronGroup, StateMonitor, Network, ms,
                     device, start_scope)
 from brian2.devices.device import Dummy
 from brian2modelfitting import Simulation, CPPStandaloneSimulation
-from brian2modelfitting.modelfitting.simulation import (initialize_neurons,
-                                                        initialize_parameter)
+from brian2modelfitting.simulation import (initialize_neurons,
+                                           initialize_parameter)
 from brian2.devices.device import reinit_devices
 
 

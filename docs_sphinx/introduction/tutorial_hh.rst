@@ -1,7 +1,7 @@
 Tutorial: TraceFitter
 =====================
 
-In following documentation we will explain how to get started with using :py:class:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter`.
+In following documentation we will explain how to get started with using :py:class:`~brian2modelfitting.modelfitting.TraceFitter`.
 Here we will optimize conductances for Hodgkin-Huxley cell model.
 
 
@@ -75,8 +75,8 @@ Optimizer and metric
 Once we know our model and parameters, it's time to pick an optimizing algorithm
 and a metric that will be used as a measure.
 
-For simplicity we will use :py:class:`~brian2modelfitting.modelfitting.optimizer.NevergradOptimizer` default method
-(`Differential Evolution`) and Mean Square Error :py:class:`~brian2modelfitting.modelfitting.metric.MSEMetric`:
+For simplicity we will use :py:class:`~brian2modelfitting.optimizer.NevergradOptimizer` default method
+(`Differential Evolution`) and Mean Square Error :py:class:`~brian2modelfitting.metric.MSEMetric`:
 
 
 .. code:: python
@@ -111,7 +111,7 @@ and we specify the initial value of integrated ``v``, by using the option: ``par
 Fit
 ~~~
 
-We are now ready to perform the optimization, by calling :py:meth:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter.fit`.
+We are now ready to perform the optimization, by calling :py:meth:`~brian2modelfitting.modelfitting.TraceFitter.fit`.
 We need to pass the ``optimizer``, ``metric`` and pick a number of rounds (``n_rounds``).
 
 .. note::
@@ -144,7 +144,7 @@ Default print of this optimization will tell us the best score in each round of 
 
 Generating traces
 ~~~~~~~~~~~~~~~~~
-To generate the traces that correspond to the new best fit parameters of the model, use :py:meth:`~brian2modelfitting.modelfitting.modelfitting.TraceFitter.generate_traces`
+To generate the traces that correspond to the new best fit parameters of the model, use :py:meth:`~brian2modelfitting.modelfitting.TraceFitter.generate_traces`
 method. For which you also have to specify the initial value of ``v``.
 
 

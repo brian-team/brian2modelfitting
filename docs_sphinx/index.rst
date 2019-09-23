@@ -42,7 +42,7 @@ API reference
    :maxdepth: 5
    :titlesonly:
 
-   api/index
+   api/brian2modelfitting
 
 Indices and tables
 ------------------

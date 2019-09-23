@@ -17,7 +17,7 @@ Nevergrad
 .. _Nevergrad: https://github.com/facebookresearch/nevergrad
 
 Offers an extensive collection of algorithms that do not require gradient computation.
-:py:class:`~brian2modelfitting.modelfitting.metric.NevergradOptimizer` can be specified in the following way:
+:py:class:`~brian2modelfitting.metric.NevergradOptimizer` can be specified in the following way:
 
 .. code:: python
 
@@ -87,12 +87,12 @@ Custom Optimizer
 ----------------
 
 To use a different back-end optimization library, user can provide a
-custom class that inherits from provided abstract class :py:class:`~brian2modelfitting.modelfitting.metric.Optimizer`
+custom class that inherits from provided abstract class :py:class:`~brian2modelfitting.metric.Optimizer`
 
 Follows `ask()/tell()` interface
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 User can plug in different optimization tool, as long as it follows ```ask() / tell```
-interface. Abstract class :py:class:`~brian2modelfitting.modelfitting.metric.Optimizer` prepared for different back-end libraries.
+interface. Abstract class :py:class:`~brian2modelfitting.metric.Optimizer` prepared for different back-end libraries.
 All of the optimizer specific arguments have to be provided upon
 optimizers initialization.
 

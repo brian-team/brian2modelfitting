@@ -12,7 +12,7 @@ from brian2modelfitting import (NevergradOptimizer, TraceFitter, MSEMetric,
                                 OnlineTraceFitter, Simulation, Metric,
                                 Optimizer, GammaFactor)
 from brian2.devices.device import reinit_devices
-from brian2modelfitting.modelfitting.modelfitting import get_param_dic
+from brian2modelfitting.modelfitting import get_param_dic
 
 
 E = 40*mV

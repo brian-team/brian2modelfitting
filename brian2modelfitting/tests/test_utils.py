@@ -1,12 +1,10 @@
 '''
 Test the modelfitting utils
 '''
-import sys
 import tqdm
-import numpy as np
 from brian2modelfitting import (callback_text, callback_setup, make_dic,
                                callback_none)
-from brian2modelfitting.modelfitting.utils import ProgressBar
+from brian2modelfitting.utils import ProgressBar
 from numpy.testing.utils import assert_equal
 
 
