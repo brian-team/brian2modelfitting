@@ -55,7 +55,7 @@ Then the multiple round optimization can be run with following code:
   g_kd : siemens (constant)
   gl   : siemens (constant)
   Cm   : farad (constant)
-  ''',)
+  ''')
 
   ## Optimization and Metric Choice
   n_opt = NevergradOptimizer()
@@ -66,7 +66,7 @@ Then the multiple round optimization can be run with following code:
                        input=inp_traces*amp, output=out_traces*mV, dt=dt,
                        n_samples=20,
                        param_init={'v': -65*mV},
-                       method='exponential_euler',)
+                       method='exponential_euler')
 
   res, error = fitter.fit(n_rounds=2,
                           optimizer=n_opt, metric=metric,
@@ -74,7 +74,7 @@ Then the multiple round optimization can be run with following code:
                           gl = [1e-09 *siemens, 1e-07 *siemens],
                           g_na = [2e-06*siemens, 2e-04*siemens],
                           g_kd = [6e-07*siemens, 6e-05*siemens],
-                          Cm=[0.1*ufarad*cm**-2 * area, 2*ufarad*cm**-2 * area],)
+                          Cm=[0.1*ufarad*cm**-2 * area, 2*ufarad*cm**-2 * area])
 
   ## Show results
   all_output = fitter.results(format='dataframe')
@@ -88,7 +88,7 @@ Then the multiple round optimization can be run with following code:
                           gl = [1e-09 *siemens, 1e-07 *siemens],
                           g_na = [2e-06*siemens, 2e-04*siemens],
                           g_kd = [6e-07*siemens, 6e-05*siemens],
-                          Cm=[0.1*ufarad*cm**-2 * area, 2*ufarad*cm**-2 * area],)
+                          Cm=[0.1*ufarad*cm**-2 * area, 2*ufarad*cm**-2 * area])
 
 
 To get the results and traces:
@@ -102,17 +102,10 @@ To get the results and traces:
   ## Visualization of the results
   fits = fitter.generate_traces(params=None, param_init={'v': -65*mV})
 
-  fig, ax = plt.subplots(ncols=5, figsize=(20,5))
-  ax[0].plot(out_traces[0].transpose())
-  ax[0].plot(fits[0].transpose()/mV)
+  fig, axes = plt.subplots(ncols=5, figsize=(20,5), sharey=True)
 
-  ax[1].plot(out_traces[1].transpose())
-  ax[1].plot(fits[1].transpose()/mV)
-  ax[2].plot(out_traces[2].transpose())
-  ax[2].plot(fits[2].transpose()/mV)
-  ax[3].plot(out_traces[3].transpose())
-  ax[3].plot(fits[3].transpose()/mV)
-  ax[4].plot(out_traces[4].transpose())
-  ax[4].plot(fits[4].transpose()/mV)
+  for ax, data, fit in zip(axes, out_traces, fits):
+      ax.plot(data.transpose())
+      ax.plot(fit.transpose()/mV)
 
   plt.show()

@@ -18,16 +18,26 @@ def test_firing_rate():
 def test_get_gamma_factor():
     src = [7, 9, 11] * ms
     src2 = [1, 2, 3] * ms
-    trg = [0, 2, 4, 6, 8] * ms
+    trg = [0, 2, 4, 6, 8, 10] * ms
 
-    gf0 = get_gamma_factor(trg, trg, delta=12*ms, time=12*ms, dt=0.1*ms)
-    gf1 = get_gamma_factor(src2, trg, delta=12*ms, time=12*ms, dt=0.1*ms)
-    gf2 = get_gamma_factor(src, src2, delta=5*ms, time=5*ms, dt=0.1*ms)
+    gf0 = get_gamma_factor(trg, trg, delta=0.5*ms, time=12*ms, dt=0.1*ms)
+    gf1 = get_gamma_factor(src2, trg, delta=0.5*ms, time=12*ms, dt=0.1*ms)
+    gf2 = get_gamma_factor(src, src2, delta=0.5*ms, time=5*ms, dt=0.1*ms)
 
-    assert_equal(gf0, 2.0)
-    assert gf1 > 1.0
-    assert gf2 > 1.0
-    assert gf1 < gf2
+    assert_equal(gf0, -1)
+    assert gf1 > 0  # Since data rate = 2 * model rate
+    assert gf2 > -1
+
+    gf0 = get_gamma_factor(trg, trg, delta=0.5*ms, time=12*ms, dt=0.1*ms,
+                           rate_correction=False)
+    gf1 = get_gamma_factor(src2, trg, delta=0.5*ms, time=12*ms, dt=0.1*ms,
+                           rate_correction=False)
+    gf2 = get_gamma_factor(src, src2, delta=0.5*ms, time=5*ms, dt=0.1*ms,
+                           rate_correction=False)
+
+    assert_equal(gf0, 0)
+    assert gf1 > 0
+    assert gf2 > 0
 
 
 def test_init():
@@ -46,6 +56,7 @@ def test_calc_mse():
                  np.zeros(5))
     assert(np.all(mse.calc(inp, out, 0.1*ms) > 0))
 
+
 def test_calc_mse_t_start():
     mse = MSEMetric(t_start=1*ms)
     out = np.random.rand(2, 20)
@@ -59,20 +70,29 @@ def test_calc_mse_t_start():
     inp[:, :, 10:] = out[None, :, 10:]
     assert_equal(mse.calc(inp, out, 0.1*ms), np.zeros(5))
 
+
 def test_calc_gf():
     assert_raises(TypeError, GammaFactor)
-    assert_raises(DimensionMismatchError, GammaFactor, delta=10)
+    assert_raises(DimensionMismatchError, GammaFactor, delta=10*mV)
     assert_raises(DimensionMismatchError, GammaFactor, time=10)
 
-    inp_gf = np.round(np.sort(np.random.rand(5, 2, 5) * 10), 2)
-    out_gf = np.round(np.sort(np.random.rand(2, 5) * 10), 2)
+    model_spikes = [[np.array([1, 5, 8]), np.array([2, 3, 8, 9])],  # Correct rate
+                    [np.array([1, 5]), np.array([0, 2, 3, 8, 9])]]  # Wrong rate
+    data_spikes = [np.array([0, 5, 9]), np.array([1, 3, 5, 6])]
 
-    gf = GammaFactor(delta=10*ms, time=10*ms)
-    errors = gf.calc(inp_gf, out_gf, 0.1*ms)
-    assert_equal(np.shape(errors), (5,))
-    assert(all(errors > 0))
-    errors = gf.calc([out_gf]*5, out_gf, 0.1*ms)
-    assert_almost_equal(errors, np.ones(5)*2)
+    gf = GammaFactor(delta=0.5*ms, time=10*ms)
+    errors = gf.calc([data_spikes]*5, data_spikes, 0.1*ms)
+    assert_almost_equal(errors, np.ones(5)*-1)
+    errors = gf.calc(model_spikes, data_spikes, 0.1*ms)
+    assert errors[0] > -1  # correct rate
+    assert errors[1] > errors[0]
+
+    gf = GammaFactor(delta=0.5*ms, time=10*ms, rate_correction=False)
+    errors = gf.calc([data_spikes]*5, data_spikes, 0.1*ms)
+    assert_almost_equal(errors, np.zeros(5))
+    errors = gf.calc(model_spikes, data_spikes, 0.1*ms)
+    assert all(errors > 0)
+
 
 def test_get_features_mse():
     mse = MSEMetric()
@@ -100,17 +120,18 @@ def test_get_errors_mse():
 
 
 def test_get_features_gamma():
-    inp_gf = np.round(np.sort(np.random.rand(3, 2, 5) * 10), 2)
-    out_gf = np.round(np.sort(np.random.rand(2, 5) * 10), 2)
+    model_spikes = [[np.array([1, 5, 8]), np.array([2, 3, 8, 9])],  # Correct rate
+                    [np.array([1, 5]), np.array([0, 2, 3, 8, 9])]]  # Wrong rate
+    data_spikes = [np.array([0, 5, 9]), np.array([1, 3, 5, 6])]
 
-    gf = GammaFactor(delta=10*ms, time=10*ms)
-    features = gf.get_features(inp_gf, out_gf, 0.1*ms)
-    assert_equal(np.shape(features), (3, 2))
-    assert(np.all(np.array(features) > 0))
+    gf = GammaFactor(delta=0.5*ms, time=10*ms)
+    features = gf.get_features(model_spikes, data_spikes, 0.1*ms)
+    assert_equal(np.shape(features), (2, 2))
+    assert(np.all(np.array(features) > -1))
 
-    features = gf.get_features([out_gf]*3, out_gf, 0.1*ms)
+    features = gf.get_features([data_spikes]*3, data_spikes, 0.1*ms)
     assert_equal(np.shape(features), (3, 2))
-    assert_almost_equal(features, np.ones((3, 2))*2)
+    assert_almost_equal(features, np.ones((3, 2))*-1)
 
 
 def test_get_errors_gamma():

@@ -4,60 +4,47 @@ from brian2modelfitting import *
 
 
 # Generate Data to Fit into
-dt = 0.01 * ms
+dt = 0.1 * ms
 defaultclock.dt = dt
 
 # Generate a step-current input and an "experimental" voltage trace
-input_current1 = np.hstack([np.zeros(int(5*ms/dt)), np.ones(int(5*ms/dt))*5, np.zeros(int(5*ms/dt))])* 5 *nA
-input_current0 = np.hstack([np.zeros(int(5*ms/dt)), np.ones(int(5*ms/dt))*10, np.zeros(int(5*ms/dt))]) * 5 * nA
-
-input_current2 = np.stack((input_current0, input_current1))
-I = TimedArray(input_current0, dt=dt)
+input_current0 = np.hstack([np.zeros(int(round(5*ms/dt))),
+                           np.ones(int(round(25*ms/dt))),
+                           np.zeros(int(round(30*ms/dt)))]) * 2.5
+input_current1 = np.hstack([np.zeros(int(round(5*ms/dt))),
+                           np.ones(int(round(25*ms/dt))),
+                           np.zeros(int(round(30*ms/dt)))]) * 5
+input_current2 = np.stack((input_current0, input_current1))*nA
+I = TimedArray(input_current2.T, dt=dt)
 
 EL = -70*mV
 VT = -50*mV
 DeltaT = 2*mV
 eqs = Equations('''
-    dv/dt = (gL*(EL-v)+gL*DeltaT*exp((v-VT)/DeltaT) + I(t))/C : volt
+    dv/dt = (gL*(EL-v)+gL*DeltaT*exp((v-VT)/DeltaT) + I(t, i))/C : volt
     gL: siemens (constant)
     C: farad (constant)
     ''')
 
-group = NeuronGroup(1, eqs,
+group = NeuronGroup(2, eqs,
                     threshold='v > -50*mV',
                     reset='v = -70*mV',
                     method='exponential_euler')
 group.v = -70 *mV
 group.set_states({'gL': [30*nS], 'C':[1*nF]})
-monitor0 = StateMonitor(group, 'v', record=True)
-smonitor0  = SpikeMonitor(group)
+monitor = StateMonitor(group, 'v', record=True)
+smonitor = SpikeMonitor(group)
 
 run(60*ms)
 
-voltage0 = monitor0.v[0]/mV
-out_spikes0 = getattr(smonitor0, 't') / ms
+voltage0 = monitor.v[0]/mV
+voltage1 = monitor.v[1]/mV
+spike_trains = smonitor.spike_trains()
+out_spikes0 = spike_trains[0] / second
+out_spikes1 = spike_trains[1] / second
 
-start_scope()
-I = TimedArray(input_current1, dt=dt)
-group1 = NeuronGroup(1, eqs,
-                    threshold='v > -50*mV',
-                    reset='v = -70*mV',
-                    method='exponential_euler')
-group1.v = -70 *mV
-group1.set_states({'gL': [30*nS], 'C':[1*nF]})
-monitor1 = StateMonitor(group1, 'v', record=True)
-smonitor1  = SpikeMonitor(group1)
-run(60*ms)
-
-out_spikes1 = getattr(smonitor1, 't') / ms
-voltage1 = monitor1.v[0]/mV
-inp_trace0 = np.array([input_current0])
-inp_trace1 = np.array([input_current1])
-
-inp_trace = np.concatenate((inp_trace0, inp_trace1))
-out_spikes = np.array([out_spikes0, out_spikes1])
+out_spikes = [out_spikes0, out_spikes1]
 print('out_spikes', out_spikes)
-
 
 # Model Fitting
 start_scope()
@@ -77,12 +64,12 @@ eqs_fit = Equations('''
     )
 
 n_opt = NevergradOptimizer('DE')
-metric = GammaFactor(delta=60*ms, time=60*ms)
+metric = GammaFactor(delta=1*ms, time=60*ms)
 
 
 # pass parameters to the NeuronGroup
 fitter = SpikeFitter(model=eqs_fit, input_var='I', dt=dt,
-                     input=inp_trace * amp, output=out_spikes,
+                     input=input_current2, output=out_spikes,
                      n_samples=30,
                      threshold='v > -50*mV',
                      reset='v = -70*mV',
@@ -93,7 +80,7 @@ result_dict, error = fitter.fit(n_rounds=2,
                                 metric=metric,
                                 callback='progressbar',
                                 gL=[20*nS, 40*nS],
-                                C = [0.5*nF, 1.5*nF])
+                                C=[0.5*nF, 1.5*nF])
 
 
 
@@ -108,7 +95,7 @@ start_scope()
 EL = -70*mV
 VT = -50*mV
 DeltaT = 2*mV
-spikes = fitter.generate_spikes(params=None, param_init={'v': -70*mV})
+spikes = fitter.generate_spikes(params=None)
 print('spike times:', spikes)
 
 start_scope()
@@ -116,8 +103,7 @@ EL = -70*mV
 VT = -50*mV
 DeltaT = 2*mV
 fits = fitter.generate(params=None,
-                       output_var='v',
-                       param_init={'v': -70*mV})
+                       output_var='v')
 
 
 print('fits', fits)

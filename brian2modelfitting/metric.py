@@ -17,8 +17,8 @@ def firing_rate(spikes):
     return (len(spikes) - 1) / (spikes[-1] - spikes[0])
 
 
-def get_gamma_factor(model, data, delta, time, dt):
-    """
+def get_gamma_factor(model, data, delta, time, dt, rate_correction=True):
+    r"""
     Calculate gamma factor between model and target spike trains,
     with precision delta.
 
@@ -32,11 +32,27 @@ def get_gamma_factor(model, data, delta, time, dt):
         time window
     dt: `~brian2.units.fundamentalunits.Quantity`
         time step
+    time: `~brian2.units.fundamentalunits.Quantity`
+        total time of the simulation
+    rate_correction: bool
+        Whether to include an error term that penalizes differences in firing
+        rate, following `Clopath et al., Neurocomputing (2007)
+        <https://doi.org/10.1016/j.neucom.2006.10.047>`_.
 
     Returns
     -------
-        float
-            The gamma factor
+    float
+        An error based on the Gamma factor. If ``rate_correction`` is used,
+        then the returned error is :math:`2\frac{\lvert r_\mathrm{data} - r_\mathrm{model}\rvert}{r_\mathrm{data}} - \Gamma`
+        (with :math:`r_\mathrm{data}` and :math:`r_\mathrm{model}` being the
+        firing rates in the data/model, and :math:`\Gamma` the coincidence
+        factor). Without ``rate_correction``, the error is
+        :math:`1 - \Gamma`. Note that the coincidence factor :math:`\Gamma`
+        has a maximum value of 1 (when the two spike trains are exactly
+        identical) and a value of 0 if there are only as many coincidences
+        as expected from two homogeneous Poisson processes of the same rate.
+        It can also take negative values if there are fewer coincidences
+        than expected by chance.
     """
     model = array(model)
     data = array(data)
@@ -58,7 +74,7 @@ def get_gamma_factor(model, data, delta, time, dt):
         matched_spikes = (diff <= delta_diff)
         coincidences = sum(matched_spikes)
     elif model_length == 0:
-        return 0
+        coincidences = 0
     else:
         indices = [amin(abs(model - data[i])) <= delta_diff for i in arange(data_length)]
         coincidences = sum(indices)
@@ -68,10 +84,12 @@ def get_gamma_factor(model, data, delta, time, dt):
     norm = .5*(1 - 2 * data_rate * delta)
     gamma = (coincidences - NCoincAvg)/(norm*(model_length + data_length))
 
-    corrected_gamma_factor = 2*abs((data_rate - model_rate)/data_rate - gamma)
+    if rate_correction:
+        rate_term = 2*abs((data_rate - model_rate)/data_rate)
+    else:
+        rate_term = 1
 
-    return corrected_gamma_factor
-
+    return rate_term - gamma
 
 def calc_eFEL(traces, inp_times, feat_list, dt):
     out_traces = []
@@ -431,14 +449,19 @@ class GammaFactor(SpikeMetric):
     Calculate gamma factors between goal and calculated spike trains, with
     precision delta.
 
-    Reference:
-    R. Jolivet et al., 'A benchmark test for a quantitative assessment of
-    simple neuron models',
-    Journal of Neuroscience Methods 169, no. 2 (2008): 417-424.
+    References:
+
+    * `R. Jolivet et al. “A Benchmark Test for a Quantitative Assessment of
+      Simple Neuron Models.” Journal of Neuroscience Methods, 169, no. 2 (2008):
+      417–24. <https://doi.org/10.1016/j.jneumeth.2007.11.006>`_
+    * `C. Clopath et al. “Predicting Neuronal Activity with Simple Models of the
+      Threshold Type: Adaptive Exponential Integrate-and-Fire Model with
+      Two Compartments.” Neurocomputing, 70, no. 10 (2007): 1668–73.
+      <https://doi.org/10.1016/j.neucom.2006.10.047>`_
     """
 
     @check_units(delta=second, time=second, t_start=0*second)
-    def __init__(self, delta, time, t_start=0*second):
+    def __init__(self, delta, time, t_start=0*second, rate_correction=True):
         """
         Initialize the metric with time window delta and time step dt output
 
@@ -448,10 +471,15 @@ class GammaFactor(SpikeMetric):
             time window
         time: `~brian2.units.fundamentalunits.Quantity`
             total length of experiment
+        rate_correciton: bool
+            Whether to include an error term that penalizes differences in firing
+            rate, following `Clopath et al., Neurocomputing (2007)
+            <https://doi.org/10.1016/j.neucom.2006.10.047>`_.
         """
         super(GammaFactor, self).__init__(t_start=t_start)
         self.delta = delta
         self.time = time
+        self.rate_correction = rate_correction
 
     def get_features(self, traces, output, dt):
         all_gf = []
@@ -459,7 +487,8 @@ class GammaFactor(SpikeMetric):
             gf_for_sample = []
             for model_response, target_response in zip(one_sample, output):
                 gf = get_gamma_factor(model_response, target_response,
-                                      self.delta, self.time, dt)
+                                      self.delta, self.time, dt,
+                                      rate_correction=self.rate_correction)
                 gf_for_sample.append(gf)
             all_gf.append(gf_for_sample)
         return array(all_gf)
