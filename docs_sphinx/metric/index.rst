@@ -61,10 +61,29 @@ trace. It is calculcated according to:
 
 :math:`2 \Delta N_{exp}r_{exp}` - expected number of coincidences with a Poission process
 
-For more details on the gamma factor, see
-`Jolivet et al. 2008, “A benchmark test for a quantitative assessment of simple
-neuron models”, J. Neurosci. Methods.
-<https://doi.org/10.1016/j.jneumeth.2007.11.006>`_
+For more details on the gamma factor, see:
+
+* `Jolivet et al. 2008, “A benchmark test for a quantitative assessment of simple
+  neuron models”, J. Neurosci. Methods.
+  <https://doi.org/10.1016/j.jneumeth.2007.11.006>`_
+* `Clopath et al. 2007, “Predicting neuronal activity with simple models of the
+  threshold type: adaptive exponential integrate-and-fire model with two
+  compartments.”, Neurocomp
+  <https://doi.org/10.1016/j.neucom.2006.10.047>`_
+
+The coincidence factor :math:`\Gamma` is 1 if the two spike trains match exactly
+and lower otherwise. It is 0 if the number of coincidences matches the number
+expected from two homogeneous Poisson processes of the same rate. To turn the
+coincidence factor into an error term (that is lower for better matches), two
+options are offered. With the ``rate_correction`` option (used by default), the
+error term used is
+:math:`2\frac{\lvert r_\mathrm{data} - r_\mathrm{model}\rvert}{r_\mathrm{data}} - \Gamma`,
+with :math:`r_\mathrm{data}` and :math:`r_\mathrm{model}` being the firing rates
+in the data/model. This is useful because the coincidence factor :math:`\Gamma`
+on its own can give high values (low errors) if the model generates many more
+spikes than were observed in the data; this is penalized by the above term. If
+``rate_correction`` is set to ``False``, :math:`1 - \Gamma` is used as the
+error.
 
 Upon initialization the user has to specify the :math:`\Delta` value, defining
 the maximal tolerance for spikes to be considered coincident:
