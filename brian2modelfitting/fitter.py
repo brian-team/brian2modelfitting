@@ -122,7 +122,7 @@ class Fitter(metaclass=abc.ABCMeta):
         if isinstance(model, str):
             model = Equations(model)
         if input_var not in model.identifiers:
-            raise Exception("%s is not an identifier in the model" % input_var)
+            raise NameError("%s is not an identifier in the model" % input_var)
 
         defaultclock.dt = dt
         self.dt = dt
@@ -437,9 +437,9 @@ class TraceFitter(Fitter):
                          param_init)
 
         if output_var not in self.model.names:
-            raise ValueError("%s is not a model variable" % output_var)
+            raise NameError("%s is not a model variable" % output_var)
         if output.shape != input.shape:
-            raise Exception("Input and output must have the same size")
+            raise ValueError("Input and output must have the same size")
 
         output_traces = TimedArray(output.transpose(), dt=dt)
 
@@ -552,9 +552,9 @@ class OnlineTraceFitter(Fitter):
                          param_init)
 
         if output_var not in self.model.names:
-            raise ValueError("%s is not a model variable" % output_var)
+            raise NameError("%s is not a model variable" % output_var)
         if output.shape != input.shape:
-            raise Exception("Input and output must have the same size")
+            raise ValueError("Input and output must have the same size")
 
         # Replace input variable by TimedArray
         output_traces = TimedArray(output.transpose(), dt=dt)

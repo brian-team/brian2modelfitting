@@ -21,8 +21,8 @@ def calc_bounds(parameter_names, **params):
         bounds for each parameter
     """
     for param in parameter_names:
-        if (param not in params):
-            raise Exception("Bounds must be set for parameter %s" % param)
+        if param not in params:
+            raise TypeError("Bounds must be set for parameter %s" % param)
 
     bounds = []
     for name in parameter_names:
@@ -131,9 +131,9 @@ class NevergradOptimizer(Optimizer):
 
     def initialize(self, parameter_names, popsize, **params):
         for param in params.keys():
-            if (param not in parameter_names):
-                raise Exception("Parameter %s must be defined as a parameter "
-                                "in the model" % param)
+            if param not in parameter_names:
+                raise ValueError("Parameter %s must be defined as a parameter "
+                                 "in the model" % param)
 
         bounds = calc_bounds(parameter_names, **params)
 
@@ -200,9 +200,9 @@ class SkoptOptimizer(Optimizer):
 
     def initialize(self, parameter_names, popsize, **params):
         for param in params.keys():
-            if (param not in parameter_names):
-                raise Exception("Parameter %s must be defined as a parameter "
-                                "in the model" % param)
+            if param not in parameter_names:
+                raise ValueError("Parameter %s must be defined as a parameter "
+                                 "in the model" % param)
 
         bounds = calc_bounds(parameter_names, **params)
 
