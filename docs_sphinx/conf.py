@@ -26,8 +26,10 @@ copyright = '2019, brian-team'
 author = 'brian-team'
 
 # The full version, including alpha/beta/rc tags
-release = '0.1'
-
+pkg_version = {}
+with open(os.path.join(brian2modelfitting_dir, 'version.py')) as fp:
+    exec(fp.read(), pkg_version)
+release = pkg_version['version']
 
 # -- General configuration ---------------------------------------------------
 
