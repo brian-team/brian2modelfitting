@@ -1,5 +1,7 @@
 import warnings
 import abc
+from collections import defaultdict
+
 import efel
 from itertools import repeat
 from brian2 import Hz, second, Quantity, ms, us
@@ -370,10 +372,7 @@ class FeatureMetric(TraceMetric):
             y = d2[key]
             d[key] = self.combine(x, y)
 
-        for k, v in d.items():
-            err += sum(v)
-
-        return err
+        return d
 
     def get_features(self, traces, output, dt):
         n_samples, n_traces, _ = traces.shape
@@ -389,14 +388,30 @@ class FeatureMetric(TraceMetric):
 
         features = []
         for one_sample in traces:
-            sample_features = []
             sample_feat = calc_eFEL(one_sample, self.traces_times,
-                                  self.feat_list, dt)
+                                    self.feat_list, dt)
             self.check_values(sample_feat)
+            sample_features = []
             for one_trace_feat, one_out in zip(sample_feat, out_feat):
                 sample_features.append(self.feat_to_err(one_trace_feat,
                                                         one_out))
-            features.append(sample_features)
+            # Convert the list of dictionaries to a dictionary of lists
+            sample_features_dict = {}
+            for feature_dict in sample_features:
+                for key, value in feature_dict.items():
+                    if key not in sample_features_dict:
+                        sample_features_dict[key] = []
+                    if len(value) != 1:
+                        raise TypeError('Feature "{}" returned more than a '
+                                        'single value, such features are not '
+                                        'supported yet.'.format(key))
+                    sample_features_dict[key].append(value[0])
+
+            # Convert lists into array
+            for key, l in sample_features_dict.items():
+                sample_features_dict[key] = array(l)
+            features.append(sample_features_dict)
+
         return features
 
     def get_errors(self, features):

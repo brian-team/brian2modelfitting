@@ -157,20 +157,22 @@ def test_get_features_feature_metric():
     feature_metric = FeatureMetric(inp_times, ['voltage_base'])
     results = feature_metric.get_features(voltage_model, voltage_target, dt=dt)
     assert len(results) == 3
-    assert all(len(r) == 2 for r in results)
-    assert_almost_equal(results[0], np.array([2.5*mV, 5*mV]))
-    assert_almost_equal(results[1], [0, 0])
-    assert_almost_equal(results[2], np.array([2.5*mV, 5*mV]))
+    assert all(isinstance(r, dict) for r in results)
+    assert all(r.keys() == {'voltage_base'} for r in results)
+    assert_almost_equal(results[0]['voltage_base'], np.array([2.5*mV, 5*mV]))
+    assert_almost_equal(results[1]['voltage_base'], [0, 0])
+    assert_almost_equal(results[2]['voltage_base'], np.array([2.5*mV, 5*mV]))
 
     # Custom comparison: squared difference
     feature_metric = FeatureMetric(inp_times, ['voltage_base'],
                                    combine=lambda x, y: (x - y)**2)
     results = feature_metric.get_features(voltage_model, voltage_target, dt=dt)
     assert len(results) == 3
-    assert all(len(r) == 2 for r in results)
-    assert_almost_equal(results[0], np.array([(2.5*mV)**2, (5*mV)**2]))
-    assert_almost_equal(results[1], [0, 0])
-    assert_almost_equal(results[2], np.array([(2.5*mV)**2, (5*mV)**2]))
+    assert all(isinstance(r, dict) for r in results)
+    assert all(r.keys() == {'voltage_base'} for r in results)
+    assert_almost_equal(results[0]['voltage_base'], np.array([(2.5*mV)**2, (5*mV)**2]))
+    assert_almost_equal(results[1]['voltage_base'], [0, 0])
+    assert_almost_equal(results[2]['voltage_base'], np.array([(2.5*mV)**2, (5*mV)**2]))
 
 
 def test_get_errors_feature_metric():
