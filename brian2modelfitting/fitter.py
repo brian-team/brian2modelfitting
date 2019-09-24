@@ -558,7 +558,11 @@ class OnlineTraceFitter(Fitter):
 
         # Replace input variable by TimedArray
         output_traces = TimedArray(output.transpose(), dt=dt)
-        self.model = self.model + Equations('total_error : %s' % repr(output.dim**2))
+        output_dim = get_dimensions(output)
+        squared_output_dim = ('1' if output_dim is DIMENSIONLESS
+                              else repr(output_dim**2))
+        error_eqs = Equations('total_error : {}'.format(squared_output_dim))
+        self.model = self.model + error_eqs
 
         # Setup NeuronGroup
         namespace = get_local_namespace(level=level+1)
@@ -587,7 +591,6 @@ class OnlineTraceFitter(Fitter):
 
     def calc_errors(self, metric=None):
         """Calculates error in online fashion.To be used inside optim_iter."""
-        errors = self.simulator.network['neurons'].total_error/int((self.duration-self.t_start)/defaultclock.dt)
         errors = self.neurons.total_error/int((self.duration-self.t_start)/defaultclock.dt)
         errors = mean(errors.reshape((self.n_samples, self.n_traces)), axis=1)
         return array(errors)
