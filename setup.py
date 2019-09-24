@@ -30,6 +30,8 @@ setup(name='brian2modelfitting',
                         'setuptools',
                         'nevergrad',
                         'scikit-optimize',
+                        'efel',
+                        'tqdm'
                         ],
       provides=['brian2modelfitting'],
       extras_require={'test': ['pytest'],
