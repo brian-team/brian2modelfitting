@@ -19,16 +19,16 @@ TraceFitter
                         dt=0.1*ms,
                         method='exponential_euler',
                         output=out_trace,
-                        n_samples=5,)
+                        n_samples=5)
 
   results, error = fitter.fit(optimizer=n_opt,
                               metric=metric,
-                              callback=True,
+                              callback='text',
                               n_rounds=1,
                               param_init={'v': -65*mV},
-                              gl=[1e-8*siemens*cm**-2 * area, 1e-3*siemens*cm**-2 * area],
-                              g_na=[1*msiemens*cm**-2 * area, 2000*msiemens*cm**-2 * area],
-                              g_kd=[1*msiemens*cm**-2 * area, 1000*msiemens*cm**-2 * area],)
+                              gl=[10*nS*cm**-2 * area, 1*mS*cm**-2 * area],
+                              g_na=[1*mS*cm**-2 * area, 2000*mS*cm**-2 * area],
+                              g_kd=[1*mS*cm**-2 * area, 1000*mS*cm**-2 * area])
 
 
 
@@ -37,10 +37,10 @@ SpikeFitter
 
 .. code:: python
 
-  n_opt = SkoptOptimizer('DE')
+  n_opt = SkoptOptimizer('ET')
   metric = GammaFactor(dt, 60*ms)
 
-  fitter = TraceFitter(model=eqs,
+  fitter = SpikeFitter(model=eqs,
                        input_var='I',
                        dt=0.1*ms,
                        input=inp_traces,
@@ -48,11 +48,10 @@ SpikeFitter
                        n_samples=30,
                        threshold='v > -50*mV',
                        reset='v = -70*mV',
-                       method='exponential_euler',)
+                       method='exponential_euler')
 
   results, error = fitter.fit(n_rounds=2,
                    optimizer=n_opt,
                    metric=metric,
-                   param_init={'v': -70*mV},
                    gL=[20*nS, 40*nS],
                    C = [0.5*nF, 1.5*nF])
