@@ -42,27 +42,25 @@ Cm   : farad (constant)
 ## Optimization and Metric Choice
 n_opt = NevergradOptimizer()
 
-# traces_times = [[0.005*second, 0.010*second]]
-traces_times = [[5*ms, 10*ms]]
+stim_times = [[5*ms, 10*ms]]
 feat_list = ['voltage_base', 'time_to_first_spike', 'Spikecount']
-weights = {'voltage_base':1, 'time_to_first_spike':1, 'Spikecount':10}
-metric = FeatureMetric(traces_times, feat_list, weights=weights)
+weights = {'voltage_base': 1, 'time_to_first_spike': 1, 'Spikecount': 10}
+metric = FeatureMetric(stim_times, feat_list, weights=weights)
 
 ## Fitting
 fitter = TraceFitter(model=eqs, input_var='I', output_var='v',
                      input=inp_traces*amp, output=out_traces*mV, dt=dt,
                      n_samples=20,
                      param_init={'v': -65*mV},
-                     method='exponential_euler',)
+                     method='exponential_euler')
 
 res, error = fitter.fit(n_rounds=2,
                         optimizer=n_opt, metric=metric,
                         callback='text',
-                        gl = [1e-09 *siemens, 1e-07 *siemens],
-                        g_na = [2e-06*siemens, 2e-04*siemens],
-                        g_kd = [6e-07*siemens, 6e-05*siemens],
-                        Cm=[0.1*ufarad*cm**-2 * area, 2*ufarad*cm**-2 * area],
-                        )
+                        gl=[1e-09 *siemens, 1e-07 *siemens],
+                        g_na=[2e-06*siemens, 2e-04*siemens],
+                        g_kd=[6e-07*siemens, 6e-05*siemens],
+                        Cm=[0.1*ufarad*cm**-2 * area, 2*ufarad*cm**-2 * area])
 
 ## Show results
 all_output = fitter.results(format='dataframe')
@@ -73,7 +71,6 @@ start_scope()
 fits = fitter.generate_traces(params=None, param_init={'v': -65*mV})
 trace = out_traces[0]
 time = arange(0, len(trace)*dt/ms, dt/ms)
-# print(time[-1])
 
 fig, ax = plt.subplots(ncols=4, figsize=(20,5))
 ax[0].plot(time, out_traces[0].transpose())

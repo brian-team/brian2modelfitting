@@ -325,17 +325,16 @@ class MSEMetric(TraceMetric):
 
 
 class FeatureMetric(TraceMetric):
-    def __init__(self, traces_times, feat_list, weights=None, combine=None,
+    def __init__(self, stim_times, feat_list, weights=None, combine=None,
                  t_start=0*second):
         super(FeatureMetric, self).__init__(t_start=t_start)
-        self.traces_times = traces_times
-        if isinstance(self.traces_times[0][0], Quantity):
-            for n, trace in enumerate(self.traces_times):
+        self.stim_times = stim_times
+        if isinstance(self.stim_times[0][0], Quantity):
+            for n, trace in enumerate(self.stim_times):
                 t_start, t_end = trace[0], trace[1]
                 t_start = t_start / ms
                 t_end = t_end / ms
-                self.traces_times[n] = [t_start, t_end]
-        n_times = shape(self.traces_times)[0]
+                self.stim_times[n] = [t_start, t_end]
 
         self.feat_list = feat_list
 
@@ -376,19 +375,19 @@ class FeatureMetric(TraceMetric):
 
     def get_features(self, traces, output, dt):
         n_samples, n_traces, _ = traces.shape
-        if len(self.traces_times) != n_traces:
-            if len(self.traces_times) == 1:
-                self.traces_times = list(repeat(self.traces_times[0], n_traces))
+        if len(self.stim_times) != n_traces:
+            if len(self.stim_times) == 1:
+                self.stim_times = list(repeat(self.stim_times[0], n_traces))
             else:
-                raise ValueError("Specify the traces_times variable of appropiate "
+                raise ValueError("Specify the stim_times variable of appropiate "
                                  "size (same as number of traces or 1).")
 
-        out_feat = calc_eFEL(output, self.traces_times, self.feat_list, dt)
+        out_feat = calc_eFEL(output, self.stim_times, self.feat_list, dt)
         self.check_values(out_feat)
 
         features = []
         for one_sample in traces:
-            sample_feat = calc_eFEL(one_sample, self.traces_times,
+            sample_feat = calc_eFEL(one_sample, self.stim_times,
                                     self.feat_list, dt)
             self.check_values(sample_feat)
             sample_features = []

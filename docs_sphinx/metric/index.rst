@@ -104,7 +104,7 @@ To get a list of all the available eFEL features, you can run the following code
 To use the `~brian2modelfitting.metric.FeatureMetric`,
 you have to provide the following input parameters:
 
-- ``traces_times`` - a list of times indicating start and end of the stimulus
+- ``stim_times`` - a list of times indicating start and end of the stimulus
   for each of input traces. This information is used by several features, e.g.
   the ``voltage_base`` feature will consider the average membrane potential
   during the last 10% of time before the stimulus (see the
@@ -118,7 +118,7 @@ Example code usage:
 
 .. code:: python
 
-  traces_times = [(50*ms, 100*ms), (50*ms, 100*ms), (50*ms, 100*ms), (50, 100*ms)]
+  stim_times = [(50*ms, 100*ms), (50*ms, 100*ms), (50*ms, 100*ms), (50, 100*ms)]
   feat_list = ['voltage_base', 'time_to_first_spike', 'Spikecount']
   metric = FeatureMetric(traces_times, feat_list, combine=None)
 
