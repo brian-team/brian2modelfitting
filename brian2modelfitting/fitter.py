@@ -1,4 +1,6 @@
 import abc
+
+from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions
 from numpy import ones, array, arange, concatenate, mean, nanmin, reshape
 from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
                     StateMonitor, SpikeMonitor, ms, device, second,
@@ -144,9 +146,17 @@ class Fitter(metaclass=abc.ABCMeta):
         self.output_var = output_var
         self.model = model
 
+        input_dim = get_dimensions(input)
+        input_dim = '1' if input_dim is DIMENSIONLESS else repr(input_dim)
+        input_eqs = "{} = input_var(t, i % n_traces) : {}".format(input_var,
+                                                                  input_dim)
+        self.model += input_eqs
+
+        input_traces = TimedArray(input.transpose(), dt=dt)
+        self.input_traces = input_traces
+
         # initialization of attributes used later
         self.best_params = None
-        self.input_traces = None
         self.network = None
         self.optimizer = None
         self.metric = None
@@ -431,17 +441,11 @@ class TraceFitter(Fitter):
         if output.shape != input.shape:
             raise Exception("Input and output must have the same size")
 
-        # Replace input variable by TimedArray
         output_traces = TimedArray(output.transpose(), dt=dt)
-        input_traces = TimedArray(input.transpose(), dt=dt)
-        self.model = self.model + Equations(input_var + '= input_var(t, i % n_traces) :\
-                                  ' + "% s" % repr(input.dim))
-
-        self.input_traces = input_traces
 
         # Setup NeuronGroup
         namespace = get_local_namespace(level=level+1)
-        namespace['input_var'] = input_traces
+        namespace['input_var'] = self.input_traces
         namespace['output_var'] = output_traces
         namespace['n_traces'] = self.n_traces
         self.neurons = self.setup_neuron_group(self.n_neurons, namespace)
@@ -493,16 +497,9 @@ class SpikeFitter(Fitter):
                          n_samples, threshold, reset, refractory, method,
                          param_init)
 
-        # Replace input variable by TimedArray
-        input_traces = TimedArray(input.transpose(), dt=dt)
-        self.model = self.model + Equations(input_var + '= input_var(t, i % n_traces) :\
-                                   ' + "% s" % repr(input.dim))
-
-        self.input_traces = input_traces
-
         # Setup NeuronGroup
         namespace = get_local_namespace(level=level+1)
-        namespace['input_var'] = input_traces
+        namespace['input_var'] = self.input_traces
         namespace['n_traces'] = self.n_traces
         self.neurons = self.setup_neuron_group(self.n_neurons, namespace)
 
@@ -561,16 +558,11 @@ class OnlineTraceFitter(Fitter):
 
         # Replace input variable by TimedArray
         output_traces = TimedArray(output.transpose(), dt=dt)
-        input_traces = TimedArray(input.transpose(), dt=dt)
-        self.model = self.model + Equations(input_var + '= input_var(t, i % n_traces) :\
-                                  ' + "% s" % repr(input.dim))
         self.model = self.model + Equations('total_error : %s' % repr(output.dim**2))
-
-        self.input_traces = input_traces
 
         # Setup NeuronGroup
         namespace = get_local_namespace(level=level+1)
-        namespace['input_var'] = input_traces
+        namespace['input_var'] = self.input_traces
         namespace['output_var'] = output_traces
         namespace['n_traces'] = self.n_traces
         self.neurons = self.setup_neuron_group(self.n_neurons, namespace)
