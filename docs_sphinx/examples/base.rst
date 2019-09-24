@@ -38,7 +38,7 @@ SpikeFitter
 .. code:: python
 
   n_opt = SkoptOptimizer('ET')
-  metric = GammaFactor(dt, 60*ms)
+  metric = GammaFactor(dt, delta=2*ms)
 
   fitter = SpikeFitter(model=eqs,
                        input_var='I',

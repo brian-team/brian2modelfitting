@@ -90,7 +90,7 @@ the maximal tolerance for spikes to be considered coincident:
 
 .. code:: python
 
-  metric = GammaFactor(delta=10*ms)
+  metric = GammaFactor(delta=2*ms)
 
 .. warning::
     The ``delta`` parameter has to be smaller than the smallest inter-spike
