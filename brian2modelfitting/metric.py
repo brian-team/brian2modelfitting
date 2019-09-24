@@ -1,5 +1,7 @@
 import warnings
 import abc
+from collections import defaultdict
+
 import efel
 from itertools import repeat
 from brian2 import Hz, second, Quantity, ms, us
@@ -77,7 +79,7 @@ def calc_eFEL(traces, inp_times, feat_list, dt):
         time = arange(0, len(trace))*dt/ms
         temp_trace = {}
         temp_trace['T'] = time
-        temp_trace['V'] = trace
+        temp_trace['V'] = array(trace, copy=False)
         temp_trace['stim_start'] = [inp_times[i][0]]
         temp_trace['stim_end'] = [inp_times[i][1]]
         out_traces.append(temp_trace)
@@ -323,17 +325,16 @@ class MSEMetric(TraceMetric):
 
 
 class FeatureMetric(TraceMetric):
-    def __init__(self, traces_times, feat_list, weights=None, combine=None,
+    def __init__(self, stim_times, feat_list, weights=None, combine=None,
                  t_start=0*second):
         super(FeatureMetric, self).__init__(t_start=t_start)
-        self.traces_times = traces_times
-        if isinstance(self.traces_times[0][0], Quantity):
-            for n, trace in enumerate(self.traces_times):
+        self.stim_times = stim_times
+        if isinstance(self.stim_times[0][0], Quantity):
+            for n, trace in enumerate(self.stim_times):
                 t_start, t_end = trace[0], trace[1]
                 t_start = t_start / ms
                 t_end = t_end / ms
-                self.traces_times[n] = [t_start, t_end]
-        n_times = shape(self.traces_times)[0]
+                self.stim_times[n] = [t_start, t_end]
 
         self.feat_list = feat_list
 
@@ -368,44 +369,59 @@ class FeatureMetric(TraceMetric):
         for key in d1.keys():
             x = d1[key]
             y = d2[key]
-            d[key] = self.combine(x, y) * self.weights[key]
+            d[key] = self.combine(x, y)
 
-        for k, v in d.items():
-            err += sum(v)
-
-        return err
+        return d
 
     def get_features(self, traces, output, dt):
         n_samples, n_traces, _ = traces.shape
-        if len(self.traces_times) != n_traces:
-            if len(self.traces_times) == 1:
-                self.traces_times = list(repeat(self.traces_times[0], n_traces))
+        if len(self.stim_times) != n_traces:
+            if len(self.stim_times) == 1:
+                self.stim_times = list(repeat(self.stim_times[0], n_traces))
             else:
-                raise ValueError("Specify the traces_times variable of appropiate "
+                raise ValueError("Specify the stim_times variable of appropiate "
                                  "size (same as number of traces or 1).")
 
-        self.out_feat = calc_eFEL(output, self.traces_times, self.feat_list, dt)
-        self.check_values(self.out_feat)
+        out_feat = calc_eFEL(output, self.stim_times, self.feat_list, dt)
+        self.check_values(out_feat)
 
         features = []
         for one_sample in traces:
-            temp_feat = calc_eFEL(one_sample, self.traces_times,
-                                  self.feat_list, dt)
-            self.check_values(temp_feat)
-            features.append(temp_feat)
+            sample_feat = calc_eFEL(one_sample, self.stim_times,
+                                    self.feat_list, dt)
+            self.check_values(sample_feat)
+            sample_features = []
+            for one_trace_feat, one_out in zip(sample_feat, out_feat):
+                sample_features.append(self.feat_to_err(one_trace_feat,
+                                                        one_out))
+            # Convert the list of dictionaries to a dictionary of lists
+            sample_features_dict = {}
+            for feature_dict in sample_features:
+                for key, value in feature_dict.items():
+                    if key not in sample_features_dict:
+                        sample_features_dict[key] = []
+                    if len(value) != 1:
+                        raise TypeError('Feature "{}" returned more than a '
+                                        'single value, such features are not '
+                                        'supported yet.'.format(key))
+                    sample_features_dict[key].append(value[0])
+
+            # Convert lists into array
+            for key, l in sample_features_dict.items():
+                sample_features_dict[key] = array(l)
+            features.append(sample_features_dict)
 
         return features
 
     def get_errors(self, features):
         errors = []
-        for feat in features:
-            temp_errors = []
-            for i, F in enumerate(feat):
-                temp_err = self.feat_to_err(F, self.out_feat[i])
-                temp_errors.append(temp_err)
-
-            error = sum(abs(temp_errors))
-            errors.append(error)
+        for one_sample in features:
+            sample_error = 0
+            for feature, values in one_sample.items():
+                # sum over the traces
+                total = sum(values) * self.weights[feature]
+                sample_error += total
+            errors.append(sample_error)
 
         return errors
 
