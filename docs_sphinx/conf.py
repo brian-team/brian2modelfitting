@@ -14,7 +14,7 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
 
-needs_sphinx = '2.0'
+needs_sphinx = '1.8'
 
 
 brian2modelfitting_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
