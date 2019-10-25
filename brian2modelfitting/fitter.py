@@ -1,12 +1,16 @@
 import abc
+import numbers
 
 from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions
 from numpy import ones, array, arange, concatenate, mean, nanmin, reshape
 from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
-                    StateMonitor, SpikeMonitor, ms, device, second,
-                    get_local_namespace, Quantity)
+                    StateMonitor, SpikeMonitor, second, get_local_namespace,
+                    Quantity)
 from brian2.input import TimedArray
 from brian2.equations.equations import Equations
+from brian2.devices import set_device, reset_device, device
+from brian2.devices.cpp_standalone.device import CPPStandaloneDevice
+from brian2.core.functions import Function
 from .simulator import RuntimeSimulator, CPPStandaloneSimulator
 from .metric import Metric, SpikeMetric, TraceMetric
 from .optimizer import Optimizer
@@ -40,6 +44,17 @@ def get_spikes(monitor, n_samples, n_traces):
             sample_spikes.append(array(spike_trains[i], copy=False))
         spikes.append(sample_spikes)
     return spikes
+
+
+def get_full_namespace(additional_namespace, level=0):
+    # Get the local namespace with all the values that could be relevant
+    # in principle -- by filtering things out, we avoid circular loops
+    namespace = {key: value
+                 for key, value in get_local_namespace(level=level + 1).items()
+                 if isinstance(value, (Quantity, numbers.Number, Function))}
+    namespace.update(additional_namespace)
+
+    return namespace
 
 
 def setup_fit():
@@ -112,7 +127,7 @@ class Fitter(metaclass=abc.ABCMeta):
                  n_samples, threshold, reset, refractory, method, param_init):
         """Initialize the fitter."""
 
-        if get_device().__class__.__name__ == 'CPPStandaloneDevice':
+        if isinstance(get_device(), CPPStandaloneDevice):
             if device.has_been_run is True:
                 raise Exception("To run another fitter in standalone mode you "
                                 "need to create new script")
@@ -157,7 +172,6 @@ class Fitter(metaclass=abc.ABCMeta):
 
         # initialization of attributes used later
         self.best_params = None
-        self.network = None
         self.optimizer = None
         self.metric = None
         if not param_init:
@@ -380,49 +394,54 @@ class Fitter(metaclass=abc.ABCMeta):
         level : `int`, optional
             How much farther to go down in the stack to find the namespace.
         """
-
-        if get_device().__class__.__name__ == 'CPPStandaloneDevice':
-            if device.has_been_run is True:
-                raise Exception("You need to reset the device before generating "
-                                "the traces in standalone mode, which will make "
-                                "you lose monitor data add: device.reinit() "
-                                "& device.activate()")
         if params is None:
             params = self.best_params
+
+        needs_device_reset = False
+        if isinstance(get_device(), CPPStandaloneDevice):
+            set_device('runtime')
+            simulator = RuntimeSimulator()
+            needs_device_reset = True
+        else:
+            simulator = self.simulator
 
         defaultclock.dt = self.dt
         Ntraces, Nsteps = self.input.shape
 
         # Setup NeuronGroup
-        namespace = get_local_namespace(level=level+1)
-        namespace['input_var'] = self.input_traces
-        namespace['n_traces'] = Ntraces
-        namespace['output_var'] = output_var
+        namespace = get_full_namespace({'input_var': self.input_traces,
+                                        'n_traces': Ntraces,
+                                        'output_var': output_var},
+                                       level=level+1)
+
         self.neurons = self.setup_neuron_group(Ntraces, namespace,
                                                name='neurons')
 
+        neurons = self.setup_neuron_group(Ntraces, namespace, name='neurons')
+        neurons.namespace['input_var'] = self.input_traces
+        neurons.namespace['n_traces'] = Ntraces
+        neurons.namespace['output_var'] = output_var
         if output_var == 'spikes':
-            monitor = SpikeMonitor(self.neurons, record=True, name='monitor')
+            monitor = SpikeMonitor(neurons, record=True, name='monitor')
         else:
-            monitor = StateMonitor(self.neurons, output_var, record=True,
-                                   name='monitor')
-        network = Network(self.neurons, monitor)
+            monitor = StateMonitor(neurons, output_var, record=True, name='monitor')
+        network = Network(neurons, monitor)
 
         if param_init:
-            self.simulator.initialize(network, param_init, name='generate')
+            simulator.initialize(network, param_init, name='generate')
         else:
-            self.simulator.initialize(network, self.param_init,
-                                      name='generate')
+            simulator.initialize(network, self.param_init, name='generate')
 
-        self.simulator.run(self.duration, params, self.parameter_names,
-                           name='generate')
+        simulator.run(self.duration, params, self.parameter_names, name='generate')
 
         if output_var == 'spikes':
-            fits = get_spikes(self.simulator.networks['generate']['monitor'],
+            fits = get_spikes(simulator.monitor,
                               1, self.n_traces)[0]  # a single "sample"
         else:
-            fits = getattr(self.simulator.networks['generate']['monitor'],
-                           output_var)
+            fits = getattr(simulator.monitor, output_var)
+
+        if needs_device_reset:
+            reset_device()
 
         return fits
 
@@ -445,17 +464,17 @@ class TraceFitter(Fitter):
         output_traces = TimedArray(output.transpose(), dt=dt)
 
         # Setup NeuronGroup
-        namespace = get_local_namespace(level=level+1)
-        namespace['input_var'] = self.input_traces
-        namespace['output_var'] = output_traces
-        namespace['n_traces'] = self.n_traces
-        self.neurons = self.setup_neuron_group(self.n_neurons, namespace)
+        namespace = get_full_namespace({'input_var': self.input_traces,
+                                        'n_traces': self.n_traces,
+                                        'output_var': output_traces},
+                                       level=level+1)
+        neurons = self.setup_neuron_group(self.n_neurons, namespace)
 
-        monitor = StateMonitor(self.neurons, output_var, record=True,
+        monitor = StateMonitor(neurons, output_var, record=True,
                                name='monitor')
-        self.network = Network(self.neurons, monitor)
+        network = Network(neurons, monitor)
 
-        self.simulator.initialize(self.network, self.param_init)
+        self.simulator.initialize(network, self.param_init)
 
     def calc_errors(self, metric):
         """
@@ -499,13 +518,13 @@ class SpikeFitter(Fitter):
                          param_init)
 
         # Setup NeuronGroup
-        namespace = get_local_namespace(level=level+1)
-        namespace['input_var'] = self.input_traces
-        namespace['n_traces'] = self.n_traces
-        self.neurons = self.setup_neuron_group(self.n_neurons, namespace)
+        namespace = get_full_namespace({'input_var': self.input_traces,
+                                        'n_traces': self.n_traces},
+                                       level=level + 1)
+        neurons = self.setup_neuron_group(self.n_neurons, namespace)
 
-        monitor = SpikeMonitor(self.neurons, record=True, name='monitor')
-        self.network = Network(self.neurons, monitor)
+        monitor = SpikeMonitor(neurons, record=True, name='monitor')
+        network = Network(neurons, monitor)
 
         if param_init:
             for param, val in param_init.items():
@@ -514,7 +533,7 @@ class SpikeFitter(Fitter):
                                      "identifier in the model" % param)
             self.param_init = param_init
 
-        self.simulator.initialize(self.network, self.param_init)
+        self.simulator.initialize(network, self.param_init)
 
     def calc_errors(self, metric):
         """
@@ -566,21 +585,22 @@ class OnlineTraceFitter(Fitter):
         self.model = self.model + error_eqs
 
         # Setup NeuronGroup
-        namespace = get_local_namespace(level=level+1)
-        namespace['input_var'] = self.input_traces
-        namespace['output_var'] = output_traces
-        namespace['n_traces'] = self.n_traces
-        self.neurons = self.setup_neuron_group(self.n_neurons, namespace)
+        namespace = get_full_namespace({'input_var': self.input_traces,
+                                        'n_traces': self.n_traces,
+                                        'output_var': output_traces},
+                                       level=level+1)
+
+        neurons = self.setup_neuron_group(self.n_neurons, namespace)
 
         self.t_start = 0*second
-        self.neurons.namespace['t_start'] = self.t_start
-        self.neurons.run_regularly('total_error +=  (' + output_var + '-output_var\
+        neurons.namespace['t_start'] = self.t_start
+        neurons.run_regularly('total_error +=  (' + output_var + '-output_var\
                                    (t,i % n_traces))**2 * int(t>=t_start)',
                                    when='end')
 
-        monitor = StateMonitor(self.neurons, output_var, record=True,
+        monitor = StateMonitor(neurons, output_var, record=True,
                                name='monitor')
-        self.network = Network(self.neurons, monitor)
+        network = Network(neurons, monitor)
         if param_init:
             for param, val in param_init.items():
                 if not (param in self.model.identifiers or param in self.model.names):
@@ -588,11 +608,11 @@ class OnlineTraceFitter(Fitter):
                                      "identifier in the model" % param)
             self.param_init = param_init
 
-        self.simulator.initialize(self.network, self.param_init)
+        self.simulator.initialize(network, self.param_init)
 
     def calc_errors(self, metric=None):
         """Calculates error in online fashion.To be used inside optim_iter."""
-        errors = self.neurons.total_error/int((self.duration-self.t_start)/defaultclock.dt)
+        errors = self.simulator.neurons.total_error/int((self.duration-self.t_start)/defaultclock.dt)
         errors = mean(errors.reshape((self.n_samples, self.n_traces)), axis=1)
         return array(errors)
 

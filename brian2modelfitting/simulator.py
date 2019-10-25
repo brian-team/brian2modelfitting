@@ -53,10 +53,13 @@ class Simulator(metaclass=abc.ABCMeta):
     """
     def __init__(self):
         self.networks = {}
+        self.current_net = None
         self.var_init = None
 
-    @abc.abstractmethod
-    def initialize(self, network, var_init, name):
+    neurons = property(lambda self: self.networks[self.current_net]['neurons'])
+    monitor = property(lambda self: self.networks[self.current_net]['monitor'])
+
+    def initialize(self, network, var_init, name='fit'):
         """
         Prepares the simulation for running
 
@@ -70,10 +73,19 @@ class Simulator(metaclass=abc.ABCMeta):
         name: `str`, optional
             name of the network
         """
-        pass
+        assert isinstance(network, Network)
+        if 'neurons' not in network:
+            raise KeyError('Expected a group named "neurons" in the '
+                           'network.')
+        if 'monitor' not in network:
+            raise KeyError('Expected a monitor named "monitor" in the '
+                           'network.')
+        self.networks[name] = network
+        self.current_net = None  # will be set in run
+        self.var_init = var_init
 
     @abc.abstractmethod
-    def run(self, duration, params, params_names):
+    def run(self, duration, params, params_names, name):
         """
         Restores the network, sets neurons to required parameters and runs
         the simulation
@@ -93,51 +105,44 @@ class Simulator(metaclass=abc.ABCMeta):
 class RuntimeSimulator(Simulator):
     """Simulation class created for use with RuntimeDevice"""
     def initialize(self, network, var_init, name='fit'):
-        assert isinstance(network, Network)
-        if not ('monitor' in network and 'neurons' in network):
-            raise KeyError('The provided network needs a "monitor" and '
-                           '"neurons".')
-        self.networks[name] = network
-        self.var_init = var_init
+        super(RuntimeSimulator, self).initialize(network, var_init, name)
         network.store()
 
     def run(self, duration, params, params_names, name='fit'):
+        self.current_net = name
         network = self.networks[name]
         network.restore()
-        network['neurons'].set_states(params, units=False)
+        self.neurons.set_states(params, units=False)
         if self.var_init is not None:
             for k, v in self.var_init.items():
-                network['neurons'].__setattr__(k, v)
+                self.neurons.__setattr__(k, v)
 
         network.run(duration, namespace={})
 
 
 class CPPStandaloneSimulator(Simulator):
     """Simulation class created for use with CPPStandaloneDevice"""
-    def initialize(self, network, var_init, name='fit'):
-        assert isinstance(network, Network)
-        if not ('monitor' in network and 'neurons' in network):
-            raise KeyError('The provided network needs a "monitor" and '
-                           '"neurons".')
-        self.networks[name] = network
-        self.var_init = var_init
+
+    def __init__(self):
+        super(CPPStandaloneSimulator, self).__init__()
+        self.params_init = None
+
 
     def run(self, duration, params, params_names, name='fit'):
         """
-        Simulation has to be run in two stages in order to initalize the
-        code generaion
+        Simulation has to be run in two stages in order to initialize the
+        code generation
         """
+        self.current_net = name
         network = self.networks[name]
         if not device.has_been_run:
-            self.params_init = initialize_neurons(params_names,
-                                                  network['neurons'],
+            self.params_init = initialize_neurons(params_names, self.neurons,
                                                   params)
             if self.var_init is not None:
                 for k, v in self.var_init.items():
-                    network['neurons'].__setattr__(k, v)
+                    self.neurons.__setattr__(k, v)
 
-            network.run(duration, namespace={})
-
+            network.run(duration, namespace={}, report='text')
         else:
             set_states(self.params_init, params)
             run_again()

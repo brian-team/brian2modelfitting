@@ -6,12 +6,12 @@ import numpy as np
 import pandas as pd
 from numpy.testing.utils import assert_equal
 from brian2 import (zeros, Equations, NeuronGroup, StateMonitor, TimedArray,
-                    nS, mV, volt, ms, Quantity, Network)
+                    nS, mV, volt, ms, Quantity, set_device, get_device, Network)
 from brian2 import have_same_dimensions
 from brian2modelfitting import (NevergradOptimizer, TraceFitter, MSEMetric,
                                 OnlineTraceFitter, Simulator, Metric,
                                 Optimizer, GammaFactor)
-from brian2.devices.device import reinit_devices
+from brian2.devices.device import reinit_devices, reset_device
 from brian2modelfitting.fitter import get_param_dic
 
 
@@ -73,6 +73,25 @@ def setup_online(request):
     return dt, otf
 
 
+@pytest.fixture()
+def setup_standalone(request):
+    set_device('cpp_standalone', directory=None)
+    dt = 0.01 * ms
+    tf = TraceFitter(dt=dt,
+                     model=model,
+                     input_var='v',
+                     output_var='I',
+                     input=input_traces,
+                     output=output_traces,
+                     n_samples=2)
+
+    def fin():
+        reinit_devices()
+        set_device('runtime')
+    request.addfinalizer(fin)
+
+    return dt, tf
+
 def test_get_param_dic():
     d = get_param_dic([1, 2], ['a', 'b'], 2, 2)
     assert isinstance(d, dict)
@@ -93,7 +112,7 @@ def test_tracefitter_init(setup):
     attr_fitter = ['dt', 'results_', 'simulator', 'parameter_names', 'n_traces',
                    'duration', 'n_neurons', 'n_samples', 'method', 'threshold',
                    'reset', 'refractory', 'input', 'output', 'output_var',
-                   'best_params', 'input_traces', 'model', 'network', 'optimizer',
+                   'best_params', 'input_traces', 'model', 'optimizer',
                    'metric']
     for attr in attr_fitter:
         assert hasattr(tf, attr)
@@ -102,16 +121,14 @@ def test_tracefitter_init(setup):
     assert tf.optimizer is None
     assert tf.best_params is None
 
-    attr_tracefitter = ['input_traces', 'model', 'neurons', 'network',
-                        'simulator']
+    attr_tracefitter = ['input_traces', 'model', 'simulator']
     for attr in attr_tracefitter:
         assert hasattr(tf, attr)
 
-    assert isinstance(tf.network['neurons'], NeuronGroup)
-    assert isinstance(tf.network['monitor'], StateMonitor)
     assert isinstance(tf.simulator, Simulator)
     assert isinstance(tf.input_traces, TimedArray)
     assert isinstance(tf.model, Equations)
+
 
 def test_tracefitter_init_errors(setup):
     dt, _ = setup
@@ -263,6 +280,19 @@ def test_fitter_generate_traces(setup):
     assert_equal(np.shape(traces), np.shape(output_traces))
 
 
+def test_fitter_generate_traces_standalone(setup_standalone):
+    dt, tf = setup_standalone
+    results, errors = tf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             g=[1*nS, 30*nS],
+                             restart=False,)
+
+    traces = tf.generate_traces()
+    assert isinstance(traces, np.ndarray)
+    assert_equal(np.shape(traces), np.shape(output_traces))
+
+
 def test_fitter_results(setup):
     dt, tf = setup
     best_params, errors = tf.fit(n_rounds=2,
@@ -303,7 +333,7 @@ def test_onlinetracefitter_init(setup_online):
     attr_fitter = ['dt', 'results_', 'simulator', 'parameter_names', 'n_traces',
                    'duration', 'n_neurons', 'n_samples', 'method', 'threshold',
                    'reset', 'refractory', 'input', 'output', 'output_var',
-                   'best_params', 'input_traces', 'model', 'network', 'optimizer',
+                   'best_params', 'input_traces', 'model', 'optimizer',
                    'metric', 't_start']
     for attr in attr_fitter:
         assert hasattr(otf, attr)
@@ -313,13 +343,10 @@ def test_onlinetracefitter_init(setup_online):
     assert otf.best_params is None
     assert_equal(otf.t_start, 0*ms)
 
-    attr_tracefitter = ['input_traces', 'model', 'neurons', 'network',
-                        'simulator']
+    attr_tracefitter = ['input_traces', 'model', 'simulator']
     for attr in attr_tracefitter:
         assert hasattr(otf, attr)
 
-    assert isinstance(otf.network['neurons'], NeuronGroup)
-    assert isinstance(otf.network['monitor'], StateMonitor)
     assert isinstance(otf.simulator, Simulator)
     assert isinstance(otf.input_traces, TimedArray)
     assert isinstance(otf.model, Equations)
