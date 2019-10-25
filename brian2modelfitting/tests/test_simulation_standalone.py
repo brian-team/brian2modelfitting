@@ -65,8 +65,8 @@ def test_initialize_simulation_standalone():
     assert_raises(KeyError, sas.initialize, empty_net, None)
     assert_raises(Exception, sas.initialize, wrong_net, None)
 
-    sas.initialize(net, var_init=None)
-    assert(isinstance(sas.network, Network))
+    sas.initialize(net, var_init=None, name='test')
+    assert(isinstance(sas.networks['test'], Network))
 
 
 def test_run_simulation_standalone(setup):
@@ -84,10 +84,10 @@ def test_run_simulation_standalone(setup):
     sas.initialize(net, var_init=None)
 
     sas.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
-    I = getattr(sas.network['monitor'], 'I')
+    I = getattr(sas.networks['fit']['monitor'], 'I')
     print(I)
     assert_equal(np.shape(I), (1, duration/dt))
 
     sas.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
-    I = getattr(sas.network['monitor'], 'I')
+    I = getattr(sas.networks['fit']['monitor'], 'I')
     assert_equal(np.shape(I), (1, 2 * duration/dt))

@@ -399,29 +399,30 @@ class Fitter(metaclass=abc.ABCMeta):
         namespace['n_traces'] = Ntraces
         namespace['output_var'] = output_var
         self.neurons = self.setup_neuron_group(Ntraces, namespace,
-                                               name='neurons_')
+                                               name='neurons')
 
         if output_var == 'spikes':
-            monitor = SpikeMonitor(self.neurons, record=True, name='monitor_')
+            monitor = SpikeMonitor(self.neurons, record=True, name='monitor')
         else:
             monitor = StateMonitor(self.neurons, output_var, record=True,
-                                   name='monitor_')
+                                   name='monitor')
         network = Network(self.neurons, monitor)
 
         if param_init:
-            self.simulator.initialize(network, param_init, name='neurons_')
+            self.simulator.initialize(network, param_init, name='generate')
         else:
             self.simulator.initialize(network, self.param_init,
-                                      name='neurons_')
+                                      name='generate')
 
         self.simulator.run(self.duration, params, self.parameter_names,
-                           name='neurons_')
+                           name='generate')
 
         if output_var == 'spikes':
-            fits = get_spikes(self.simulator.network['monitor_'],
+            fits = get_spikes(self.simulator.networks['generate']['monitor'],
                               1, self.n_traces)[0]  # a single "sample"
         else:
-            fits = getattr(self.simulator.network['monitor_'], output_var)
+            fits = getattr(self.simulator.networks['generate']['monitor'],
+                           output_var)
 
         return fits
 
@@ -461,7 +462,7 @@ class TraceFitter(Fitter):
         Returns errors after simulation with StateMonitor.
         To be used inside optim_iter.
         """
-        traces = getattr(self.simulator.network['monitor'],
+        traces = getattr(self.simulator.networks['fit']['monitor'],
                          self.output_var+'_')
         # Reshape traces for easier calculation of error
         traces = reshape(traces, (traces.shape[0]//self.n_traces,
@@ -520,7 +521,7 @@ class SpikeFitter(Fitter):
         Returns errors after simulation with SpikeMonitor.
         To be used inside optim_iter.
         """
-        spikes = get_spikes(self.simulator.network['monitor'],
+        spikes = get_spikes(self.simulator.networks['fit']['monitor'],
                             self.n_samples, self.n_traces)
         errors = metric.calc(spikes, self.output, self.dt)
         return errors

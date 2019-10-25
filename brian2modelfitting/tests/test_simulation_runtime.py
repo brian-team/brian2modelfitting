@@ -73,7 +73,7 @@ def test_initialize_simulation_runtime():
     assert_raises(TypeError, rts.initialize)
 
     rts.initialize(net, var_init=None)
-    assert(isinstance(rts.network, Network))
+    assert(isinstance(rts.networks['fit'], Network))
     assert_raises(KeyError, rts.initialize, empty_net, None)
     assert_raises(Exception, rts.initialize, wrong_net, None)
     assert_raises(TypeError, rts.initialize, Network)
@@ -91,7 +91,7 @@ def test_run_simulation_runtime(setup):
     rts.initialize(net, var_init=None)
 
     rts.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
-    I = getattr(rts.network['monitor'], 'I')
+    I = getattr(rts.networks['fit']['monitor'], 'I')
     assert_equal(np.shape(I), (1, duration/dt))
 
 
@@ -107,5 +107,5 @@ def test_run_simulation_runtime_var_init(setup):
     rts.initialize(net, var_init={'v': -60*mV})
 
     rts.run(duration, {'gL': 100, 'C': 10}, ['gL', 'C'])
-    v = getattr(rts.network['monitor'], 'v')
+    v = getattr(rts.networks['fit']['monitor'], 'v')
     assert_equal(np.shape(v), (1, duration/dt))

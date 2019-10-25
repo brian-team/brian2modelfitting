@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from numpy.testing.utils import assert_equal
 from brian2 import (zeros, Equations, NeuronGroup, StateMonitor, TimedArray,
-                    nS, mV, volt, ms, Quantity)
+                    nS, mV, volt, ms, Quantity, Network)
 from brian2 import have_same_dimensions
 from brian2modelfitting import (NevergradOptimizer, TraceFitter, MSEMetric,
                                 OnlineTraceFitter, Simulator, Metric,
@@ -191,6 +191,23 @@ def test_fit_restart(setup):
                              optimizer=n_opt,
                              metric=metric,
                              g=[1*nS, 30*nS])
+
+
+def test_fit_continue_with_generate(setup):
+    dt, tf = setup
+    results, error = tf.fit(n_rounds=2,
+                            optimizer=n_opt,
+                            metric=metric,
+                            g=[1*nS, 30*nS])
+
+    fits = tf.generate_traces()
+
+    results, error = tf.fit(n_rounds=2,
+                            optimizer=n_opt,
+                            metric=metric,
+                            g=[1*nS, 30*nS])
+
+    fits = tf.generate_traces()
 
 
 def test_fit_restart_errors(setup):
