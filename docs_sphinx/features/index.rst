@@ -204,22 +204,8 @@ Important notes:
 .. warning::
     In standlone mode one script can not be used to contain multiple - `~brian2modelfitting.fitter.Fitter`, use separate scripts!
 
-
-Before generation of traces, you have to  reinitialize the device add additional
-piece of code before calling `~brian2modelfitting.fitter.Fitter.generate`:
-
-.. code:: python
-
-    device.reinit()
-    device.activate()
-
-    fitter.generate_traces()
-
-
-.. warning::
-     Device reinitialization causes the device to reset, and disables the possibility for further fitting or
-     retrieving information from fitter monitors.
-
+Note that the generation of traces or spikes via `~brian2modelfitting.fitter.Fitter.generate`
+will always use runtime mode, even when the fitting procedure uses standalone mode.
 
 
 OnlineTraceFitter

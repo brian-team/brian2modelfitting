@@ -84,7 +84,7 @@ def test_spikefitter_init(setup):
     attr_fitter = ['dt', 'results_', 'simulator', 'parameter_names', 'n_traces',
                    'duration', 'n_neurons', 'n_samples', 'method', 'threshold',
                    'reset', 'refractory', 'input', 'output', 'output_var',
-                   'best_params', 'input_traces', 'model', 'network', 'optimizer',
+                   'best_params', 'input_traces', 'model', 'optimizer',
                    'metric']
     for attr in attr_fitter:
         assert hasattr(sf, attr)
@@ -93,13 +93,10 @@ def test_spikefitter_init(setup):
     assert sf.optimizer is None
     assert sf.best_params is None
 
-    attr_spikefitter = ['input_traces', 'model', 'neurons', 'network',
-                        'simulator']
+    attr_spikefitter = ['input_traces', 'model', 'simulator']
     for attr in attr_spikefitter:
         assert hasattr(sf, attr)
 
-    assert isinstance(sf.network['neurons'], NeuronGroup)
-    assert isinstance(sf.network['monitor'], SpikeMonitor)
     assert isinstance(sf.simulator, Simulator)
     assert isinstance(sf.input_traces, TimedArray)
     assert isinstance(sf.model, Equations)

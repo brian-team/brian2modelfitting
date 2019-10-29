@@ -1,7 +1,7 @@
 import os
 import abc
 from numpy import atleast_1d
-from brian2 import device, NeuronGroup
+from brian2 import device, Network
 
 
 def initialize_parameter(variableview, value):
@@ -48,10 +48,18 @@ def set_states(init_dict, values):
 
 class Simulator(metaclass=abc.ABCMeta):
     """
-    Simluation class created to perform a simulation for fit_traces
+    Simulation class created to perform a simulation for fitting traces or
+    spikes.
     """
-    @abc.abstractmethod
-    def initialize(self, network, var_init, name):
+    def __init__(self):
+        self.networks = {}
+        self.current_net = None
+        self.var_init = None
+
+    neurons = property(lambda self: self.networks[self.current_net]['neurons'])
+    monitor = property(lambda self: self.networks[self.current_net]['monitor'])
+
+    def initialize(self, network, var_init, name='fit'):
         """
         Prepares the simulation for running
 
@@ -65,10 +73,19 @@ class Simulator(metaclass=abc.ABCMeta):
         name: `str`, optional
             name of the network
         """
-        pass
+        assert isinstance(network, Network)
+        if 'neurons' not in network:
+            raise KeyError('Expected a group named "neurons" in the '
+                           'network.')
+        if 'monitor' not in network:
+            raise KeyError('Expected a monitor named "monitor" in the '
+                           'network.')
+        self.networks[name] = network
+        self.current_net = None  # will be set in run
+        self.var_init = var_init
 
     @abc.abstractmethod
-    def run(self, duration, params, params_names):
+    def run(self, duration, params, params_names, name):
         """
         Restores the network, sets neurons to required parameters and runs
         the simulation
@@ -87,48 +104,45 @@ class Simulator(metaclass=abc.ABCMeta):
 
 class RuntimeSimulator(Simulator):
     """Simulation class created for use with RuntimeDevice"""
-    def initialize(self, network, var_init, name='neurons'):
-        if network[name] is NeuronGroup:
-            raise Exception("Network needs to have a NeuronGroup 'neurons'")
+    def initialize(self, network, var_init, name='fit'):
+        super(RuntimeSimulator, self).initialize(network, var_init, name)
+        network.store()
 
-        self.network = network
-        self.var_init = var_init
-        self.network.store()
-
-    def run(self, duration, params, params_names, name='neurons'):
-        self.network.restore()
-        self.network[name].set_states(params, units=False)
+    def run(self, duration, params, params_names, name='fit'):
+        self.current_net = name
+        network = self.networks[name]
+        network.restore()
+        self.neurons.set_states(params, units=False)
         if self.var_init is not None:
             for k, v in self.var_init.items():
-                self.network[name].__setattr__(k, v)
+                self.neurons.__setattr__(k, v)
 
-        self.network.run(duration, namespace={})
+        network.run(duration, namespace={})
 
 
 class CPPStandaloneSimulator(Simulator):
     """Simulation class created for use with CPPStandaloneDevice"""
-    def initialize(self, network, var_init, name='neurons'):
-        if not network[name]:
-            raise Exception("Network needs to have a NeuronGroup 'neurons'")
 
-        self.network = network
-        self.var_init = var_init
+    def __init__(self):
+        super(CPPStandaloneSimulator, self).__init__()
+        self.params_init = None
 
-    def run(self, duration, params, params_names, name='neurons'):
+
+    def run(self, duration, params, params_names, name='fit'):
         """
-        Simulation has to be run in two stages in order to initalize the
-        code generaion
+        Simulation has to be run in two stages in order to initialize the
+        code generation
         """
+        self.current_net = name
+        network = self.networks[name]
         if not device.has_been_run:
-            self.params_init = initialize_neurons(params_names,
-                                                  self.network[name],
+            self.params_init = initialize_neurons(params_names, self.neurons,
                                                   params)
             if self.var_init is not None:
                 for k, v in self.var_init.items():
-                    self.network[name].__setattr__(k, v)
+                    self.neurons.__setattr__(k, v)
 
-            self.network.run(duration, namespace={})
-
+            network.run(duration, namespace={}, report='text')
         else:
             set_states(self.params_init, params)
             run_again()

@@ -30,12 +30,7 @@ model2 = Equations('''
                   VT=-50*mV,
                   DeltaT=2*mV,)
 
-neurons = NeuronGroup(1, model, name='neurons')
-monitor = StateMonitor(neurons, 'I', record=True, name='monitor')
-
-net = Network(neurons, monitor)
 empty_net = Network()
-wrong_net = Network(NeuronGroup(1, model, name='neurons2'))
 
 
 @pytest.fixture()
@@ -43,11 +38,16 @@ def setup(request):
     dt = 0.1 * ms
     duration = 10 * ms
 
+    neurons = NeuronGroup(1, model, name='neurons')
+    monitor = StateMonitor(neurons, 'I', record=True, name='monitor')
+
+    net = Network(neurons, monitor)
+
     def fin():
         reinit_devices()
     request.addfinalizer(fin)
 
-    return dt, duration
+    return net, dt, duration
 
 
 def test_init():
@@ -56,47 +56,47 @@ def test_init():
 
 
 def test_initialize_parameter():
+    neurons = NeuronGroup(1, model, name='neurons')
     g_init = initialize_parameter(neurons.__getattr__('g'), 100)
     assert(isinstance(g_init, Dummy))
 
 
 def test_initialize_neurons():
+    neurons = NeuronGroup(1, model, name='neurons')
     params_init = initialize_neurons(['g', 'E'], neurons, {'g': 100, 'E': 10})
     assert(isinstance(params_init, dict))
     assert(isinstance(params_init['g'], Dummy))
     assert(isinstance(params_init['E'], Dummy))
 
 
-def test_initialize_simulation_runtime():
+def test_initialize_simulation_runtime(setup):
+    net, dt, duration = setup
     start_scope()
     rts = RuntimeSimulator()
     assert_raises(TypeError, rts.initialize)
 
     rts.initialize(net, var_init=None)
-    assert(isinstance(rts.network, Network))
+    assert(isinstance(rts.networks['fit'], Network))
     assert_raises(KeyError, rts.initialize, empty_net, None)
+    wrong_net = Network(NeuronGroup(1, model, name='neurons2'))
     assert_raises(Exception, rts.initialize, wrong_net, None)
     assert_raises(TypeError, rts.initialize, Network)
 
 
 def test_run_simulation_runtime(setup):
-    dt, duration = setup
+    net, dt, duration = setup
     start_scope()
-
-    neurons = NeuronGroup(1, model, name='neurons')
-    monitor = StateMonitor(neurons, 'I', record=True, name='monitor')
-    net = Network(neurons, monitor)
 
     rts = RuntimeSimulator()
     rts.initialize(net, var_init=None)
 
     rts.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
-    I = getattr(rts.network['monitor'], 'I')
+    I = getattr(rts.networks['fit']['monitor'], 'I')
     assert_equal(np.shape(I), (1, duration/dt))
 
 
 def test_run_simulation_runtime_var_init(setup):
-    dt, duration = setup
+    _, dt, duration = setup
     start_scope()
 
     neurons = NeuronGroup(1, model2, name='neurons')
@@ -107,5 +107,5 @@ def test_run_simulation_runtime_var_init(setup):
     rts.initialize(net, var_init={'v': -60*mV})
 
     rts.run(duration, {'gL': 100, 'C': 10}, ['gL', 'C'])
-    v = getattr(rts.network['monitor'], 'v')
+    v = getattr(rts.networks['fit']['monitor'], 'v')
     assert_equal(np.shape(v), (1, duration/dt))
