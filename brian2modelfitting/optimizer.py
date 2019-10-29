@@ -1,10 +1,17 @@
 import abc
-from numpy import array, all, ndarray
-from brian2 import asarray
+from numpy import array, all, ndarray, asarray
+import warnings
 
+# Prevent sklearn from adding a filter by monkey-patching the warnings module
+# TODO: Remove when we depend on a newer version of scikit-learn (with
+#       https://github.com/scikit-learn/scikit-learn/pull/15080 merged)
+_filterwarnings = warnings.filterwarnings
+warnings.filterwarnings = lambda *args, **kwds: None
 from skopt.space import Real
 from skopt import Optimizer as skoptOptimizer
 from sklearn.base import RegressorMixin
+warnings.filterwarnings = _filterwarnings
+
 from nevergrad import instrumentation as inst
 from nevergrad.optimization import optimizerlib, registry
 
