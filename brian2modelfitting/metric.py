@@ -336,7 +336,7 @@ class MSEMetric(TraceMetric):
     """
 
     def get_features(self, model_traces, data_traces, dt):
-        return sum((model_traces - data_traces)**2, axis=2)
+        return ((model_traces - data_traces)**2).mean(axis=2)
 
     def get_errors(self, features):
         return features.mean(axis=1)
