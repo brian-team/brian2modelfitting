@@ -2,7 +2,10 @@ import warnings
 import abc
 from collections import defaultdict
 
-import efel
+try:
+    import efel
+except ImportError:
+    warnings.warn('eFEL package not found.')
 from itertools import repeat
 from brian2 import Hz, second, Quantity, ms, us
 from brian2.units.fundamentalunits import check_units, in_unit
@@ -334,9 +337,12 @@ class MSEMetric(TraceMetric):
     """
     Mean Square Error between goal and calculated output.
     """
+    def __init__(self, t_start=0*second, normalization=1.):
+        super(MSEMetric, self).__init__(t_start=t_start)
+        self.normalization_factor = 1./float(normalization) # A normalization factor for the traces
 
     def get_features(self, model_traces, data_traces, dt):
-        return ((model_traces - data_traces)**2).mean(axis=2)
+        return (((model_traces - data_traces)*self.normalization_factor)**2).mean(axis=2)
 
     def get_errors(self, features):
         return features.mean(axis=1)
