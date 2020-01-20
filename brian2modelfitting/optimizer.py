@@ -1,5 +1,5 @@
 import abc
-from numpy import array, all, ndarray, asarray
+import numpy as np
 import warnings
 
 # Prevent sklearn from adding a filter by monkey-patching the warnings module
@@ -12,7 +12,6 @@ from skopt import Optimizer as skoptOptimizer
 from sklearn.base import RegressorMixin
 warnings.filterwarnings = _filterwarnings
 
-import nevergrad as ng
 from nevergrad import instrumentation as inst
 from nevergrad.optimization import optimizerlib, registry
 
@@ -133,11 +132,14 @@ class NevergradOptimizer(Optimizer):
         if method not in list(registry.keys()):
             raise AssertionError("Unknown to Nevergrad optimization method:"
                                  + method)
-
+        self.tested_parameters = []
+        self.errors = []
         self.method = method
         self.kwds = kwds
 
     def initialize(self, parameter_names, popsize, **params):
+        self.tested_parameters = []
+        self.errors = []
         for param in params.keys():
             if param not in parameter_names:
                 raise ValueError("Parameter %s must be defined as a parameter "
@@ -169,12 +171,14 @@ class NevergradOptimizer(Optimizer):
         return parameters
 
     def tell(self, parameters, errors):
-        if not(all(parameters == [list(v.args) for v in self.candidates])):
+        if not(np.all(parameters == [list(v.args) for v in self.candidates])):
             raise AssertionError("Parameters and Candidates don't have "
                                  "identical values")
 
         for i, candidate in enumerate(self.candidates):
             self.optim.tell(candidate, errors[i])
+        self.tested_parameters.extend(parameters)
+        self.errors.extend(errors)
 
     def recommend(self):
         res = self.optim.provide_recommendation()
@@ -207,8 +211,12 @@ class SkoptOptimizer(Optimizer):
 
         self.method = method
         self.kwds = kwds
+        self.tested_parameters = []
+        self.errors = []
 
     def initialize(self, parameter_names, popsize, **params):
+        self.tested_parameters = []
+        self.errors = []
         for param in params.keys():
             if param not in parameter_names:
                 raise ValueError("Parameter %s must be defined as a parameter "
@@ -218,7 +226,7 @@ class SkoptOptimizer(Optimizer):
 
         instruments = []
         for i, name in enumerate(parameter_names):
-            vars()[name] = Real(*asarray(bounds[i]), transform='normalize')
+            vars()[name] = Real(*np.asarray(bounds[i]), transform='normalize')
             instruments.append(vars()[name])
 
         self.optim = skoptOptimizer(
@@ -230,12 +238,14 @@ class SkoptOptimizer(Optimizer):
         return self.optim.ask(n_points=n_samples)
 
     def tell(self, parameters, errors):
-        if type(errors) is ndarray:
+        if isinstance(errors, np.ndarray):
             errors = errors.tolist()
 
+        self.tested_parameters.extend(parameters)
+        self.errors.extend(errors)
         self.optim.tell(parameters, errors)
 
     def recommend(self):
         xi = self.optim.Xi
-        yii = array(self.optim.yi)
+        yii = np.array(self.optim.yi)
         return xi[yii.argmin()]

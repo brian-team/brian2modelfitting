@@ -142,7 +142,6 @@ class Fitter(metaclass=abc.ABCMeta):
         defaultclock.dt = dt
         self.dt = dt
 
-        self.results_, self.errors = [], []
         self.simulator = setup_fit()
 
         self.parameter_names = model.parameter_names
@@ -244,8 +243,6 @@ class Fitter(metaclass=abc.ABCMeta):
         errors = self.calc_errors(metric)
 
         optimizer.tell(parameters, errors)
-        self.results_.append(parameters)
-        self.errors.append(errors)
 
         results = optimizer.recommend()
 
@@ -301,7 +298,6 @@ class Fitter(metaclass=abc.ABCMeta):
                 raise Exception("You can not change the optimizer between fits")
 
         if self.optimizer is None or restart is True:
-            self.results_, self.errors = [], []
             optimizer.initialize(self.parameter_names, popsize=self.n_samples,
                                  **params)
 
@@ -318,7 +314,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
             # create output variables
             self.best_params = make_dic(self.parameter_names, best_params)
-            error = nanmin(self.errors)
+            error = nanmin(self.optimizer.errors)
 
             if callback(parameters, errors, best_params, error, index) is True:
                 break
@@ -346,10 +342,10 @@ class Fitter(metaclass=abc.ABCMeta):
         names = list(self.parameter_names)
         names.append('errors')
 
-        params = array(self.results_)
+        params = array(self.optimizer.tested_parameters)
         params = params.reshape(-1, params.shape[-1])
 
-        errors = array([array(self.errors).flatten()])
+        errors = array([array(self.optimizer.errors).flatten()])
         data = concatenate((params, errors.transpose()), axis=1)
         dim = self.model.dimensions
 
