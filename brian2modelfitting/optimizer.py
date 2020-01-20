@@ -12,6 +12,7 @@ from skopt import Optimizer as skoptOptimizer
 from sklearn.base import RegressorMixin
 warnings.filterwarnings = _filterwarnings
 
+import nevergrad as ng
 from nevergrad import instrumentation as inst
 from nevergrad.optimization import optimizerlib, registry
 
@@ -146,7 +147,9 @@ class NevergradOptimizer(Optimizer):
 
         instruments = []
         for i, name in enumerate(parameter_names):
-            vars()[name] = inst.var.Array(1).bounded(*bounds[i]).asscalar()
+            assert len(bounds[i]) == 2
+            vars()[name] = inst.var.Array(1).asscalar().bounded([bounds[i][0]],
+                                                                [bounds[i][1]])
             instruments.append(vars()[name])
 
         instrum = inst.Instrumentation(*instruments)
