@@ -120,13 +120,21 @@ class NevergradOptimizer(Optimizer):
     method: `str`, optional
         The optimization method. By default differential evolution, can be
         chosen from any method in Nevergrad registry
+    use_nevergrad_recommendation: bool, optional
+        Whether to use Nevergrad's recommendation as the "best result". This
+        recommendation takes several evaluations of the same parameters (for
+        stochastic simulations) into account. The alternative is to simply
+        return the parameters with the lowest error so far (the default). The
+        problem with Nevergrad's recommendation is that it can give wrong result
+        for errors that are very close in magnitude due (see github issue #16).
     budget: int or None
         number of allowed evaluations
     num_workers: int
         number of evaluations which will be run in parallel at once
     """
 
-    def __init__(self,  method='DE', **kwds):
+    def __init__(self,  method='DE', use_nevergrad_recommendation=False,
+                 **kwds):
         super(Optimizer, self).__init__()
 
         if method not in list(registry.keys()):
@@ -135,6 +143,7 @@ class NevergradOptimizer(Optimizer):
         self.tested_parameters = []
         self.errors = []
         self.method = method
+        self.use_nevergrad_recommendation = use_nevergrad_recommendation
         self.kwds = kwds
 
     def initialize(self, parameter_names, popsize, **params):
@@ -181,8 +190,12 @@ class NevergradOptimizer(Optimizer):
         self.errors.extend(errors)
 
     def recommend(self):
-        res = self.optim.provide_recommendation()
-        return res.args
+        if self.use_nevergrad_recommendation:
+            res = self.optim.provide_recommendation()
+            return res.args
+        else:
+            best = np.argmin(self.errors)
+            return self.tested_parameters[best]
 
 
 class SkoptOptimizer(Optimizer):
