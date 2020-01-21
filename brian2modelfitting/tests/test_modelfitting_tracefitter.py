@@ -109,7 +109,7 @@ def test_get_param_dic():
 
 def test_tracefitter_init(setup):
     dt, tf = setup
-    attr_fitter = ['dt', 'results_', 'simulator', 'parameter_names', 'n_traces',
+    attr_fitter = ['dt', 'simulator', 'parameter_names', 'n_traces',
                    'duration', 'n_neurons', 'n_samples', 'method', 'threshold',
                    'reset', 'refractory', 'input', 'output', 'output_var',
                    'best_params', 'input_traces', 'model', 'optimizer',
@@ -330,7 +330,7 @@ def test_fitter_results(setup):
 # OnlineTraceFitter
 def test_onlinetracefitter_init(setup_online):
     dt, otf = setup_online
-    attr_fitter = ['dt', 'results_', 'simulator', 'parameter_names', 'n_traces',
+    attr_fitter = ['dt', 'simulator', 'parameter_names', 'n_traces',
                    'duration', 'n_neurons', 'n_samples', 'method', 'threshold',
                    'reset', 'refractory', 'input', 'output', 'output_var',
                    'best_params', 'input_traces', 'model', 'optimizer',

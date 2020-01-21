@@ -1,5 +1,5 @@
 import abc
-from numpy import array, all, ndarray, asarray
+import numpy as np
 import warnings
 
 # Prevent sklearn from adding a filter by monkey-patching the warnings module
@@ -12,7 +12,6 @@ from skopt import Optimizer as skoptOptimizer
 from sklearn.base import RegressorMixin
 warnings.filterwarnings = _filterwarnings
 
-import nevergrad as ng
 from nevergrad import instrumentation as inst
 from nevergrad.optimization import optimizerlib, registry
 
@@ -121,23 +120,35 @@ class NevergradOptimizer(Optimizer):
     method: `str`, optional
         The optimization method. By default differential evolution, can be
         chosen from any method in Nevergrad registry
+    use_nevergrad_recommendation: bool, optional
+        Whether to use Nevergrad's recommendation as the "best result". This
+        recommendation takes several evaluations of the same parameters (for
+        stochastic simulations) into account. The alternative is to simply
+        return the parameters with the lowest error so far (the default). The
+        problem with Nevergrad's recommendation is that it can give wrong result
+        for errors that are very close in magnitude due (see github issue #16).
     budget: int or None
         number of allowed evaluations
     num_workers: int
         number of evaluations which will be run in parallel at once
     """
 
-    def __init__(self,  method='DE', **kwds):
+    def __init__(self,  method='DE', use_nevergrad_recommendation=False,
+                 **kwds):
         super(Optimizer, self).__init__()
 
         if method not in list(registry.keys()):
             raise AssertionError("Unknown to Nevergrad optimization method:"
                                  + method)
-
+        self.tested_parameters = []
+        self.errors = []
         self.method = method
+        self.use_nevergrad_recommendation = use_nevergrad_recommendation
         self.kwds = kwds
 
     def initialize(self, parameter_names, popsize, **params):
+        self.tested_parameters = []
+        self.errors = []
         for param in params.keys():
             if param not in parameter_names:
                 raise ValueError("Parameter %s must be defined as a parameter "
@@ -169,16 +180,22 @@ class NevergradOptimizer(Optimizer):
         return parameters
 
     def tell(self, parameters, errors):
-        if not(all(parameters == [list(v.args) for v in self.candidates])):
+        if not(np.all(parameters == [list(v.args) for v in self.candidates])):
             raise AssertionError("Parameters and Candidates don't have "
                                  "identical values")
 
         for i, candidate in enumerate(self.candidates):
             self.optim.tell(candidate, errors[i])
+        self.tested_parameters.extend(parameters)
+        self.errors.extend(errors)
 
     def recommend(self):
-        res = self.optim.provide_recommendation()
-        return res.args
+        if self.use_nevergrad_recommendation:
+            res = self.optim.provide_recommendation()
+            return res.args
+        else:
+            best = np.argmin(self.errors)
+            return self.tested_parameters[best]
 
 
 class SkoptOptimizer(Optimizer):
@@ -207,8 +224,12 @@ class SkoptOptimizer(Optimizer):
 
         self.method = method
         self.kwds = kwds
+        self.tested_parameters = []
+        self.errors = []
 
     def initialize(self, parameter_names, popsize, **params):
+        self.tested_parameters = []
+        self.errors = []
         for param in params.keys():
             if param not in parameter_names:
                 raise ValueError("Parameter %s must be defined as a parameter "
@@ -218,7 +239,7 @@ class SkoptOptimizer(Optimizer):
 
         instruments = []
         for i, name in enumerate(parameter_names):
-            vars()[name] = Real(*asarray(bounds[i]), transform='normalize')
+            vars()[name] = Real(*np.asarray(bounds[i]), transform='normalize')
             instruments.append(vars()[name])
 
         self.optim = skoptOptimizer(
@@ -230,12 +251,14 @@ class SkoptOptimizer(Optimizer):
         return self.optim.ask(n_points=n_samples)
 
     def tell(self, parameters, errors):
-        if type(errors) is ndarray:
+        if isinstance(errors, np.ndarray):
             errors = errors.tolist()
 
+        self.tested_parameters.extend(parameters)
+        self.errors.extend(errors)
         self.optim.tell(parameters, errors)
 
     def recommend(self):
         xi = self.optim.Xi
-        yii = array(self.optim.yi)
+        yii = np.array(self.optim.yi)
         return xi[yii.argmin()]

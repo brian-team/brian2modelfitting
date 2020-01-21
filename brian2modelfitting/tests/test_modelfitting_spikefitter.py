@@ -81,7 +81,7 @@ def test_get_spikes(setup_spikes):
 
 def test_spikefitter_init(setup):
     dt, sf = setup
-    attr_fitter = ['dt', 'results_', 'simulator', 'parameter_names', 'n_traces',
+    attr_fitter = ['dt', 'simulator', 'parameter_names', 'n_traces',
                    'duration', 'n_neurons', 'n_samples', 'method', 'threshold',
                    'reset', 'refractory', 'input', 'output', 'output_var',
                    'best_params', 'input_traces', 'model', 'optimizer',
