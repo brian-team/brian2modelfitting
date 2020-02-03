@@ -451,6 +451,9 @@ class TraceFitter(Fitter):
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method,
                          param_init)
+        # We store the bounds set in TraceFitter.fit, so that Tracefitter.refine
+        # can
+        self.bounds = None
 
         if output_var not in self.model.names:
             raise NameError("%s is not a model variable" % output_var)
@@ -491,6 +494,7 @@ class TraceFitter(Fitter):
         if not isinstance(metric, TraceMetric):
             raise TypeError("You can only use TraceMetric child metric with "
                             "TraceFitter")
+        self.bounds = dict(params)
         self.best_params, error = super().fit(optimizer, metric, n_rounds,
                                               callback, restart, **params)
         return self.best_params, error
@@ -513,9 +517,10 @@ class TraceFitter(Fitter):
         parameters = lmfit.Parameters()
         for param_name in self.parameter_names:
             if param_name not in kwds:
-                raise KeyError(f'Missing bounds for parameter {param_name}')
-            min_bound, max_bound = kwds.pop(param_name)
-            parameters.add(param_name, value=params[param_name],
+                min_bound, max_bound = self.bounds[param_name]
+            else:
+                min_bound, max_bound = kwds.pop(param_name)
+            parameters.add(param_name, value=array(params[param_name]),
                            min=array(min_bound), max=array(max_bound))
         namespace = get_full_namespace({'input_var': self.input_traces,
                                         'n_traces': self.n_traces,
