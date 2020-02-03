@@ -501,6 +501,49 @@ class TraceFitter(Fitter):
                              param_init=param_init, level=level+1)
         return fits
 
+    def refine(self, params=None, level=0, **kwds):
+        try:
+            import lmfit
+        except ImportError:
+            raise ImportError('Refinement needs the "lmfit" package.')
+        if params is None:
+            params = self.best_params
+
+        # Set up Parameter objects
+        parameters = lmfit.Parameters()
+        for param_name in self.parameter_names:
+            if param_name not in kwds:
+                raise KeyError(f'Missing bounds for parameter {param_name}')
+            min_bound, max_bound = kwds.pop(param_name)
+            parameters.add(param_name, value=params[param_name],
+                           min=array(min_bound), max=array(max_bound))
+        namespace = get_full_namespace({'input_var': self.input_traces,
+                                        'n_traces': self.n_traces,
+                                        'output_var': self.output_var},
+                                       level=level+1)
+        neurons = self.setup_neuron_group(self.n_traces, namespace,
+                                          name='neurons')
+
+        if self.output_var == 'spikes':
+            monitor = SpikeMonitor(neurons, record=True, name='monitor')
+        else:
+            monitor = StateMonitor(neurons, self.output_var, record=True,
+                                   name='monitor')
+        network = Network(neurons, monitor)
+
+        self.simulator.initialize(network, self.param_init, name='refine')
+
+        def _calc_error(params):
+            self.simulator.run(self.duration, {p: array(val)
+                                               for p, val in params.items()},
+                               self.parameter_names, name='refine')
+            trace = getattr(self.simulator.networks['refine']['monitor'],
+                            self.output_var+'_')
+            return (trace - self.output).flatten()
+
+        result = lmfit.minimize(_calc_error, parameters, **kwds)
+        return {p: array(val) for p, val in result.params.items()}, result
+
 
 class SpikeFitter(Fitter):
     def __init__(self, model, input, output, dt, reset, threshold,
