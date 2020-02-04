@@ -506,6 +506,44 @@ class TraceFitter(Fitter):
         return fits
 
     def refine(self, params=None, level=0, **kwds):
+        """
+        Refine the fitting results with a sequentially operating minimization
+        algorithm. Uses the `lmfit <https://lmfit.github.io/lmfit-py/>`_
+        package which itself makes use of
+        `scipy.optimize <https://docs.scipy.org/doc/scipy/reference/optimize.html>`_.
+        Has to be called after `~.TraceFitter.fit`, but a call with
+        ``n_rounds=0`` is enough.
+
+        Parameters
+        ----------
+        params : dict, optional
+            A dictionary with the parameters to use as a starting point for the
+            refinement. If not given, the best parameters found so far by
+            `~.TraceFitter.fit` will be used.
+        level : int, optional
+            How much farther to go down in the stack to find the namespace.
+        kwds
+            Additional arguments can overwrite the bounds for individual
+            parameters (if not given, the bounds previously specified in the
+            call to `~.TraceFitter.fit` will be used). All other arguments will
+            be passed on to `.lmfit.minimize` and can be used to e.g. change the
+            method, or to specify method-specific arguments.
+
+        Returns
+        -------
+        parameters : dict
+            The parameters at the end of the optimization process as a
+            dictionary.
+        result : `.lmfit.MinimizerResult`
+            The result of the optimization process.
+
+        Notes
+        -----
+        The default method used by `lmfit` is least-squares minimization using
+        a Levenberg-Marquardt method. Note that there is no support for
+        specifying a `Metric`, the given output trace(s) will be subtracted
+        from the simulated trace(s) and passed on to the minimization algorithm.
+        """
         try:
             import lmfit
         except ImportError:
