@@ -196,7 +196,7 @@ def test_fitter_fit_errors(setup):
                g=[1*nS, 30*nS])
 
 
-@pytest.mark.skipif(reason="needs lmfit package")
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine(setup):
     dt, tf = setup
     results, errors = tf.fit(n_rounds=2,
