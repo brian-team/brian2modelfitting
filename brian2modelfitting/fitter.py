@@ -549,12 +549,18 @@ class TraceFitter(Fitter):
         except ImportError:
             raise ImportError('Refinement needs the "lmfit" package.')
         if params is None:
+            if self.best_params is None:
+                raise TypeError('You need to either specify parameters or run '
+                                'the fit function first.')
             params = self.best_params
 
         # Set up Parameter objects
         parameters = lmfit.Parameters()
         for param_name in self.parameter_names:
             if param_name not in kwds:
+                if self.bounds is None:
+                    raise TypeError('You need to either specify bounds for all '
+                                    'parameters or run the fit function first.')
                 min_bound, max_bound = self.bounds[param_name]
             else:
                 min_bound, max_bound = kwds.pop(param_name)
@@ -566,12 +572,8 @@ class TraceFitter(Fitter):
                                        level=level+1)
         neurons = self.setup_neuron_group(self.n_traces, namespace,
                                           name='neurons')
-
-        if self.output_var == 'spikes':
-            monitor = SpikeMonitor(neurons, record=True, name='monitor')
-        else:
-            monitor = StateMonitor(neurons, self.output_var, record=True,
-                                   name='monitor')
+        monitor = StateMonitor(neurons, self.output_var, record=True,
+                               name='monitor')
         network = Network(neurons, monitor)
 
         self.simulator.initialize(network, self.param_init, name='refine')

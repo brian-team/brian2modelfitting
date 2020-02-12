@@ -4,6 +4,10 @@ Test the modelfitting module
 import pytest
 import numpy as np
 import pandas as pd
+try:
+    import lmfit
+except ImportError:
+    lmfit = None
 from numpy.testing.utils import assert_equal
 from brian2 import (zeros, Equations, NeuronGroup, StateMonitor, TimedArray,
                     nS, mV, volt, ms, Quantity, set_device, get_device, Network)
@@ -159,7 +163,8 @@ def test_fitter_fit(setup):
     results, errors = tf.fit(n_rounds=2,
                              optimizer=n_opt,
                              metric=metric,
-                             g=[1*nS, 30*nS])
+                             g=[1*nS, 30*nS],
+                             callback=None)
 
     attr_fit = ['optimizer', 'metric', 'best_params']
     for attr in attr_fit:
@@ -189,6 +194,47 @@ def test_fitter_fit_errors(setup):
                optimizer=n_opt,
                metric=1,
                g=[1*nS, 30*nS])
+
+
+pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine(setup):
+    dt, tf = setup
+    results, errors = tf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             g=[1*nS, 30*nS],
+                             callback=None)
+    # Run refine after running fit
+    params, result = tf.refine()
+    assert result.method == 'leastsq'
+    assert isinstance(params, dict)
+    assert isinstance(result, lmfit.minimizer.MinimizerResult)
+
+    # Pass options to lmfit.minimize
+    params, result = tf.refine(method='least_squares')
+    assert result.method == 'least_squares'
+
+
+pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_direct(setup):
+    dt, tf = setup
+    # Run refine without running fit before
+    params, result = tf.refine({'g': 5*nS}, g=[1*nS, 30*nS])
+    assert isinstance(params, dict)
+    assert isinstance(result, lmfit.minimizer.MinimizerResult)
+
+
+pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_errors(setup):
+    dt, tf = setup
+    with pytest.raises(TypeError):
+        # Missing start parameter
+        tf.refine(g=[1*nS, 30*nS])
+
+    with pytest.raises(TypeError):
+        # Missing bounds
+        tf.refine({'g': 5*nS})
+
 
 
 def test_fit_restart(setup):
