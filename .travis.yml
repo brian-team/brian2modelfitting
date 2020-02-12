@@ -2,12 +2,11 @@ dist: xenial
 language: python
 python:
   - "3.6"
-  - "3.7"
+  - "3.8"
 
 # command to install dependencies
 install:
-  - pip install pytest-coverage
-  - pip install coveralls
+  - pip install pytest-coverage coveralls lmfit
   - pip install -r requirements.txt
   - pip install .
 
