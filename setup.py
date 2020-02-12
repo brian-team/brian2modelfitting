@@ -28,7 +28,7 @@ setup(name='brian2modelfitting',
       install_requires=['numpy',
                         'brian2>=2.2',
                         'setuptools',
-                        'nevergrad',
+                        'nevergrad>=0.2,<=0.3',
                         'scikit-optimize',
                         'efel',
                         'tqdm'
