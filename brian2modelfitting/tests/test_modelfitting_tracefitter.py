@@ -196,7 +196,7 @@ def test_fitter_fit_errors(setup):
                g=[1*nS, 30*nS])
 
 
-pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+@pytest.mark.skipif(reason="needs lmfit package")
 def test_fitter_refine(setup):
     dt, tf = setup
     results, errors = tf.fit(n_rounds=2,
@@ -215,7 +215,7 @@ def test_fitter_refine(setup):
     assert result.method == 'least_squares'
 
 
-pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine_direct(setup):
     dt, tf = setup
     # Run refine without running fit before
@@ -224,7 +224,7 @@ def test_fitter_refine_direct(setup):
     assert isinstance(result, lmfit.minimizer.MinimizerResult)
 
 
-pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine_errors(setup):
     dt, tf = setup
     with pytest.raises(TypeError):
