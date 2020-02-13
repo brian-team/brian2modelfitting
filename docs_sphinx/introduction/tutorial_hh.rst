@@ -14,17 +14,29 @@ We start by importing ``brian2`` and ``brian2modelfitting``:
 
 Problem description
 -------------------
-We have 2 step input currents of different amplitude and two "data samples"
+We have five step input currents of different amplitude and five "data samples"
 recorded from the model with goal parameters. The goal of this exercise is to
 optimize the conductances of the model ``gl``, ``g_na``, ``g_kd``, for which we
 know the expected ranges.
-
 
 Visualization of input currents and corresponding output traces which we will
 try to fit:
 
 .. image:: ../_static/hh_tutorial_input.png
 
+We can load these currents and "recorded" membrane potentials with the pandas library
+
+.. code:: python
+
+    import pandas as pd
+    inp_trace = pd.read_csv('input_traces_hh.csv', index_col=0).to_numpy()
+    out_trace = pd.read_csv('output_traces_hh.csv', index_col=0).to_numpy()
+
+.. note::
+
+    You can download the CSV files used above here:
+    :download:`input_traces_hh.csv <../../examples/input_traces_hh.csv>`,
+    :download:`output_traces_hh.csv <../../examples/output_traces_hh.csv>`
 
 Procedure
 ---------
@@ -36,6 +48,7 @@ We have to specify all of the constants for the model
 
 .. code:: python
 
+  area = 20000*umetre**2
   Cm=1*ufarad*cm**-2 * area
   El=-65*mV
   EK=-90*mV
@@ -98,7 +111,7 @@ time step ``dt``, number of samples we want to draw in each optimization round.
                        input=inp_trace * amp,
                        output=out_trace*mV,
                        dt=0.01*ms,
-                       n_samples=10,
+                       n_samples=100,
                        method='exponential_euler',
                        param_init={'v': -65*mV})
 
@@ -118,7 +131,7 @@ We are now ready to perform the optimization, by calling the
 
 .. code:: python
 
-  res, error = fitter.fit(n_rounds=2,
+  res, error = fitter.fit(n_rounds=10,
                           optimizer=opt,
                           metric=metric,
                           gl=[2*psiemens, 200*nsiemens],
@@ -134,10 +147,19 @@ Output:
 The default output during the optimization run will tell us the best parameters
 in each round of optimization and the corresponding error:
 
-.. code:: python
+.. code:: pycon
 
-  Round 0: fit (4.222867177282197e-05, 7.504100120635022e-08, 4.772988880219001e-05) with error: 0.5165218259614359
-  Round 1: fit (2.676589777337801e-05, 1.482336088690629e-07, 0.0001772869243329754) with error: 0.1665320942433037
+    Round 0: fit [9.850944960633812e-05, 5.136956717618642e-05, 1.132001753695881e-07] with error: 0.00023112503428419085
+    Round 1: fit [2.5885625978001192e-05, 5.994175009416155e-05, 1.132001753695881e-07] with error: 0.0001351283127819249
+    Round 2: fit [2.358033085911261e-05, 5.2863196016834924e-05, 7.255743458079185e-08] with error: 8.600916130059129e-05
+    Round 3: fit [2.013515980650059e-05, 4.5888592959196316e-05, 7.3254174819061e-08] with error: 5.704891495098806e-05
+    Round 4: fit [9.666300621928093e-06, 3.471303670631636e-05, 2.6927249265934296e-08] with error: 3.237910401003197e-05
+    Round 5: fit [8.037164838105382e-06, 2.155149445338687e-05, 1.9305129338706338e-08] with error: 1.080794896277778e-05
+    Round 6: fit [7.161113899555702e-06, 2.2680883630214104e-05, 2.369859751788268e-08] with error: 4.527456021770018e-06
+    Round 7: fit [7.471475084450997e-06, 2.3920164839406964e-05, 1.7956856689140395e-08] with error: 4.4765688852930405e-06
+    Round 8: fit [6.511156620775884e-06, 2.209792671051356e-05, 1.368667359118384e-08] with error: 1.8105782339584402e-06
+    Round 9: fit [6.511156620775884e-06, 2.209792671051356e-05, 1.368667359118384e-08] with error: 1.8105782339584402e-06
+
 
 Generating traces
 ~~~~~~~~~~~~~~~~~
@@ -153,3 +175,34 @@ method.
 The following plot shows the fit traces in comparison to our target data:
 
 .. image:: ../_static/hh_best_fit.png
+
+The fit looks good in general, but if we zoom in on the fourth column we see that the
+fit is still not perfect:
+
+.. image:: ../_static/hh_best_fit_zoom.png
+
+We can improve the fit by using a classic, sequential curve fitting algorithm.
+
+Refining fits
+~~~~~~~~~~~~~
+When using `~brian2modelfitting.fitter.TraceFitter`, you can further refine the fit by
+applying a standard least squares fitting algorithm (e.g. Levenberg–Marquardt), by calling
+`~brian2modelfitting.fitter.TraceFitter.refine`. By default, this will start from the
+previously found best parameters:
+
+.. code:: python
+
+    refined_params, result_info = fitter.refine()
+
+We can now generate traces with the refined parameters:
+
+.. code:: python
+
+    traces = fitter.generate_traces(params=refined_params)
+
+Plotting the results, we see that the fits have improved and now closely match the
+target data:
+
+.. image:: ../_static/hh_best_fit_refined.png
+
+.. image:: ../_static/hh_best_fit_refined_zoom.png

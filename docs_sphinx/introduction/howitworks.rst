@@ -93,12 +93,15 @@ Example of `~brian2modelfitting.fitter.TraceFitter` with all of the necessary ar
 
 Remarks
 -------
- - After performing first fitting, user can continue the optimization
-   with another `~brian2modelfitting.fitter.Fitter.fit()` run.
+- After performing first fitting, user can continue the optimization
+  with another `~brian2modelfitting.fitter.Fitter.fit()` run.
 
- - Number of samples can not be changed between rounds or `~brian2modelfitting.fitter.Fitter.fit()`
-   calls, due to parallelization of the simulations.
+- Number of samples can not be changed between rounds or `~brian2modelfitting.fitter.Fitter.fit()`
+  calls, due to parallelization of the simulations.
 
 .. warning::
   User is not allowed to change the optimizer or metric between `~brian2modelfitting.fitter.Fitter.fit()`
   calls.
+
+- When using the `~brian2modelfitting.fitter.TraceFitter`, users can use a standard
+  curve fitting algorithm for refinement by calling `~brian2modelfitting.fitter.TraceFitter.refine`.
