@@ -543,6 +543,9 @@ class TraceFitter(Fitter):
         a Levenberg-Marquardt method. Note that there is no support for
         specifying a `Metric`, the given output trace(s) will be subtracted
         from the simulated trace(s) and passed on to the minimization algorithm.
+
+        This method always uses the runtime mode, independent of the selection
+        of the current device.
         """
         try:
             import lmfit
@@ -576,7 +579,15 @@ class TraceFitter(Fitter):
                                name='monitor')
         network = Network(neurons, monitor)
 
-        self.simulator.initialize(network, self.param_init, name='refine')
+        needs_device_reset = False
+        if isinstance(get_device(), CPPStandaloneDevice):
+            set_device('runtime')
+            simulator = RuntimeSimulator()
+            needs_device_reset = True
+        else:
+            simulator = self.simulator
+
+        simulator.initialize(network, self.param_init, name='refine')
 
         def _calc_error(params):
             self.simulator.run(self.duration, {p: array(val)
@@ -587,6 +598,10 @@ class TraceFitter(Fitter):
             return (trace - self.output).flatten()
 
         result = lmfit.minimize(_calc_error, parameters, **kwds)
+
+        if needs_device_reset:
+            reset_device()
+
         return {p: array(val) for p, val in result.params.items()}, result
 
 
