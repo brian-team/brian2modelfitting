@@ -216,6 +216,25 @@ def test_fitter_refine(setup):
 
 
 @pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_standalone(setup_standalone):
+    dt, tf = setup_standalone
+    results, errors = tf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             g=[1*nS, 30*nS],
+                             callback=None)
+    # Run refine after running fit
+    params, result = tf.refine()
+    assert result.method == 'leastsq'
+    assert isinstance(params, dict)
+    assert isinstance(result, lmfit.minimizer.MinimizerResult)
+
+    # Pass options to lmfit.minimize
+    params, result = tf.refine(method='least_squares')
+    assert result.method == 'least_squares'
+
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine_direct(setup):
     dt, tf = setup
     # Run refine without running fit before

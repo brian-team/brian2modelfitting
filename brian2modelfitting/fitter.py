@@ -569,6 +569,15 @@ class TraceFitter(Fitter):
                 min_bound, max_bound = kwds.pop(param_name)
             parameters.add(param_name, value=array(params[param_name]),
                            min=array(min_bound), max=array(max_bound))
+
+        needs_device_reset = False
+        if isinstance(get_device(), CPPStandaloneDevice):
+            set_device('runtime')
+            simulator = RuntimeSimulator()
+            needs_device_reset = True
+        else:
+            simulator = self.simulator
+
         namespace = get_full_namespace({'input_var': self.input_traces,
                                         'n_traces': self.n_traces,
                                         'output_var': self.output_var},
@@ -579,21 +588,13 @@ class TraceFitter(Fitter):
                                name='monitor')
         network = Network(neurons, monitor)
 
-        needs_device_reset = False
-        if isinstance(get_device(), CPPStandaloneDevice):
-            set_device('runtime')
-            simulator = RuntimeSimulator()
-            needs_device_reset = True
-        else:
-            simulator = self.simulator
-
         simulator.initialize(network, self.param_init, name='refine')
 
         def _calc_error(params):
-            self.simulator.run(self.duration, {p: array(val)
-                                               for p, val in params.items()},
-                               self.parameter_names, name='refine')
-            trace = getattr(self.simulator.networks['refine']['monitor'],
+            simulator.run(self.duration, {p: array(val)
+                                          for p, val in params.items()},
+                          self.parameter_names, name='refine')
+            trace = getattr(simulator.networks['refine']['monitor'],
                             self.output_var+'_')
             return (trace - self.output).flatten()
 
