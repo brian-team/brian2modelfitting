@@ -36,11 +36,15 @@ strmodel = '''
     g : siemens (constant)
     '''
 
+constant_model = Equations('''
+    v = c + x: volt
+    c : volt (constant)''')
+
 n_opt = NevergradOptimizer()
 metric = MSEMetric()
 
 
-@pytest.fixture()
+@pytest.fixture
 def setup(request):
     dt = 0.01 * ms
     tf = TraceFitter(dt=dt,
@@ -58,7 +62,27 @@ def setup(request):
     return dt, tf
 
 
-@pytest.fixture()
+@pytest.fixture
+def setup_constant(request):
+    dt = 0.1 * ms
+    # Membrane potential is constant at 10mV for first 50 steps, then at 20mV
+    out_trace = np.hstack([np.ones(50) * 10 * mV, np.ones(50) * 20 * mV])
+    tf = TraceFitter(dt=dt,
+                     model=constant_model,
+                     input_var='x',
+                     output_var='v',
+                     input=(np.zeros(100)*mV)[None, :],
+                     output=out_trace[None, :],
+                     n_samples=100,)
+
+    def fin():
+        reinit_devices()
+    request.addfinalizer(fin)
+
+    return dt, tf
+
+
+@pytest.fixture
 def setup_online(request):
     dt = 0.01 * ms
 
@@ -77,7 +101,7 @@ def setup_online(request):
     return dt, otf
 
 
-@pytest.fixture()
+@pytest.fixture
 def setup_standalone(request):
     set_device('cpp_standalone', directory=None)
     dt = 0.01 * ms
@@ -196,6 +220,16 @@ def test_fitter_fit_errors(setup):
                g=[1*nS, 30*nS])
 
 
+def test_fitter_fit_tstart(setup_constant):
+    dt, tf = setup_constant
+
+    # Ignore the first 50 steps at 10mV
+    params, result = tf.fit(n_rounds=10, optimizer=n_opt,
+                            metric=MSEMetric(t_start=50*dt),
+                            c=[0 * mV, 30 * mV])
+    # Fit should be close to 20mV
+    assert np.abs(params['c']*volt - 20*mV) < 1*mV
+
 @pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine(setup):
     dt, tf = setup
@@ -244,6 +278,34 @@ def test_fitter_refine_direct(setup):
 
 
 @pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_tstart(setup_constant):
+    dt, tf = setup_constant
+
+    # Ignore the first 50 steps at 10mV
+    params, result = tf.refine({'c': 5*mV}, c=[0 * mV, 30 * mV],
+                               t_start=50*dt)
+
+    # Fit should be close to 20mV
+    print(params['c'])
+    assert np.abs(params['c']*volt - 20*mV) < 1*mV
+
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_reuse_tstart(setup_constant):
+    dt, tf = setup_constant
+
+    # Ignore the first 50 steps at 10mV but do not actually fit (0 rounds)
+    params, result = tf.fit(n_rounds=0, optimizer=n_opt,
+                            metric=MSEMetric(t_start=50*dt),
+                            c=[0 * mV, 30 * mV])
+    # t_start should be reused
+    params, result = tf.refine({'c': 5 * mV}, c=[0 * mV, 30 * mV])
+
+    # Fit should be close to 20mV
+    assert np.abs(params['c'] * volt - 20 * mV) < 1 * mV
+
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine_errors(setup):
     dt, tf = setup
     with pytest.raises(TypeError):
@@ -253,7 +315,6 @@ def test_fitter_refine_errors(setup):
     with pytest.raises(TypeError):
         # Missing bounds
         tf.refine({'g': 5*nS})
-
 
 
 def test_fit_restart(setup):
