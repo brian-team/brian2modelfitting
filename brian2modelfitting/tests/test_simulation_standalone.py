@@ -42,6 +42,8 @@ def setup(request):
 
 @pytest.fixture()
 def setup_standalone(request):
+    # Workaround to avoid issues with Network instances still around
+    Network.__instances__().clear()
     set_device('cpp_standalone', directory=None)
     dt = 0.1 * ms
     duration = 10 * ms
