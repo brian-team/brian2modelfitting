@@ -603,7 +603,7 @@ class TraceFitter(Fitter):
         if needs_device_reset:
             reset_device()
 
-        return {p: array(val) for p, val in result.params.items()}, result
+        return {p: float(val) for p, val in result.params.items()}, result
 
 
 class SpikeFitter(Fitter):
