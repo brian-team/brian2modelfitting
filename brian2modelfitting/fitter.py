@@ -267,8 +267,9 @@ class Fitter(metaclass=abc.ABCMeta):
         callback: `str` or `~typing.Callable`
             Either the name of a provided callback function (``text`` or
             ``progressbar``), or a custom feedback function
-            ``func(results, errors, parameters, index)``. If this function
-            returns ``True`` the fitting execution is interrupted.
+            ``func(parameters, errors, best_parameters, best_error, index)``.
+            If this function returns ``True`` the fitting execution is
+            interrupted.
         restart: bool
             Flag that reinitializes the Fitter to reset the optimization.
             With restart True user is allowed to change optimizer/metric.
@@ -315,8 +316,11 @@ class Fitter(metaclass=abc.ABCMeta):
             # create output variables
             self.best_params = make_dic(self.parameter_names, best_params)
             error = nanmin(self.optimizer.errors)
+            param_dicts = [{p: v for p, v in zip(self.parameter_names,
+                                                one_param_set)}
+                          for one_param_set in parameters]
 
-            if callback(parameters, errors, best_params, error, index) is True:
+            if callback(param_dicts, errors, self.best_params, error, index) is True:
                 break
 
         return self.best_params, error
