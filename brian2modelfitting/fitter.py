@@ -505,7 +505,7 @@ class TraceFitter(Fitter):
                              param_init=param_init, level=level+1)
         return fits
 
-    def refine(self, params=None, t_start=None, level=0, **kwds):
+    def refine(self, params=None, t_start=None, normalization=None, level=0, **kwds):
         """
         Refine the fitting results with a sequentially operating minimization
         algorithm. Uses the `lmfit <https://lmfit.github.io/lmfit-py/>`_
@@ -522,10 +522,15 @@ class TraceFitter(Fitter):
             `~.TraceFitter.fit` will be used.
         t_start : `~brian2.units.fundamentalunits.Quantity`, optional
             Initial simulation/model time that should be ignored for the error
-            calculation. If the metric used in previous fits has a `t_start`
-            option (this is the case for `MSEMetric`), this will be reused if
-            not otherwise set. If no such metric has been used previously,
-            the default is 0s.
+            calculation. If not set, will reuse the `t_start` value from the
+            previously used metric.
+        normalization : float, optional
+            A normalization factor that will be multiplied with the total error
+            before handing it to the optimization algorithm. Can be useful if
+            the algorithm makes assumptions about the scale of errors, e.g. if
+            the size of steps in the parameter space depends on the absolute
+            value of the error. If not set, will reuse the `normalization` value
+            from the previously used metric.
         level : int, optional
             How much farther to go down in the stack to find the namespace.
         kwds
@@ -565,6 +570,8 @@ class TraceFitter(Fitter):
 
         if t_start is None:
             t_start = getattr(self.metric, 't_start', 0*second)
+        if normalization is None:
+            normalization = getattr(self.metric, 'normalization', 1.)
 
         # Set up Parameter objects
         parameters = lmfit.Parameters()
@@ -607,7 +614,8 @@ class TraceFitter(Fitter):
                           self.parameter_names, name='refine')
             trace = getattr(simulator.networks['refine']['monitor'],
                             self.output_var+'_')
-            return (trace[:, t_start_steps:] - self.output[:, t_start_steps:]).flatten()
+            residual = trace[:, t_start_steps:] - self.output[:, t_start_steps:]
+            return residual.flatten() * normalization
 
         result = lmfit.minimize(_calc_error, parameters, **kwds)
 

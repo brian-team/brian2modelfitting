@@ -275,8 +275,14 @@ def test_fitter_refine_direct(setup):
     dt, tf = setup
     # Run refine without running fit before
     params, result = tf.refine({'g': 5*nS}, g=[1*nS, 30*nS])
+    error = result.chisqr
     assert isinstance(params, dict)
     assert isinstance(result, lmfit.minimizer.MinimizerResult)
+    # The algorithm is deterministic and should therefore give the same result
+    # for the second run
+    params, result = tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS],
+                               normalization=2)
+    assert result.chisqr == 4 * error
 
 
 @pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
