@@ -2,7 +2,7 @@ import abc
 import numbers
 
 from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions
-from numpy import ones, array, arange, concatenate, mean, nanmin, reshape
+from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape
 from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
                     StateMonitor, SpikeMonitor, second, get_local_namespace,
                     Quantity)
@@ -509,7 +509,8 @@ class TraceFitter(Fitter):
                              param_init=param_init, level=level+1)
         return fits
 
-    def refine(self, params=None, t_start=None, normalization=None, level=0, **kwds):
+    def refine(self, params=None, t_start=None, normalization=None,
+               callback='text', level=0, **kwds):
         """
         Refine the fitting results with a sequentially operating minimization
         algorithm. Uses the `lmfit <https://lmfit.github.io/lmfit-py/>`_
@@ -535,6 +536,12 @@ class TraceFitter(Fitter):
             the size of steps in the parameter space depends on the absolute
             value of the error. If not set, will reuse the `normalization` value
             from the previously used metric.
+        callback: `str` or `~typing.Callable`
+            Either the name of a provided callback function (``text`` or
+            ``progressbar``), or a custom feedback function
+            ``func(parameters, errors, best_parameters, best_error, index)``.
+            If this function returns ``True`` the fitting execution is
+            interrupted.
         level : int, optional
             How much farther to go down in the stack to find the namespace.
         kwds
@@ -576,6 +583,8 @@ class TraceFitter(Fitter):
             t_start = getattr(self.metric, 't_start', 0*second)
         if normalization is None:
             normalization = getattr(self.metric, 'normalization', 1.)
+
+        callback = callback_setup(callback, None)
 
         # Set up Parameter objects
         parameters = lmfit.Parameters()
@@ -621,7 +630,20 @@ class TraceFitter(Fitter):
             residual = trace[:, t_start_steps:] - self.output[:, t_start_steps:]
             return residual.flatten() * normalization
 
-        result = lmfit.minimize(_calc_error, parameters, **kwds)
+        tested_parameters = []
+        errors = []
+        def _callback_wrapper(params, iter, resid, *args, **kwds):
+            error = mean(resid**2)
+            params =  {p: float(val) for p, val in params.items()}
+            tested_parameters.append(params)
+            errors.append(error)
+            best_idx = argmin(errors)
+            best_error = errors[best_idx]
+            best_params = tested_parameters[best_idx]
+            return callback(params, errors, best_params, best_error, iter)
+
+        result = lmfit.minimize(_calc_error, parameters,
+                                iter_cb=_callback_wrapper, **kwds)
 
         if needs_device_reset:
             reset_device()
