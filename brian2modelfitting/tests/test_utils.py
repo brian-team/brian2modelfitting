@@ -10,8 +10,6 @@ from numpy.testing.utils import assert_equal
 
 def test_callback_text(capsys):
     callback_text([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2)
-    c, _ = capsys.readouterr()
-    assert_equal(c, "Round 2: fit {'a': 3} with error: 0.1\n")
 
 
 def test_callback_none():
@@ -20,8 +18,7 @@ def test_callback_none():
 
 
 def test_ProgressBar():
-    pb = ProgressBar(toolbar_width=10)
-    assert_equal(pb.toolbar_width, 10)
+    pb = ProgressBar(total=10)
     assert isinstance(pb.t, tqdm.tqdm)
     pb([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2)
 

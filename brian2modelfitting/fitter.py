@@ -2,7 +2,7 @@ import abc
 import numbers
 
 from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions
-from numpy import ones, array, arange, concatenate, mean, nanmin, reshape
+from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape
 from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
                     StateMonitor, SpikeMonitor, second, get_local_namespace,
                     Quantity)
@@ -267,8 +267,9 @@ class Fitter(metaclass=abc.ABCMeta):
         callback: `str` or `~typing.Callable`
             Either the name of a provided callback function (``text`` or
             ``progressbar``), or a custom feedback function
-            ``func(results, errors, parameters, index)``. If this function
-            returns ``True`` the fitting execution is interrupted.
+            ``func(parameters, errors, best_parameters, best_error, index)``.
+            If this function returns ``True`` the fitting execution is
+            interrupted.
         restart: bool
             Flag that reinitializes the Fitter to reset the optimization.
             With restart True user is allowed to change optimizer/metric.
@@ -315,8 +316,11 @@ class Fitter(metaclass=abc.ABCMeta):
             # create output variables
             self.best_params = make_dic(self.parameter_names, best_params)
             error = nanmin(self.optimizer.errors)
+            param_dicts = [{p: v for p, v in zip(self.parameter_names,
+                                                one_param_set)}
+                          for one_param_set in parameters]
 
-            if callback(parameters, errors, best_params, error, index) is True:
+            if callback(param_dicts, errors, self.best_params, error, index) is True:
                 break
 
         return self.best_params, error
@@ -451,6 +455,9 @@ class TraceFitter(Fitter):
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method,
                          param_init)
+        # We store the bounds set in TraceFitter.fit, so that Tracefitter.refine
+        # can
+        self.bounds = None
 
         if output_var not in self.model.names:
             raise NameError("%s is not a model variable" % output_var)
@@ -491,6 +498,7 @@ class TraceFitter(Fitter):
         if not isinstance(metric, TraceMetric):
             raise TypeError("You can only use TraceMetric child metric with "
                             "TraceFitter")
+        self.bounds = dict(params)
         self.best_params, error = super().fit(optimizer, metric, n_rounds,
                                               callback, restart, **params)
         return self.best_params, error
@@ -500,6 +508,147 @@ class TraceFitter(Fitter):
         fits = self.generate(params=params, output_var=self.output_var,
                              param_init=param_init, level=level+1)
         return fits
+
+    def refine(self, params=None, t_start=None, normalization=None,
+               callback='text', level=0, **kwds):
+        """
+        Refine the fitting results with a sequentially operating minimization
+        algorithm. Uses the `lmfit <https://lmfit.github.io/lmfit-py/>`_
+        package which itself makes use of
+        `scipy.optimize <https://docs.scipy.org/doc/scipy/reference/optimize.html>`_.
+        Has to be called after `~.TraceFitter.fit`, but a call with
+        ``n_rounds=0`` is enough.
+
+        Parameters
+        ----------
+        params : dict, optional
+            A dictionary with the parameters to use as a starting point for the
+            refinement. If not given, the best parameters found so far by
+            `~.TraceFitter.fit` will be used.
+        t_start : `~brian2.units.fundamentalunits.Quantity`, optional
+            Initial simulation/model time that should be ignored for the error
+            calculation. If not set, will reuse the `t_start` value from the
+            previously used metric.
+        normalization : float, optional
+            A normalization factor that will be multiplied with the total error
+            before handing it to the optimization algorithm. Can be useful if
+            the algorithm makes assumptions about the scale of errors, e.g. if
+            the size of steps in the parameter space depends on the absolute
+            value of the error. If not set, will reuse the `normalization` value
+            from the previously used metric.
+        callback: `str` or `~typing.Callable`
+            Either the name of a provided callback function (``text`` or
+            ``progressbar``), or a custom feedback function
+            ``func(parameters, errors, best_parameters, best_error, index)``.
+            If this function returns ``True`` the fitting execution is
+            interrupted.
+        level : int, optional
+            How much farther to go down in the stack to find the namespace.
+        kwds
+            Additional arguments can overwrite the bounds for individual
+            parameters (if not given, the bounds previously specified in the
+            call to `~.TraceFitter.fit` will be used). All other arguments will
+            be passed on to `.lmfit.minimize` and can be used to e.g. change the
+            method, or to specify method-specific arguments.
+
+        Returns
+        -------
+        parameters : dict
+            The parameters at the end of the optimization process as a
+            dictionary.
+        result : `.lmfit.MinimizerResult`
+            The result of the optimization process.
+
+        Notes
+        -----
+        The default method used by `lmfit` is least-squares minimization using
+        a Levenberg-Marquardt method. Note that there is no support for
+        specifying a `Metric`, the given output trace(s) will be subtracted
+        from the simulated trace(s) and passed on to the minimization algorithm.
+
+        This method always uses the runtime mode, independent of the selection
+        of the current device.
+        """
+        try:
+            import lmfit
+        except ImportError:
+            raise ImportError('Refinement needs the "lmfit" package.')
+        if params is None:
+            if self.best_params is None:
+                raise TypeError('You need to either specify parameters or run '
+                                'the fit function first.')
+            params = self.best_params
+
+        if t_start is None:
+            t_start = getattr(self.metric, 't_start', 0*second)
+        if normalization is None:
+            normalization = getattr(self.metric, 'normalization', 1.)
+
+        callback = callback_setup(callback, None)
+
+        # Set up Parameter objects
+        parameters = lmfit.Parameters()
+        for param_name in self.parameter_names:
+            if param_name not in kwds:
+                if self.bounds is None:
+                    raise TypeError('You need to either specify bounds for all '
+                                    'parameters or run the fit function first.')
+                min_bound, max_bound = self.bounds[param_name]
+            else:
+                min_bound, max_bound = kwds.pop(param_name)
+            parameters.add(param_name, value=array(params[param_name]),
+                           min=array(min_bound), max=array(max_bound))
+
+        needs_device_reset = False
+        if isinstance(get_device(), CPPStandaloneDevice):
+            set_device('runtime')
+            simulator = RuntimeSimulator()
+            needs_device_reset = True
+        else:
+            simulator = self.simulator
+
+        namespace = get_full_namespace({'input_var': self.input_traces,
+                                        'n_traces': self.n_traces,
+                                        'output_var': self.output_var},
+                                       level=level+1)
+        neurons = self.setup_neuron_group(self.n_traces, namespace,
+                                          name='neurons')
+        monitor = StateMonitor(neurons, self.output_var, record=True,
+                               name='monitor')
+        network = Network(neurons, monitor)
+
+        simulator.initialize(network, self.param_init, name='refine')
+
+        t_start_steps = int(round(t_start / self.dt))
+
+        def _calc_error(params):
+            simulator.run(self.duration, {p: float(val)
+                                          for p, val in params.items()},
+                          self.parameter_names, name='refine')
+            trace = getattr(simulator.networks['refine']['monitor'],
+                            self.output_var+'_')
+            residual = trace[:, t_start_steps:] - self.output[:, t_start_steps:]
+            return residual.flatten() * normalization
+
+        tested_parameters = []
+        errors = []
+        def _callback_wrapper(params, iter, resid, *args, **kwds):
+            error = mean(resid**2)
+            params =  {p: float(val) for p, val in params.items()}
+            tested_parameters.append(params)
+            errors.append(error)
+            best_idx = argmin(errors)
+            best_error = errors[best_idx]
+            best_params = tested_parameters[best_idx]
+            return callback(params, errors, best_params, best_error, iter)
+
+        result = lmfit.minimize(_calc_error, parameters,
+                                iter_cb=_callback_wrapper, **kwds)
+
+        if needs_device_reset:
+            reset_device()
+
+        return {p: float(val) for p, val in result.params.items()}, result
 
 
 class SpikeFitter(Fitter):

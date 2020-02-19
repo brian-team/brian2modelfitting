@@ -1,6 +1,8 @@
 '''
 Test the metric class
 '''
+import pytest
+
 import numpy as np
 from numpy.testing.utils import assert_equal, assert_raises, assert_almost_equal
 from brian2 import ms, mV
@@ -55,6 +57,16 @@ def test_calc_mse():
     assert_equal(mse.calc(np.tile(out, (5, 1, 1)), out, 0.1*ms),
                  np.zeros(5))
     assert(np.all(mse.calc(inp, out, 0.1*ms) > 0))
+
+    inp = np.vstack([np.ones((1, 3, 10)), np.zeros((1, 3, 10))])
+    out = np.ones((3, 10))
+    errors = mse.calc(inp, out, 0.01*ms)
+    assert_equal(errors, [0, 1])
+    mse = MSEMetric(normalization=2)
+    errors = mse.calc(inp, out, 0.01 * ms)
+    # The normalization factor scales the traces, so the squared error scales
+    # with the square of the normalization factor
+    assert_equal(errors, [0, 4])
 
 
 def test_calc_mse_t_start():
@@ -128,6 +140,10 @@ def test_get_features_gamma():
     features = gf.get_features(model_spikes, data_spikes, 0.1*ms)
     assert_equal(np.shape(features), (2, 2))
     assert(np.all(np.array(features) > -1))
+    normed_gf = GammaFactor(delta=0.5 * ms, time=10 * ms, normalization=2.)
+    normed_features = normed_gf.get_features(model_spikes, data_spikes,
+                                             0.1 * ms)
+    assert_equal(normed_features, 2*features)
 
     features = gf.get_features([data_spikes]*3, data_spikes, 0.1*ms)
     assert_equal(np.shape(features), (3, 2))
@@ -175,6 +191,10 @@ def test_get_features_feature_metric():
     inp_times = [[99 * ms, 150 * ms], [49 * ms, 150 * ms]]
 
     # Default comparison: absolute difference
+    # Check that FeatureMetric rejects the normalization argument
+    with pytest.raises(ValueError):
+        feature_metric = FeatureMetric(inp_times, ['voltage_base'],
+                                       normalization=2)
     feature_metric = FeatureMetric(inp_times, ['voltage_base'])
     results = feature_metric.get_features(voltage_model, voltage_target, dt=dt)
     assert len(results) == 3

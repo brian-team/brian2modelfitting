@@ -4,6 +4,10 @@ Test the modelfitting module
 import pytest
 import numpy as np
 import pandas as pd
+try:
+    import lmfit
+except ImportError:
+    lmfit = None
 from numpy.testing.utils import assert_equal
 from brian2 import (zeros, Equations, NeuronGroup, StateMonitor, TimedArray,
                     nS, mV, volt, ms, Quantity, set_device, get_device, Network)
@@ -32,11 +36,15 @@ strmodel = '''
     g : siemens (constant)
     '''
 
+constant_model = Equations('''
+    v = c + x: volt
+    c : volt (constant)''')
+
 n_opt = NevergradOptimizer()
 metric = MSEMetric()
 
 
-@pytest.fixture()
+@pytest.fixture
 def setup(request):
     dt = 0.01 * ms
     tf = TraceFitter(dt=dt,
@@ -54,7 +62,27 @@ def setup(request):
     return dt, tf
 
 
-@pytest.fixture()
+@pytest.fixture
+def setup_constant(request):
+    dt = 0.1 * ms
+    # Membrane potential is constant at 10mV for first 50 steps, then at 20mV
+    out_trace = np.hstack([np.ones(50) * 10 * mV, np.ones(50) * 20 * mV])
+    tf = TraceFitter(dt=dt,
+                     model=constant_model,
+                     input_var='x',
+                     output_var='v',
+                     input=(np.zeros(100)*mV)[None, :],
+                     output=out_trace[None, :],
+                     n_samples=100,)
+
+    def fin():
+        reinit_devices()
+    request.addfinalizer(fin)
+
+    return dt, tf
+
+
+@pytest.fixture
 def setup_online(request):
     dt = 0.01 * ms
 
@@ -73,8 +101,10 @@ def setup_online(request):
     return dt, otf
 
 
-@pytest.fixture()
+@pytest.fixture
 def setup_standalone(request):
+    # Workaround to avoid issues with Network instances still around
+    Network.__instances__().clear()
     set_device('cpp_standalone', directory=None)
     dt = 0.01 * ms
     tf = TraceFitter(dt=dt,
@@ -159,7 +189,8 @@ def test_fitter_fit(setup):
     results, errors = tf.fit(n_rounds=2,
                              optimizer=n_opt,
                              metric=metric,
-                             g=[1*nS, 30*nS])
+                             g=[1*nS, 30*nS],
+                             callback=None)
 
     attr_fit = ['optimizer', 'metric', 'best_params']
     for attr in attr_fit:
@@ -189,6 +220,109 @@ def test_fitter_fit_errors(setup):
                optimizer=n_opt,
                metric=1,
                g=[1*nS, 30*nS])
+
+
+def test_fitter_fit_tstart(setup_constant):
+    dt, tf = setup_constant
+
+    # Ignore the first 50 steps at 10mV
+    params, result = tf.fit(n_rounds=10, optimizer=n_opt,
+                            metric=MSEMetric(t_start=50*dt),
+                            c=[0 * mV, 30 * mV])
+    # Fit should be close to 20mV
+    assert np.abs(params['c']*volt - 20*mV) < 1*mV
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine(setup):
+    dt, tf = setup
+    results, errors = tf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             g=[1*nS, 30*nS],
+                             callback=None)
+    # Run refine after running fit
+    params, result = tf.refine()
+    assert result.method == 'leastsq'
+    assert isinstance(params, dict)
+    assert isinstance(result, lmfit.minimizer.MinimizerResult)
+
+    # Pass options to lmfit.minimize
+    params, result = tf.refine(method='least_squares')
+    assert result.method == 'least_squares'
+
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_standalone(setup_standalone):
+    dt, tf = setup_standalone
+    results, errors = tf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             g=[1*nS, 30*nS],
+                             callback=None)
+    # Run refine after running fit
+    params, result = tf.refine()
+    assert result.method == 'leastsq'
+    assert isinstance(params, dict)
+    assert isinstance(result, lmfit.minimizer.MinimizerResult)
+
+    # Pass options to lmfit.minimize
+    params, result = tf.refine(method='least_squares')
+    assert result.method == 'least_squares'
+
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_direct(setup):
+    dt, tf = setup
+    # Run refine without running fit before
+    params, result = tf.refine({'g': 5*nS}, g=[1*nS, 30*nS])
+    error = result.chisqr
+    assert isinstance(params, dict)
+    assert isinstance(result, lmfit.minimizer.MinimizerResult)
+    # The algorithm is deterministic and should therefore give the same result
+    # for the second run
+    params, result = tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS],
+                               normalization=2)
+    assert result.chisqr == 4 * error
+
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_tstart(setup_constant):
+    dt, tf = setup_constant
+
+    # Ignore the first 50 steps at 10mV
+    params, result = tf.refine({'c': 5*mV}, c=[0 * mV, 30 * mV],
+                               t_start=50*dt)
+
+    # Fit should be close to 20mV
+    print(params['c'])
+    assert np.abs(params['c']*volt - 20*mV) < 1*mV
+
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_reuse_tstart(setup_constant):
+    dt, tf = setup_constant
+
+    # Ignore the first 50 steps at 10mV but do not actually fit (0 rounds)
+    params, result = tf.fit(n_rounds=0, optimizer=n_opt,
+                            metric=MSEMetric(t_start=50*dt),
+                            c=[0 * mV, 30 * mV])
+    # t_start should be reused
+    params, result = tf.refine({'c': 5 * mV}, c=[0 * mV, 30 * mV])
+
+    # Fit should be close to 20mV
+    assert np.abs(params['c'] * volt - 20 * mV) < 1 * mV
+
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_errors(setup):
+    dt, tf = setup
+    with pytest.raises(TypeError):
+        # Missing start parameter
+        tf.refine(g=[1*nS, 30*nS])
+
+    with pytest.raises(TypeError):
+        # Missing bounds
+        tf.refine({'g': 5*nS})
 
 
 def test_fit_restart(setup):
