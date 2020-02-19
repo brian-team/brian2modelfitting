@@ -116,16 +116,25 @@ class Metric(metaclass=abc.ABCMeta):
     """
 
     @check_units(t_start=second)
-    def __init__(self, t_start=0*second, **kwds):
+    def __init__(self, t_start=0*second, normalization=1., **kwds):
         """
         Initialize the metric.
 
         Parameters
         ----------
-        t_start: `~brian2.units.fundamentalunits.Quantity`, optional
+        t_start : `~brian2.units.fundamentalunits.Quantity`, optional
             Start of time window considered for calculating the fit error.
+        normalization : float, optional
+            A normalization factor that will be used before handing results to
+            the optimization algorithm. Can be useful if the algorithm makes
+            assumptions about the scale of errors, e.g. if the size of steps in
+            the parameter space depends on the absolute value of the error.
+            Trace-based metrics multiply the factor with the traces itself,
+            other metrics use it to scale the total error. Not used by default,
+            i.e. defaults to 1.
         """
         self.t_start = t_start
+        self.normalization = normalization
 
     @abc.abstractmethod
     def get_features(self, model_results, target_results, dt):
@@ -217,8 +226,8 @@ class TraceMetric(Metric):
             ``(n_samples, )``.
         """
         start_steps = int(round(self.t_start/dt))
-        features = self.get_features(model_traces[:, :, start_steps:],
-                                     data_traces[:, start_steps:],
+        features = self.get_features(model_traces[:, :, start_steps:] * self.normalization,
+                                     data_traces[:, start_steps:] * self.normalization,
                                      dt)
         errors = self.get_errors(features)
 
@@ -300,7 +309,7 @@ class SpikeMetric(Metric):
             model_spikes = relevant_model_spikes
             data_spikes = relevant_data_spikes
         features = self.get_features(model_spikes, data_spikes, dt)
-        errors = self.get_errors(features)
+        errors = self.get_errors(features) * self.normalization
 
         return errors
 
@@ -337,12 +346,11 @@ class MSEMetric(TraceMetric):
     """
     Mean Square Error between goal and calculated output.
     """
-    def __init__(self, t_start=0*second, normalization=1.):
-        super(MSEMetric, self).__init__(t_start=t_start)
-        self.normalization_factor = 1./float(normalization) # A normalization factor for the traces
 
     def get_features(self, model_traces, data_traces, dt):
-        return (((model_traces - data_traces)*self.normalization_factor)**2).mean(axis=2)
+        # Note that the traces have already beeen normalized in
+        # TraceMetric.calc
+        return ((model_traces - data_traces)**2).mean(axis=2)
 
     def get_errors(self, features):
         return features.mean(axis=1)
@@ -350,8 +358,12 @@ class MSEMetric(TraceMetric):
 
 class FeatureMetric(TraceMetric):
     def __init__(self, stim_times, feat_list, weights=None, combine=None,
-                 t_start=0*second):
-        super(FeatureMetric, self).__init__(t_start=t_start)
+                 t_start=0*second, normalization=1.):
+        if normalization != 1:
+            raise ValueError('Do not set the normalization factor when using '
+                             'the FeatureMetric, use weights instead.')
+        super(FeatureMetric, self).__init__(t_start=t_start,
+                                            normalization=normalization)
         self.stim_times = stim_times
         if isinstance(self.stim_times[0][0], Quantity):
             for n, trace in enumerate(self.stim_times):
@@ -368,10 +380,8 @@ class FeatureMetric(TraceMetric):
         self.combine = combine
 
         if weights is None:
-            weights = {}
-            for key in feat_list:
-                weights[key] = 1
-        if type(weights) is not dict:
+            weights = {key: 1 for key in feat_list}
+        if not isinstance(weights, dict):
             raise TypeError("Weights has to be a dictionary!")
 
         self.weights = weights
@@ -447,7 +457,7 @@ class FeatureMetric(TraceMetric):
                 sample_error += total
             errors.append(sample_error)
 
-        return errors
+        return array(errors) * self.normalization
 
 
 class GammaFactor(SpikeMetric):
@@ -467,7 +477,8 @@ class GammaFactor(SpikeMetric):
     """
 
     @check_units(delta=second, time=second, t_start=0*second)
-    def __init__(self, delta, time, t_start=0*second, rate_correction=True):
+    def __init__(self, delta, time, t_start=0*second, normalization=1.,
+                 rate_correction=True):
         """
         Initialize the metric with time window delta and time step dt output
 
@@ -482,7 +493,8 @@ class GammaFactor(SpikeMetric):
             rate, following `Clopath et al., Neurocomputing (2007)
             <https://doi.org/10.1016/j.neucom.2006.10.047>`_.
         """
-        super(GammaFactor, self).__init__(t_start=t_start)
+        super(GammaFactor, self).__init__(t_start=t_start,
+                                          normalization=normalization)
         self.delta = delta
         self.time = time
         self.rate_correction = rate_correction
@@ -497,7 +509,7 @@ class GammaFactor(SpikeMetric):
                                       rate_correction=self.rate_correction)
                 gf_for_sample.append(gf)
             all_gf.append(gf_for_sample)
-        return array(all_gf)
+        return array(all_gf) * self.normalization
 
     def get_errors(self, features):
         errors = features.mean(axis=1)

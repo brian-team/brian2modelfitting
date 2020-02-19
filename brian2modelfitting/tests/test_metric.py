@@ -56,6 +56,16 @@ def test_calc_mse():
                  np.zeros(5))
     assert(np.all(mse.calc(inp, out, 0.1*ms) > 0))
 
+    inp = np.vstack([np.ones((1, 3, 10)), np.zeros((1, 3, 10))])
+    out = np.ones((3, 10))
+    errors = mse.calc(inp, out, 0.01*ms)
+    assert_equal(errors, [0, 1])
+    mse = MSEMetric(normalization=2)
+    errors = mse.calc(inp, out, 0.01 * ms)
+    # The normalization factor scales the traces, so the squared error scales
+    # with the square of the normalization factor
+    assert_equal(errors, [0, 4])
+
 
 def test_calc_mse_t_start():
     mse = MSEMetric(t_start=1*ms)
