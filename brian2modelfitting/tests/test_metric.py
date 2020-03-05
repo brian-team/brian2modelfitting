@@ -62,7 +62,7 @@ def test_calc_mse():
     out = np.ones((3, 10))
     errors = mse.calc(inp, out, 0.01*ms)
     assert_equal(errors, [0, 1])
-    mse = MSEMetric(normalization=2)
+    mse = MSEMetric(normalization=1/2)
     errors = mse.calc(inp, out, 0.01 * ms)
     # The normalization factor scales the traces, so the squared error scales
     # with the square of the normalization factor

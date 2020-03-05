@@ -125,16 +125,16 @@ class Metric(metaclass=abc.ABCMeta):
         t_start : `~brian2.units.fundamentalunits.Quantity`, optional
             Start of time window considered for calculating the fit error.
         normalization : float, optional
-            A normalization factor that will be used before handing results to
-            the optimization algorithm. Can be useful if the algorithm makes
-            assumptions about the scale of errors, e.g. if the size of steps in
-            the parameter space depends on the absolute value of the error.
-            Trace-based metrics multiply the factor with the traces itself,
-            other metrics use it to scale the total error. Not used by default,
-            i.e. defaults to 1.
+            A normalization term that will be used rescale results before
+            handing them to the optimization algorithm. Can be useful if the
+            algorithm makes assumptions about the scale of errors, e.g. if the
+            size of steps in the parameter space depends on the absolute value
+            of the error. Trace-based metrics divide the traces itself by the
+            value, other metrics use it to scale the total error. Not used by
+            default, i.e. defaults to 1.
         """
         self.t_start = t_start
-        self.normalization = normalization
+        self.normalization = 1/normalization
 
     @abc.abstractmethod
     def get_features(self, model_results, target_results, dt):

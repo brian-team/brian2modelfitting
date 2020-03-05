@@ -582,12 +582,13 @@ class TraceFitter(Fitter):
             calculation. If not set, will reuse the `t_start` value from the
             previously used metric.
         normalization : float, optional
-            A normalization factor that will be multiplied with the total error
-            before handing it to the optimization algorithm. Can be useful if
-            the algorithm makes assumptions about the scale of errors, e.g. if
-            the size of steps in the parameter space depends on the absolute
-            value of the error. If not set, will reuse the `normalization` value
-            from the previously used metric.
+            A normalization term that will be used rescale results before
+            handing them to the optimization algorithm. Can be useful if the
+            algorithm makes assumptions about the scale of errors, e.g. if the
+            size of steps in the parameter space depends on the absolute value
+            of the error. The difference between simulated and target traces
+            will be divided by this value. If not set, will reuse the
+            `normalization` value from the previously used metric.
         callback: `str` or `~typing.Callable`
             Either the name of a provided callback function (``text`` or
             ``progressbar``), or a custom feedback function
@@ -635,6 +636,8 @@ class TraceFitter(Fitter):
             t_start = getattr(self.metric, 't_start', 0*second)
         if normalization is None:
             normalization = getattr(self.metric, 'normalization', 1.)
+        else:
+            normalization = 1/normalization
 
         callback_func = callback_setup(callback, None)
 
