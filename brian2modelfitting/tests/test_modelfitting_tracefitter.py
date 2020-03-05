@@ -294,7 +294,6 @@ def test_fitter_refine_tstart(setup_constant):
                                t_start=50*dt)
 
     # Fit should be close to 20mV
-    print(params['c'])
     assert np.abs(params['c']*volt - 20*mV) < 1*mV
 
 
