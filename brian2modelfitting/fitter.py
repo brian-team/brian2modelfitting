@@ -1,7 +1,7 @@
 import abc
 import numbers
 
-from brian2.parsing.sympytools import sympy_to_str
+from brian2.parsing.sympytools import sympy_to_str, str_to_sympy
 from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions
 from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape, zeros
 from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
@@ -85,14 +85,15 @@ def get_sensitivity_equations(group, parameters, namespace=None, level=1):
     diff_eqs = eqs.get_substituted_expressions(group.variables)
     diff_eq_names = [name for name, _ in diff_eqs]
 
-    system = Matrix([diff_eq[1] for diff_eq in diff_eqs])
-    J = system.jacobian(diff_eq_names)
+    system = Matrix([str_to_sympy(diff_eq[1].code)
+                     for diff_eq in diff_eqs]).as_mutable()
+    J = system.jacobian([str_to_sympy(d) for d in diff_eq_names])
 
     sensitivity = []
     sensitivity_names = []
     for parameter in parameters:
         F = system.jacobian([parameter])
-        names = ['S_{}_{}'.format(diff_eq_name, parameter)
+        names = [str_to_sympy(f'S_{diff_eq_name}_{parameter}')
                  for diff_eq_name in diff_eq_names]
         sensitivity.append(J * Matrix(names) + F)
         sensitivity_names.append(names)
