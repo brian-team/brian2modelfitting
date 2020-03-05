@@ -281,7 +281,7 @@ def test_fitter_refine_direct(setup):
     # The algorithm is deterministic and should therefore give the same result
     # for the second run
     params, result = tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS],
-                               normalization=2)
+                               normalization=1/2)
     assert result.chisqr == 4 * error
 
 
