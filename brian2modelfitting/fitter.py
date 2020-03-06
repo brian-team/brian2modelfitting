@@ -94,7 +94,7 @@ def get_sensitivity_equations(group, parameters, namespace=None, level=1):
     sensitivity = []
     sensitivity_names = []
     for parameter in parameters:
-        F = system.jacobian([parameter])
+        F = system.jacobian([str_to_sympy(parameter)])
         names = [str_to_sympy(f'S_{diff_eq_name}_{parameter}')
                  for diff_eq_name in diff_eq_names]
         sensitivity.append(J * Matrix(names) + F)
