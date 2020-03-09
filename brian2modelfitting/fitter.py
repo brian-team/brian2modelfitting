@@ -143,7 +143,6 @@ def get_sensitivity_equations(group, parameters, namespace=None, level=1,
                 # Check if the equation stays at zero if initialized at zero
                 zeroed = eq.subs(name, sympy.S.Zero)
                 if zeroed == sympy.S.Zero:
-                    print(f'removing {sympy_to_str(name)} from equations')
                     # No need to include equation as differential equation
                     if unit == '1':
                         new_eqs.append(f'{sympy_to_str(name)} = 0 : {unit}')
