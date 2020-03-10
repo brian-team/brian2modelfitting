@@ -155,7 +155,6 @@ def test_tracefitter_init(setup):
     for attr in attr_tracefitter:
         assert hasattr(tf, attr)
 
-    assert isinstance(tf.simulator, Simulator)
     assert isinstance(tf.input_traces, TimedArray)
     assert isinstance(tf.model, Equations)
 
@@ -480,7 +479,6 @@ def test_onlinetracefitter_init(setup_online):
     for attr in attr_tracefitter:
         assert hasattr(otf, attr)
 
-    assert isinstance(otf.simulator, Simulator)
     assert isinstance(otf.input_traces, TimedArray)
     assert isinstance(otf.model, Equations)
 
@@ -522,7 +520,6 @@ def test_onlinetracefitter_fit(setup_online):
 
     assert otf.metric is None
     assert isinstance(otf.optimizer, Optimizer)
-    assert isinstance(otf.simulator, Simulator)
 
     assert isinstance(results, dict)
     assert isinstance(errors, float)

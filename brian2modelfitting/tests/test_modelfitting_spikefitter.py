@@ -97,7 +97,6 @@ def test_spikefitter_init(setup):
     for attr in attr_spikefitter:
         assert hasattr(sf, attr)
 
-    assert isinstance(sf.simulator, Simulator)
     assert isinstance(sf.input_traces, TimedArray)
     assert isinstance(sf.model, Equations)
 
@@ -126,7 +125,6 @@ def test_spikefitter_fit(setup):
 
     assert isinstance(sf.metric, Metric)
     assert isinstance(sf.optimizer, Optimizer)
-    assert isinstance(sf.simulator, Simulator)
 
     assert isinstance(results, dict)
     assert isinstance(errors, float)
