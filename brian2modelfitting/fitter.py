@@ -153,8 +153,11 @@ def get_sensitivity_equations(group, parameters, namespace=None, level=1,
                     else:
                         new_eqs.append(f'{sympy_to_str(name)} = 0*{unit} : {unit}')
                     continue
+            rhs = sympy_to_str(eq)
+            if rhs == '0':  # avoid unit mismatch
+                rhs = f'0*{unit}/second'
             new_eqs.append('d{lhs}/dt = {rhs} : {unit}'.format(lhs=sympy_to_str(name),
-                                                               rhs=sympy_to_str(eq),
+                                                               rhs=rhs,
                                                                unit=unit))
     new_eqs = Equations('\n'.join(new_eqs))
     return new_eqs
@@ -361,20 +364,24 @@ class Fitter(metaclass=abc.ABCMeta):
             group of neurons
 
         """
-        neurons = NeuronGroup(n_neurons, self.model, method=self.method,
+        # We only want to specify the method argument if it is not None –
+        # otherwise it should use NeuronGroup's default value
+        kwds = {}
+        if self.method is not None:
+            kwds['method'] = self.method
+        neurons = NeuronGroup(n_neurons, self.model,
                               threshold=self.threshold, reset=self.reset,
                               refractory=self.refractory, name=name,
-                              namespace=namespace, dt=self.dt)
+                              namespace=namespace, dt=self.dt, **kwds)
         if calc_gradient:
             sensitivity_eqs = get_sensitivity_equations(neurons,
                                                         parameters=self.parameter_names,
                                                         optimize=optimize,
                                                         namespace=namespace)
             neurons = NeuronGroup(n_neurons, self.model + sensitivity_eqs,
-                                  method=self.method,
                                   threshold=self.threshold, reset=self.reset,
                                   refractory=self.refractory, name=name,
-                                  namespace=namespace, dt=self.dt)
+                                  namespace=namespace, dt=self.dt, **kwds)
         return neurons
 
     @abc.abstractmethod
