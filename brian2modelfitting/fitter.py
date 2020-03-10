@@ -342,6 +342,10 @@ class Fitter(metaclass=abc.ABCMeta):
 
         network = Network(neurons, monitor)
 
+        if calc_gradient:
+            param_init = dict(param_init)
+            param_init.update(get_sensitivity_init(neurons, self.parameter_names,
+                                                   param_init))
         simulator.initialize(network, param_init, name=network_name)
         return simulator
 
