@@ -13,4 +13,7 @@ install:
 # command to run tests
 script:
   - pytest --cov=brian2modelfitting
-  - coveralls
+
+after_success:
+  - travis_retry coveralls
+  if: env(python) = 3.6
