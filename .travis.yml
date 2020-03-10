@@ -15,6 +15,6 @@ script:
   - pytest --cov=brian2modelfitting
 
 after_success:
-  - if ["$python" == "3.6"]; then
+  - if [ "$python" == "3.6" ]; then
     travis_retry coveralls;
   fi
