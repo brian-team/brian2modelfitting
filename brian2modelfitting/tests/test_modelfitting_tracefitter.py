@@ -4,14 +4,16 @@ Test the modelfitting module
 import pytest
 import numpy as np
 import pandas as pd
+
 try:
     import lmfit
 except ImportError:
     lmfit = None
 from numpy.testing.utils import assert_equal
 from brian2 import (zeros, Equations, NeuronGroup, StateMonitor, TimedArray,
-                    nS, mV, volt, ms, Quantity, set_device, get_device, Network)
-from brian2 import have_same_dimensions
+                    nS, mV, volt, ms, pA, pF, Quantity, set_device, get_device,
+                    Network, have_same_dimensions)
+from brian2.equations.equations import DIFFERENTIAL_EQUATION, SUBEXPRESSION
 from brian2modelfitting import (NevergradOptimizer, TraceFitter, MSEMetric,
                                 OnlineTraceFitter, Simulator, Metric,
                                 Optimizer, GammaFactor)
@@ -282,6 +284,49 @@ def test_fitter_refine_direct(setup):
     params, result = tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS],
                                normalization=1/2)
     assert result.chisqr == 4 * error
+
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_calc_gradient():
+    tau = 5*ms
+    Cm = 100*pF
+    inputs = (np.ones((100, 2))*np.array([1, 2])).T*100*pA
+    # The model results can be approximated with exponentials
+    def exp_fit(x, a, b):
+        return a * np.exp(x / b) -70 - a * np.exp(0)
+    outputs = np.vstack([exp_fit(np.arange(100), 1.2836869755582263, 51.41761887704586),
+                         exp_fit(np.arange(100), 2.567374463239943,  51.417624003833076)])
+
+    model = '''
+    dv/dt = (g_L * (E_L - v) + I_e)/Cm : volt
+    dI_e/dt = -I/tau : amp
+    g_L : siemens (constant)
+    E_L : volt (constant)
+    '''
+    tf = TraceFitter(dt=0.1*ms,
+                     model=model,
+                     input_var='I',
+                     output_var='v',
+                     input=inputs,
+                     output=outputs,
+                     n_samples=2,
+                     param_init={'v': 'E_L'})
+    params, result = tf.refine({'g_L': 5 * nS, 'E_L': -65*mV},
+                               g_L=[1 * nS, 30 * nS],
+                               E_L=[-80*mV, -50*mV],
+                               calc_gradient=True)
+    assert 'S_v_g_L' in tf.simulator.neurons.equations
+    assert 'S_I_e_g_L' in tf.simulator.neurons.equations
+    assert tf.simulator.neurons.equations['S_v_g_L'].type == DIFFERENTIAL_EQUATION
+    assert tf.simulator.neurons.equations['S_I_e_g_L'].type == SUBEXPRESSION  # optimized away
+    params, result = tf.refine({'g_L': 5 * nS, 'E_L': -65*mV},
+                               g_L=[1 * nS, 30 * nS],
+                               E_L=[-80*mV, -50*mV],
+                               calc_gradient=True, optimize=False)
+    assert 'S_v_g_L' in tf.simulator.neurons.equations
+    assert 'S_I_e_g_L' in tf.simulator.neurons.equations
+    assert tf.simulator.neurons.equations['S_v_g_L'].type == DIFFERENTIAL_EQUATION
+    assert tf.simulator.neurons.equations['S_I_e_g_L'].type == DIFFERENTIAL_EQUATION
 
 
 @pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
