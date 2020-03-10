@@ -1,4 +1,5 @@
 dist: xenial
+os: linux
 language: python
 python:
   - "3.6"
@@ -17,4 +18,4 @@ script:
 after_success:
   - if [ "$python" == "3.6" ]; then
     travis_retry coveralls;
-  fi
+    fi
