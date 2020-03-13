@@ -67,12 +67,14 @@ def get_full_namespace(additional_namespace, level=0):
 
 def setup_fit():
     """
-    Function sets up simulator in one of the two availabel modes: runtime
-    or standalone.
+    Function sets up simulator in one of the two available modes: runtime
+    or standalone. The `.Simulator` that will be used depends on the currently
+    set `.Device`. In the case of `.CPPStandaloneDevice`, the device will also
+    be reset if it has already run a simulation.
 
     Returns
     -------
-    simulator : .Simulator
+    simulator : `.Simulator`
     """
     simulators = {
         'CPPStandaloneDevice': CPPStandaloneSimulator(),
@@ -581,11 +583,19 @@ class Fitter(metaclass=abc.ABCMeta):
         params: dict
             Dictionary of parameters to generate fits for.
         output_var: str
-            Name of the output variable to be monitored.
+            Name of the output variable to be monitored, or the special name
+            ``spikes`` to record spikes.
         param_init: dict
             Dictionary of initial values for the model.
         level : `int`, optional
             How much farther to go down in the stack to find the namespace.
+
+        Returns
+        -------
+        fit
+            Either a 2D `.Quantity` with the recorded output variable over time,
+            with shape <number of input traces> × <number of time steps>, or
+            a list of spike times for each input trace.
         """
         if params is None:
             params = self.best_params
@@ -616,7 +626,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
 
 class TraceFitter(Fitter):
-    """Input nad output have to have the same dimensions."""
+    """Input and output have to have the same dimensions."""
     def __init__(self, model, input_var, input, output_var, output, dt,
                  n_samples=30, method=None, reset=None, refractory=False,
                  threshold=None, param_init=None):
@@ -636,7 +646,7 @@ class TraceFitter(Fitter):
     def calc_errors(self, metric):
         """
         Returns errors after simulation with StateMonitor.
-        To be used inside optim_iter.
+        To be used inside `optim_iter`.
         """
         traces = getattr(self.simulator.networks['fit']['monitor'],
                          self.output_var+'_')
