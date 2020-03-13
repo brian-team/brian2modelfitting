@@ -1,13 +1,18 @@
 import abc
 import numbers
 
+import sympy
+from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape, zeros
+
+from brian2.parsing.sympytools import sympy_to_str, str_to_sympy
 from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions
-from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape
-from brian2 import (NeuronGroup,  defaultclock, get_device, Network,
+from brian2.utils.stringtools import get_identifiers
+
+from brian2 import (NeuronGroup, defaultclock, get_device, Network,
                     StateMonitor, SpikeMonitor, second, get_local_namespace,
-                    Quantity)
+                    Quantity, get_logger)
 from brian2.input import TimedArray
-from brian2.equations.equations import Equations
+from brian2.equations.equations import Equations, SUBEXPRESSION
 from brian2.devices import set_device, reset_device, device
 from brian2.devices.cpp_standalone.device import CPPStandaloneDevice
 from brian2.core.functions import Function
@@ -15,6 +20,9 @@ from .simulator import RuntimeSimulator, CPPStandaloneSimulator
 from .metric import Metric, SpikeMetric, TraceMetric
 from .optimizer import Optimizer
 from .utils import callback_setup, make_dic
+
+
+logger = get_logger(__name__)
 
 
 def get_param_dic(params, param_names, n_traces, n_samples):
@@ -59,19 +67,152 @@ def get_full_namespace(additional_namespace, level=0):
 
 def setup_fit():
     """
-    Function sets up simulator in one of the two availabel modes: runtime
-    or standalone.
+    Function sets up simulator in one of the two available modes: runtime
+    or standalone. The `.Simulator` that will be used depends on the currently
+    set `.Device`. In the case of `.CPPStandaloneDevice`, the device will also
+    be reset if it has already run a simulation.
 
     Returns
     -------
-    simulator : .Simulator
+    simulator : `.Simulator`
     """
     simulators = {
         'CPPStandaloneDevice': CPPStandaloneSimulator(),
         'RuntimeDevice': RuntimeSimulator()
     }
-
+    if isinstance(get_device(), CPPStandaloneDevice):
+        if device.has_been_run is True:
+            get_device().reinit()
+            get_device().activate()
     return simulators[get_device().__class__.__name__]
+
+
+def get_sensitivity_equations(group, parameters, namespace=None, level=1,
+                              optimize=True):
+    """
+    Get equations for sensitivity variables.
+
+    Parameters
+    ----------
+    group : `NeuronGroup`
+        The group of neurons that will be simulated.
+    parameters : list of str
+        Names of the parameters that are fit.
+    namespace : dict, optional
+        The namespace to use.
+    level : `int`, optional
+        How much farther to go down in the stack to find the namespace.
+    optimize : bool, optional
+        Whether to remove sensitivity variables from the equations that do
+        not evolve if initialized to zero (e.g. ``dS_x_y/dt = -S_x_y/tau``
+        would be removed). This avoids unnecessary computation but will fail
+        in the rare case that such a sensitivity variable needs to be
+        initialized to a non-zero value. Defaults to ``True``.
+
+    Returns
+    -------
+    sensitivity_eqs : `Equations`
+        The equations for the sensitivity variables.
+    """
+    if namespace is None:
+        namespace = get_local_namespace(level)
+        namespace.update(group.namespace)
+
+    eqs = group.equations
+    diff_eqs = eqs.get_substituted_expressions(group.variables)
+    diff_eq_names = [name for name, _ in diff_eqs]
+
+    system = sympy.Matrix([str_to_sympy(diff_eq[1].code)
+                           for diff_eq in diff_eqs])
+    J = system.jacobian([str_to_sympy(d) for d in diff_eq_names])
+
+    sensitivity = []
+    sensitivity_names = []
+    for parameter in parameters:
+        F = system.jacobian([str_to_sympy(parameter)])
+        names = [str_to_sympy(f'S_{diff_eq_name}_{parameter}')
+                 for diff_eq_name in diff_eq_names]
+        sensitivity.append(J * sympy.Matrix(names) + F)
+        sensitivity_names.append(names)
+
+    new_eqs = []
+    for names, sensitivity_eqs, param in zip(sensitivity_names, sensitivity, parameters):
+        for name, eq, orig_var in zip(names, sensitivity_eqs, diff_eq_names):
+            if param in namespace:
+                unit = eqs[orig_var].dim / namespace[param].dim
+            elif param in group.variables:
+                unit = eqs[orig_var].dim / group.variables[param].dim
+            else:
+                raise AssertionError(f'Parameter {param} neither in namespace nor variables')
+            unit = repr(unit) if not unit.is_dimensionless else '1'
+            if optimize:
+                # Check if the equation stays at zero if initialized at zero
+                zeroed = eq.subs(name, sympy.S.Zero)
+                if zeroed == sympy.S.Zero:
+                    # No need to include equation as differential equation
+                    if unit == '1':
+                        new_eqs.append(f'{sympy_to_str(name)} = 0 : {unit}')
+                    else:
+                        new_eqs.append(f'{sympy_to_str(name)} = 0*{unit} : {unit}')
+                    continue
+            rhs = sympy_to_str(eq)
+            if rhs == '0':  # avoid unit mismatch
+                rhs = f'0*{unit}/second'
+            new_eqs.append('d{lhs}/dt = {rhs} : {unit}'.format(lhs=sympy_to_str(name),
+                                                               rhs=rhs,
+                                                               unit=unit))
+    new_eqs = Equations('\n'.join(new_eqs))
+    return new_eqs
+
+
+def get_sensitivity_init(group, parameters, param_init):
+    """
+    Calculate the initial values for the sensitivity parameters (necessary if
+    initial values are functions of parameters).
+
+    Parameters
+    ----------
+    group : `NeuronGroup`
+        The group of neurons that will be simulated.
+    parameters : list of str
+        Names of the parameters that are fit.
+    param_init : dict
+        The dictionary with expressions to initialize the model variables.
+
+    Returns
+    -------
+    sensitivity_init : dict
+        Dictionary of expressions to initialize the sensitivity
+        parameters.
+    """
+    sensitivity_dict = {}
+    for var_name, expr in param_init.items():
+        if not isinstance(expr, str):
+            continue
+        identifiers = get_identifiers(expr)
+        for identifier in identifiers:
+            if (identifier in group.variables
+                    and getattr(group.variables[identifier],
+                                'type', None) == SUBEXPRESSION):
+                raise NotImplementedError('Initializations that refer to a '
+                                          'subexpression are currently not '
+                                          'supported')
+            sympy_expr = str_to_sympy(expr)
+            for parameter in parameters:
+                diffed = sympy_expr.diff(str_to_sympy(parameter))
+                if diffed != sympy.S.Zero:
+                    if getattr(group.variables[parameter],
+                               'type', None) == SUBEXPRESSION:
+                        raise NotImplementedError('Sensitivity '
+                                                  f'S_{var_name}_{parameter} '
+                                                  'is initialized to a non-zero '
+                                                  'value, but it has been '
+                                                  'removed from the equations. '
+                                                  'Set optimize=False to avoid '
+                                                  'this.')
+                    init_expr = sympy_to_str(diffed)
+                    sensitivity_dict[f'S_{var_name}_{parameter}'] = init_expr
+    return sensitivity_dict
 
 
 class Fitter(metaclass=abc.ABCMeta):
@@ -127,10 +268,6 @@ class Fitter(metaclass=abc.ABCMeta):
                  n_samples, threshold, reset, refractory, method, param_init):
         """Initialize the fitter."""
 
-        if isinstance(get_device(), CPPStandaloneDevice):
-            if device.has_been_run is True:
-                raise Exception("To run another fitter in standalone mode you "
-                                "need to create new script")
         if dt is None:
             raise ValueError("dt-sampling frequency of the input must be set")
 
@@ -139,10 +276,9 @@ class Fitter(metaclass=abc.ABCMeta):
         if input_var not in model.identifiers:
             raise NameError("%s is not an identifier in the model" % input_var)
 
-        defaultclock.dt = dt
         self.dt = dt
 
-        self.simulator = setup_fit()
+        self.simulator = None
 
         self.parameter_names = model.parameter_names
         self.n_traces, n_steps = input.shape
@@ -182,7 +318,41 @@ class Fitter(metaclass=abc.ABCMeta):
                                  "parameter in the model" % param)
         self.param_init = param_init
 
-    def setup_neuron_group(self, n_neurons, namespace, name='neurons'):
+    def setup_simulator(self, network_name, n_neurons, output_var, param_init,
+                        calc_gradient=False, optimize=True, level=1):
+        simulator = setup_fit()
+
+        namespace = get_full_namespace({'input_var': self.input_traces,
+                                        'n_traces': self.n_traces},
+                                       level=level+1)
+        if network_name != 'generate':
+            namespace['output_var'] = TimedArray(self.output.transpose(),
+                                                 dt=self.dt)
+        neurons = self.setup_neuron_group(n_neurons, namespace,
+                                          calc_gradient=calc_gradient,
+                                          optimize=optimize)
+
+        if output_var == 'spikes':
+            monitor = SpikeMonitor(neurons, name='monitor')
+        else:
+            record_vars = [output_var]
+            if calc_gradient:
+                record_vars.extend([f'S_{output_var}_{p}'
+                                    for p in self.parameter_names])
+            monitor = StateMonitor(neurons, record_vars, record=True,
+                                   name='monitor', dt=self.dt)
+
+        network = Network(neurons, monitor)
+
+        if calc_gradient:
+            param_init = dict(param_init)
+            param_init.update(get_sensitivity_init(neurons, self.parameter_names,
+                                                   param_init))
+        simulator.initialize(network, param_init, name=network_name)
+        return simulator
+
+    def setup_neuron_group(self, n_neurons, namespace, calc_gradient=False,
+                           optimize=True, name='neurons'):
         """
         Setup neuron group, initialize required number of neurons, create
         namespace and initialize the parameters.
@@ -200,11 +370,24 @@ class Fitter(metaclass=abc.ABCMeta):
             group of neurons
 
         """
-        neurons = NeuronGroup(n_neurons, self.model, method=self.method,
+        # We only want to specify the method argument if it is not None –
+        # otherwise it should use NeuronGroup's default value
+        kwds = {}
+        if self.method is not None:
+            kwds['method'] = self.method
+        neurons = NeuronGroup(n_neurons, self.model,
                               threshold=self.threshold, reset=self.reset,
                               refractory=self.refractory, name=name,
-                              namespace=namespace)
-
+                              namespace=namespace, dt=self.dt, **kwds)
+        if calc_gradient:
+            sensitivity_eqs = get_sensitivity_equations(neurons,
+                                                        parameters=self.parameter_names,
+                                                        optimize=optimize,
+                                                        namespace=namespace)
+            neurons = NeuronGroup(n_neurons, self.model + sensitivity_eqs,
+                                  threshold=self.threshold, reset=self.reset,
+                                  refractory=self.refractory, name=name,
+                                  namespace=namespace, dt=self.dt, **kwds)
         return neurons
 
     @abc.abstractmethod
@@ -240,6 +423,7 @@ class Fitter(metaclass=abc.ABCMeta):
         d_param = get_param_dic(parameters, self.parameter_names,
                                 self.n_traces, self.n_samples)
         self.simulator.run(self.duration, d_param, self.parameter_names)
+
         errors = self.calc_errors(metric)
 
         optimizer.tell(parameters, errors)
@@ -249,7 +433,7 @@ class Fitter(metaclass=abc.ABCMeta):
         return results, parameters, errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
-            restart=False, **params):
+            restart=False, level=0, **params):
         """
         Run the optimization algorithm for given amount of rounds with given
         number of samples drawn. Return best set of parameters and
@@ -275,6 +459,8 @@ class Fitter(metaclass=abc.ABCMeta):
             With restart True user is allowed to change optimizer/metric.
         **params
             bounds for each parameter
+        level : `int`, optional
+            How much farther to go down in the stack to find the namespace.
 
         Returns
         -------
@@ -306,6 +492,15 @@ class Fitter(metaclass=abc.ABCMeta):
         self.metric = metric
 
         callback = callback_setup(callback, n_rounds)
+
+        # Check whether we can reuse the current simulator or whether we have
+        # to create a new one (only relevant for standalone, but does not hurt
+        # for runtime)
+        if self.simulator is None or self.simulator.current_net != 'fit':
+            self.simulator = self.setup_simulator('fit', self.n_neurons,
+                                                  output_var=self.output_var,
+                                                  param_init=self.param_init,
+                                                  level=level+1)
 
         # Run Optimization Loop
         error = None
@@ -388,75 +583,59 @@ class Fitter(metaclass=abc.ABCMeta):
         params: dict
             Dictionary of parameters to generate fits for.
         output_var: str
-            Name of the output variable to be monitored.
+            Name of the output variable to be monitored, or the special name
+            ``spikes`` to record spikes.
         param_init: dict
             Dictionary of initial values for the model.
         level : `int`, optional
             How much farther to go down in the stack to find the namespace.
+
+        Returns
+        -------
+        fit
+            Either a 2D `.Quantity` with the recorded output variable over time,
+            with shape <number of input traces> × <number of time steps>, or
+            a list of spike times for each input trace.
         """
         if params is None:
             params = self.best_params
-
-        needs_device_reset = False
-        if isinstance(get_device(), CPPStandaloneDevice):
-            set_device('runtime')
-            simulator = RuntimeSimulator()
-            needs_device_reset = True
+        if param_init is None:
+            param_init = self.param_init
         else:
-            simulator = self.simulator
+            param_init = dict(self.param_init)
+            self.param_init.update(param_init)
+        if output_var is None:
+            output_var = self.output_var
 
-        defaultclock.dt = self.dt
-        Ntraces, Nsteps = self.input.shape
-
-        # Setup NeuronGroup
-        namespace = get_full_namespace({'input_var': self.input_traces,
-                                        'n_traces': Ntraces,
-                                        'output_var': output_var},
-                                       level=level+1)
-
-        self.neurons = self.setup_neuron_group(Ntraces, namespace,
-                                               name='neurons')
-
-        neurons = self.setup_neuron_group(Ntraces, namespace, name='neurons')
-        neurons.namespace['input_var'] = self.input_traces
-        neurons.namespace['n_traces'] = Ntraces
-        neurons.namespace['output_var'] = output_var
-        if output_var == 'spikes':
-            monitor = SpikeMonitor(neurons, record=True, name='monitor')
-        else:
-            monitor = StateMonitor(neurons, output_var, record=True, name='monitor')
-        network = Network(neurons, monitor)
-
-        if param_init:
-            simulator.initialize(network, param_init, name='generate')
-        else:
-            simulator.initialize(network, self.param_init, name='generate')
-
-        simulator.run(self.duration, params, self.parameter_names, name='generate')
+        self.simulator = self.setup_simulator('generate', self.n_traces,
+                                              output_var=output_var,
+                                              param_init=param_init,
+                                              level=level+1)
+        param_dic = get_param_dic([params[p] for p in self.parameter_names],
+                                  self.parameter_names, self.n_traces, 1)
+        self.simulator.run(self.duration, param_dic, self.parameter_names,
+                           name='generate')
 
         if output_var == 'spikes':
-            fits = get_spikes(simulator.monitor,
+            fits = get_spikes(self.simulator.monitor,
                               1, self.n_traces)[0]  # a single "sample"
         else:
-            fits = getattr(simulator.monitor, output_var)
-
-        if needs_device_reset:
-            reset_device()
+            fits = getattr(self.simulator.monitor, output_var)[:]
 
         return fits
 
 
 class TraceFitter(Fitter):
-    """Input nad output have to have the same dimensions."""
+    """Input and output have to have the same dimensions."""
     def __init__(self, model, input_var, input, output_var, output, dt,
                  n_samples=30, method=None, reset=None, refractory=False,
-                 threshold=None, level=0, param_init=None):
+                 threshold=None, param_init=None):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method,
                          param_init)
         # We store the bounds set in TraceFitter.fit, so that Tracefitter.refine
-        # can
+        # can reuse them
         self.bounds = None
 
         if output_var not in self.model.names:
@@ -464,25 +643,10 @@ class TraceFitter(Fitter):
         if output.shape != input.shape:
             raise ValueError("Input and output must have the same size")
 
-        output_traces = TimedArray(output.transpose(), dt=dt)
-
-        # Setup NeuronGroup
-        namespace = get_full_namespace({'input_var': self.input_traces,
-                                        'n_traces': self.n_traces,
-                                        'output_var': output_traces},
-                                       level=level+1)
-        neurons = self.setup_neuron_group(self.n_neurons, namespace)
-
-        monitor = StateMonitor(neurons, output_var, record=True,
-                               name='monitor')
-        network = Network(neurons, monitor)
-
-        self.simulator.initialize(network, self.param_init)
-
     def calc_errors(self, metric):
         """
         Returns errors after simulation with StateMonitor.
-        To be used inside optim_iter.
+        To be used inside `optim_iter`.
         """
         traces = getattr(self.simulator.networks['fit']['monitor'],
                          self.output_var+'_')
@@ -494,13 +658,14 @@ class TraceFitter(Fitter):
         return errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
-            restart=False, **params):
+            restart=False, level=0, **params):
         if not isinstance(metric, TraceMetric):
             raise TypeError("You can only use TraceMetric child metric with "
                             "TraceFitter")
         self.bounds = dict(params)
         self.best_params, error = super().fit(optimizer, metric, n_rounds,
-                                              callback, restart, **params)
+                                              callback, restart, level=level+1,
+                                              **params)
         return self.best_params, error
 
     def generate_traces(self, params=None, param_init=None, level=0):
@@ -510,7 +675,8 @@ class TraceFitter(Fitter):
         return fits
 
     def refine(self, params=None, t_start=None, normalization=None,
-               callback='text', level=0, **kwds):
+               callback='text', calc_gradient=False, optimize=True,
+               level=0, **kwds):
         """
         Refine the fitting results with a sequentially operating minimization
         algorithm. Uses the `lmfit <https://lmfit.github.io/lmfit-py/>`_
@@ -530,18 +696,34 @@ class TraceFitter(Fitter):
             calculation. If not set, will reuse the `t_start` value from the
             previously used metric.
         normalization : float, optional
-            A normalization factor that will be multiplied with the total error
-            before handing it to the optimization algorithm. Can be useful if
-            the algorithm makes assumptions about the scale of errors, e.g. if
-            the size of steps in the parameter space depends on the absolute
-            value of the error. If not set, will reuse the `normalization` value
-            from the previously used metric.
+            A normalization term that will be used rescale results before
+            handing them to the optimization algorithm. Can be useful if the
+            algorithm makes assumptions about the scale of errors, e.g. if the
+            size of steps in the parameter space depends on the absolute value
+            of the error. The difference between simulated and target traces
+            will be divided by this value. If not set, will reuse the
+            `normalization` value from the previously used metric.
         callback: `str` or `~typing.Callable`
             Either the name of a provided callback function (``text`` or
             ``progressbar``), or a custom feedback function
             ``func(parameters, errors, best_parameters, best_error, index)``.
             If this function returns ``True`` the fitting execution is
             interrupted.
+        calc_gradient: bool, optional
+            Whether to add "sensitivity variables" to the equation that track
+            the sensitivity of the equation variables to the parameters. This
+            information will be used to pass the local gradient of the error
+            with respect to the parameters to the optimization function. This
+            can lead to much faster convergence than with an estimated gradient
+            but comes at the expense of additional computation. Defaults to
+            ``False``.
+        optimize : bool, optional
+            Whether to remove sensitivity variables from the equations that do
+            not evolve if initialized to zero (e.g. ``dS_x_y/dt = -S_x_y/tau``
+            would be removed). This avoids unnecessary computation but will fail
+            in the rare case that such a sensitivity variable needs to be
+            initialized to a non-zero value. Only taken into account if
+            ``calc_gradient`` is ``True``. Defaults to ``True``.
         level : int, optional
             How much farther to go down in the stack to find the namespace.
         kwds
@@ -583,8 +765,10 @@ class TraceFitter(Fitter):
             t_start = getattr(self.metric, 't_start', 0*second)
         if normalization is None:
             normalization = getattr(self.metric, 'normalization', 1.)
+        else:
+            normalization = 1/normalization
 
-        callback = callback_setup(callback, None)
+        callback_func = callback_setup(callback, None)
 
         # Set up Parameter objects
         parameters = lmfit.Parameters()
@@ -599,54 +783,66 @@ class TraceFitter(Fitter):
             parameters.add(param_name, value=array(params[param_name]),
                            min=array(min_bound), max=array(max_bound))
 
-        needs_device_reset = False
-        if isinstance(get_device(), CPPStandaloneDevice):
-            set_device('runtime')
-            simulator = RuntimeSimulator()
-            needs_device_reset = True
-        else:
-            simulator = self.simulator
-
-        namespace = get_full_namespace({'input_var': self.input_traces,
-                                        'n_traces': self.n_traces,
-                                        'output_var': self.output_var},
-                                       level=level+1)
-        neurons = self.setup_neuron_group(self.n_traces, namespace,
-                                          name='neurons')
-        monitor = StateMonitor(neurons, self.output_var, record=True,
-                               name='monitor')
-        network = Network(neurons, monitor)
-
-        simulator.initialize(network, self.param_init, name='refine')
+        self.simulator = self.setup_simulator('refine', self.n_traces,
+                                              output_var=self.output_var,
+                                              param_init=self.param_init,
+                                              calc_gradient=calc_gradient,
+                                              optimize=optimize,
+                                              level=level+1)
 
         t_start_steps = int(round(t_start / self.dt))
 
         def _calc_error(params):
-            simulator.run(self.duration, {p: float(val)
-                                          for p, val in params.items()},
-                          self.parameter_names, name='refine')
-            trace = getattr(simulator.networks['refine']['monitor'],
-                            self.output_var+'_')
+            param_dic = get_param_dic([params[p] for p in self.parameter_names],
+                                      self.parameter_names, self.n_traces, 1)
+            self.simulator.run(self.duration, param_dic,
+                               self.parameter_names, name='refine')
+            trace = getattr(self.simulator.monitor, self.output_var+'_')
             residual = trace[:, t_start_steps:] - self.output[:, t_start_steps:]
             return residual.flatten() * normalization
+
+        def _calc_gradient(params):
+            residuals = []
+            for name in self.parameter_names:
+                trace = getattr(self.simulator.monitor,
+                                f'S_{self.output_var}_{name}_')
+                residual = trace[:, t_start_steps:]
+                residuals.append(residual.flatten() * normalization)
+            gradient = array(residuals)
+            return gradient.T
 
         tested_parameters = []
         errors = []
         def _callback_wrapper(params, iter, resid, *args, **kwds):
             error = mean(resid**2)
-            params =  {p: float(val) for p, val in params.items()}
+            params = {p: float(val) for p, val in params.items()}
             tested_parameters.append(params)
             errors.append(error)
             best_idx = argmin(errors)
             best_error = errors[best_idx]
             best_params = tested_parameters[best_idx]
-            return callback(params, errors, best_params, best_error, iter)
+            return callback_func(params, array(errors),
+                                 best_params, best_error, iter)
 
+        assert 'Dfun' not in kwds
+        if calc_gradient:
+            kwds.update({'Dfun': _calc_gradient})
+        if 'iter_cb' in kwds:
+            # Use the given callback but raise a warning if callback is not
+            # set to None
+            if callback is not None:
+                logger.warn('The iter_cb keyword has been specified together '
+                            f'with callback={callback!r}. Only the iter_cb '
+                            'callback will be used. Use the standard '
+                            'callback mechanism or set callback=None to '
+                            'remove this warning.',
+                            name_suffix='iter_cb_callback')
+            iter_cb = kwds.pop('iter_cb')
+        else:
+            iter_cb = _callback_wrapper
         result = lmfit.minimize(_calc_error, parameters,
-                                iter_cb=_callback_wrapper, **kwds)
-
-        if needs_device_reset:
-            reset_device()
+                                iter_cb=iter_cb,
+                                **kwds)
 
         return {p: float(val) for p, val in result.params.items()}, result
 
@@ -654,22 +850,14 @@ class TraceFitter(Fitter):
 class SpikeFitter(Fitter):
     def __init__(self, model, input, output, dt, reset, threshold,
                  input_var='I', refractory=False, n_samples=30,
-                 method=None, level=0, param_init=None):
+                 method=None, param_init=None):
         """Initialize the fitter."""
         if method is None:
             method = 'exponential_euler'
         super().__init__(dt, model, input, output, input_var, 'v',
                          n_samples, threshold, reset, refractory, method,
                          param_init)
-
-        # Setup NeuronGroup
-        namespace = get_full_namespace({'input_var': self.input_traces,
-                                        'n_traces': self.n_traces},
-                                       level=level + 1)
-        neurons = self.setup_neuron_group(self.n_neurons, namespace)
-
-        monitor = SpikeMonitor(neurons, record=True, name='monitor')
-        network = Network(neurons, monitor)
+        self.output_var = 'spikes'
 
         if param_init:
             for param, val in param_init.items():
@@ -678,7 +866,7 @@ class SpikeFitter(Fitter):
                                      "identifier in the model" % param)
             self.param_init = param_init
 
-        self.simulator.initialize(network, self.param_init)
+        self.simulator = None
 
     def calc_errors(self, metric):
         """
@@ -691,12 +879,13 @@ class SpikeFitter(Fitter):
         return errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
-            restart=False, **params):
+            restart=False, level=0, **params):
         if not isinstance(metric, SpikeMetric):
             raise TypeError("You can only use SpikeMetric child metric with "
                             "SpikeFitter")
         self.best_params, error = super().fit(optimizer, metric, n_rounds,
-                                              callback, restart, **params)
+                                              callback, restart, level=level+1,
+                                              **params)
         return self.best_params, error
 
     def generate_spikes(self, params=None, param_init=None, level=0):
@@ -729,23 +918,8 @@ class OnlineTraceFitter(Fitter):
         error_eqs = Equations('total_error : {}'.format(squared_output_dim))
         self.model = self.model + error_eqs
 
-        # Setup NeuronGroup
-        namespace = get_full_namespace({'input_var': self.input_traces,
-                                        'n_traces': self.n_traces,
-                                        'output_var': output_traces},
-                                       level=level+1)
+        self.t_start = t_start
 
-        neurons = self.setup_neuron_group(self.n_neurons, namespace)
-
-        self.t_start = 0*second
-        neurons.namespace['t_start'] = self.t_start
-        neurons.run_regularly('total_error +=  (' + output_var + '-output_var\
-                                   (t,i % n_traces))**2 * int(t>=t_start)',
-                                   when='end')
-
-        monitor = StateMonitor(neurons, output_var, record=True,
-                               name='monitor')
-        network = Network(neurons, monitor)
         if param_init:
             for param, val in param_init.items():
                 if not (param in self.model.identifiers or param in self.model.names):
@@ -753,7 +927,7 @@ class OnlineTraceFitter(Fitter):
                                      "identifier in the model" % param)
             self.param_init = param_init
 
-        self.simulator.initialize(network, self.param_init)
+        self.simulator = None
 
     def calc_errors(self, metric=None):
         """Calculates error in online fashion.To be used inside optim_iter."""

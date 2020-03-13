@@ -127,7 +127,6 @@ class CPPStandaloneSimulator(Simulator):
         super(CPPStandaloneSimulator, self).__init__()
         self.params_init = None
 
-
     def run(self, duration, params, params_names, name='fit'):
         """
         Simulation has to be run in two stages in order to initialize the
@@ -142,7 +141,7 @@ class CPPStandaloneSimulator(Simulator):
                 for k, v in self.var_init.items():
                     self.neurons.__setattr__(k, v)
 
-            network.run(duration, namespace={}, report='text')
+            network.run(duration, namespace={})
         else:
             set_states(self.params_init, params)
             run_again()

@@ -62,7 +62,7 @@ def test_calc_mse():
     out = np.ones((3, 10))
     errors = mse.calc(inp, out, 0.01*ms)
     assert_equal(errors, [0, 1])
-    mse = MSEMetric(normalization=2)
+    mse = MSEMetric(normalization=1/2)
     errors = mse.calc(inp, out, 0.01 * ms)
     # The normalization factor scales the traces, so the squared error scales
     # with the square of the normalization factor
@@ -140,7 +140,7 @@ def test_get_features_gamma():
     features = gf.get_features(model_spikes, data_spikes, 0.1*ms)
     assert_equal(np.shape(features), (2, 2))
     assert(np.all(np.array(features) > -1))
-    normed_gf = GammaFactor(delta=0.5 * ms, time=10 * ms, normalization=2.)
+    normed_gf = GammaFactor(delta=0.5 * ms, time=10 * ms, normalization=1/2.)
     normed_features = normed_gf.get_features(model_spikes, data_spikes,
                                              0.1 * ms)
     assert_equal(normed_features, 2*features)

@@ -4,14 +4,16 @@ Test the modelfitting module
 import pytest
 import numpy as np
 import pandas as pd
+
 try:
     import lmfit
 except ImportError:
     lmfit = None
 from numpy.testing.utils import assert_equal
 from brian2 import (zeros, Equations, NeuronGroup, StateMonitor, TimedArray,
-                    nS, mV, volt, ms, Quantity, set_device, get_device, Network)
-from brian2 import have_same_dimensions
+                    nS, mV, volt, ms, pA, pF, Quantity, set_device, get_device,
+                    Network, have_same_dimensions)
+from brian2.equations.equations import DIFFERENTIAL_EQUATION, SUBEXPRESSION
 from brian2modelfitting import (NevergradOptimizer, TraceFitter, MSEMetric,
                                 OnlineTraceFitter, Simulator, Metric,
                                 Optimizer, GammaFactor)
@@ -155,7 +157,6 @@ def test_tracefitter_init(setup):
     for attr in attr_tracefitter:
         assert hasattr(tf, attr)
 
-    assert isinstance(tf.simulator, Simulator)
     assert isinstance(tf.input_traces, TimedArray)
     assert isinstance(tf.model, Equations)
 
@@ -207,6 +208,44 @@ def test_fitter_fit(setup):
     assert_equal(results, tf.best_params)
 
 
+def test_fitter_fit_callback(setup):
+    dt, tf = setup
+
+    calls = []
+    def our_callback(params, errors, best_params, best_error, index):
+        calls.append(index)
+        assert all(isinstance(p, dict) for p in params)
+        assert isinstance(errors, np.ndarray)
+        assert isinstance(best_params, dict)
+        assert isinstance(best_error, float)
+        assert isinstance(index, int)
+    results, errors = tf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             g=[1*nS, 30*nS],
+                             callback=our_callback)
+    assert len(calls) == 2
+
+    # Stop a fit via the callback
+
+    calls = []
+    def our_callback(params, errors, best_params, best_error, index):
+        calls.append(index)
+        assert all(isinstance(p, dict) for p in params)
+        assert isinstance(errors, np.ndarray)
+        assert isinstance(best_params, dict)
+        assert isinstance(best_error, float)
+        assert isinstance(index, int)
+        return True  # stop
+
+    results, errors = tf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             g=[1*nS, 30*nS],
+                             callback=our_callback)
+    assert len(calls) == 1
+
+
 def test_fitter_fit_errors(setup):
     dt, tf = setup
     with pytest.raises(TypeError):
@@ -218,7 +257,7 @@ def test_fitter_fit_errors(setup):
     with pytest.raises(TypeError):
         tf.fit(n_rounds=2,
                optimizer=n_opt,
-               metric=1,
+               metric=GammaFactor(3*ms, 60*ms),  # spike metric
                g=[1*nS, 30*nS])
 
 
@@ -281,8 +320,51 @@ def test_fitter_refine_direct(setup):
     # The algorithm is deterministic and should therefore give the same result
     # for the second run
     params, result = tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS],
-                               normalization=2)
+                               normalization=1/2)
     assert result.chisqr == 4 * error
+
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_calc_gradient():
+    tau = 5*ms
+    Cm = 100*pF
+    inputs = (np.ones((100, 2))*np.array([1, 2])).T*100*pA
+    # The model results can be approximated with exponentials
+    def exp_fit(x, a, b):
+        return a * np.exp(x / b) -70 - a * np.exp(0)
+    outputs = np.vstack([exp_fit(np.arange(100), 1.2836869755582263, 51.41761887704586),
+                         exp_fit(np.arange(100), 2.567374463239943,  51.417624003833076)])
+
+    model = '''
+    dv/dt = (g_L * (E_L - v) + I_e)/Cm : volt
+    dI_e/dt = -I/tau : amp
+    g_L : siemens (constant)
+    E_L : volt (constant)
+    '''
+    tf = TraceFitter(dt=0.1*ms,
+                     model=model,
+                     input_var='I',
+                     output_var='v',
+                     input=inputs,
+                     output=outputs,
+                     n_samples=2,
+                     param_init={'v': 'E_L'})
+    params, result = tf.refine({'g_L': 5 * nS, 'E_L': -65*mV},
+                               g_L=[1 * nS, 30 * nS],
+                               E_L=[-80*mV, -50*mV],
+                               calc_gradient=True)
+    assert 'S_v_g_L' in tf.simulator.neurons.equations
+    assert 'S_I_e_g_L' in tf.simulator.neurons.equations
+    assert tf.simulator.neurons.equations['S_v_g_L'].type == DIFFERENTIAL_EQUATION
+    assert tf.simulator.neurons.equations['S_I_e_g_L'].type == SUBEXPRESSION  # optimized away
+    params, result = tf.refine({'g_L': 5 * nS, 'E_L': -65*mV},
+                               g_L=[1 * nS, 30 * nS],
+                               E_L=[-80*mV, -50*mV],
+                               calc_gradient=True, optimize=False)
+    assert 'S_v_g_L' in tf.simulator.neurons.equations
+    assert 'S_I_e_g_L' in tf.simulator.neurons.equations
+    assert tf.simulator.neurons.equations['S_v_g_L'].type == DIFFERENTIAL_EQUATION
+    assert tf.simulator.neurons.equations['S_I_e_g_L'].type == DIFFERENTIAL_EQUATION
 
 
 @pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
@@ -294,7 +376,6 @@ def test_fitter_refine_tstart(setup_constant):
                                t_start=50*dt)
 
     # Fit should be close to 20mV
-    print(params['c'])
     assert np.abs(params['c']*volt - 20*mV) < 1*mV
 
 
@@ -323,6 +404,41 @@ def test_fitter_refine_errors(setup):
     with pytest.raises(TypeError):
         # Missing bounds
         tf.refine({'g': 5*nS})
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_callback(setup, caplog):
+    dt, tf = setup
+
+    calls = []
+    def our_callback(params, errors, best_params, best_error, index):
+        calls.append(index)
+        assert isinstance(params, dict)
+        assert isinstance(errors, np.ndarray)
+        assert isinstance(best_params, dict)
+        assert isinstance(best_error, float)
+        assert isinstance(index, int)
+
+    tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS], callback=our_callback)
+    assert len(calls)
+
+    # Use scipy's iter_cb instead of our callback mechanism
+
+    calls = []
+    def iter_cb(params, iter, resid, *args, **kws):
+        calls.append(iter)
+        assert isinstance(params, lmfit.Parameters)
+        assert isinstance(iter, int)
+        assert isinstance(resid, np.ndarray)
+
+    tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS], iter_cb=iter_cb)
+    assert len(caplog.records) == 1
+    assert len(calls)
+
+    calls.clear()
+    tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS], iter_cb=iter_cb,
+              callback=None)
+    assert len(caplog.records) == 1  # no additional warning
+    assert len(calls)
 
 
 def test_fit_restart(setup):
@@ -481,7 +597,6 @@ def test_onlinetracefitter_init(setup_online):
     for attr in attr_tracefitter:
         assert hasattr(otf, attr)
 
-    assert isinstance(otf.simulator, Simulator)
     assert isinstance(otf.input_traces, TimedArray)
     assert isinstance(otf.model, Equations)
 
@@ -493,14 +608,14 @@ def test_onlinetracefitter_init_errors(setup_online):
                           n_samples=10,
                           output=output_traces,
                           output_var='I',
-                          input_var='Exception',)
+                          input_var='Exception')
 
     with pytest.raises(Exception):
         OnlineTraceFitter(dt=0.1*ms, model=model, input=input_traces,
                           n_samples=10,
                           output=output_traces,
                           input_var='v',
-                          output_var='Exception',)
+                          output_var='Exception')
 
     with pytest.raises(Exception):
         OnlineTraceFitter(dt=0.1*ms, model=model, input=input_traces,
@@ -523,10 +638,20 @@ def test_onlinetracefitter_fit(setup_online):
 
     assert otf.metric is None
     assert isinstance(otf.optimizer, Optimizer)
-    assert isinstance(otf.simulator, Simulator)
 
     assert isinstance(results, dict)
     assert isinstance(errors, float)
     assert 'g' in results.keys()
 
     assert_equal(results, otf.best_params)
+
+
+def test_onlinetracefitter_generate_traces(setup_online):
+    dt, otf = setup_online
+    results, errors = otf.fit(n_rounds=2,
+                              optimizer=n_opt,
+                              g=[1 * nS, 30 * nS],
+                              restart=False, )
+    traces = otf.generate_traces()
+    assert isinstance(traces, np.ndarray)
+    assert_equal(np.shape(traces), np.shape(output_traces))
