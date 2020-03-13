@@ -850,7 +850,7 @@ class TraceFitter(Fitter):
 class SpikeFitter(Fitter):
     def __init__(self, model, input, output, dt, reset, threshold,
                  input_var='I', refractory=False, n_samples=30,
-                 method=None, level=0, param_init=None):
+                 method=None, param_init=None):
         """Initialize the fitter."""
         if method is None:
             method = 'exponential_euler'

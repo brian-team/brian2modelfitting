@@ -208,6 +208,44 @@ def test_fitter_fit(setup):
     assert_equal(results, tf.best_params)
 
 
+def test_fitter_fit_callback(setup):
+    dt, tf = setup
+
+    calls = []
+    def our_callback(params, errors, best_params, best_error, index):
+        calls.append(index)
+        assert all(isinstance(p, dict) for p in params)
+        assert isinstance(errors, np.ndarray)
+        assert isinstance(best_params, dict)
+        assert isinstance(best_error, float)
+        assert isinstance(index, int)
+    results, errors = tf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             g=[1*nS, 30*nS],
+                             callback=our_callback)
+    assert len(calls) == 2
+
+    # Stop a fit via the callback
+
+    calls = []
+    def our_callback(params, errors, best_params, best_error, index):
+        calls.append(index)
+        assert all(isinstance(p, dict) for p in params)
+        assert isinstance(errors, np.ndarray)
+        assert isinstance(best_params, dict)
+        assert isinstance(best_error, float)
+        assert isinstance(index, int)
+        return True  # stop
+
+    results, errors = tf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             g=[1*nS, 30*nS],
+                             callback=our_callback)
+    assert len(calls) == 1
+
+
 def test_fitter_fit_errors(setup):
     dt, tf = setup
     with pytest.raises(TypeError):
@@ -219,7 +257,7 @@ def test_fitter_fit_errors(setup):
     with pytest.raises(TypeError):
         tf.fit(n_rounds=2,
                optimizer=n_opt,
-               metric=1,
+               metric=GammaFactor(3*ms, 60*ms),  # spike metric
                g=[1*nS, 30*nS])
 
 
@@ -570,14 +608,14 @@ def test_onlinetracefitter_init_errors(setup_online):
                           n_samples=10,
                           output=output_traces,
                           output_var='I',
-                          input_var='Exception',)
+                          input_var='Exception')
 
     with pytest.raises(Exception):
         OnlineTraceFitter(dt=0.1*ms, model=model, input=input_traces,
                           n_samples=10,
                           output=output_traces,
                           input_var='v',
-                          output_var='Exception',)
+                          output_var='Exception')
 
     with pytest.raises(Exception):
         OnlineTraceFitter(dt=0.1*ms, model=model, input=input_traces,
@@ -606,3 +644,14 @@ def test_onlinetracefitter_fit(setup_online):
     assert 'g' in results.keys()
 
     assert_equal(results, otf.best_params)
+
+
+def test_onlinetracefitter_generate_traces(setup_online):
+    dt, otf = setup_online
+    results, errors = otf.fit(n_rounds=2,
+                              optimizer=n_opt,
+                              g=[1 * nS, 30 * nS],
+                              restart=False, )
+    traces = otf.generate_traces()
+    assert isinstance(traces, np.ndarray)
+    assert_equal(np.shape(traces), np.shape(output_traces))

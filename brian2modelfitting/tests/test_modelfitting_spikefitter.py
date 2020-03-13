@@ -7,7 +7,7 @@ from numpy.testing.utils import assert_equal
 from brian2 import (Equations, NeuronGroup, SpikeMonitor, TimedArray,
                     nS, nF, mV, ms, nA, amp, run)
 from brian2modelfitting import (NevergradOptimizer, SpikeFitter, GammaFactor,
-                                Simulator, Metric, Optimizer)
+                                Simulator, Metric, Optimizer, MSEMetric)
 from brian2modelfitting.fitter import get_spikes
 from brian2.devices.device import reinit_devices
 
@@ -101,14 +101,22 @@ def test_spikefitter_init(setup):
     assert isinstance(sf.model, Equations)
 
 
-def test_tracefitter_init_errors(setup):
+def test_spikefitter_init_errors(setup):
     dt, _ = setup
     with pytest.raises(Exception):
         SpikeFitter(model=model, input_var='Exception', dt=dt,
                     input=inp_trace*amp, output=output,
                     n_samples=2,
                     threshold='v > -50*mV',
-                    reset='v = -70*mV',)
+                    reset='v = -70*mV')
+
+    with pytest.raises(ValueError):
+        sf = SpikeFitter(model=model, input_var='I', dt=dt,
+                         input=inp_trace * amp, output=output,
+                         n_samples=2,
+                         threshold='v > -50*mV',
+                         reset='v = -70*mV',
+                         param_init={'V': -70*mV})  # name is "v" not "V"
 
 
 def test_spikefitter_fit(setup):
@@ -132,6 +140,23 @@ def test_spikefitter_fit(setup):
     assert 'C' in results.keys()
 
     assert_equal(results, sf.best_params)
+
+
+def test_spikefitter_fit_errors(setup):
+    dt, sf = setup
+    with pytest.raises(TypeError):
+        results, errors = sf.fit(n_rounds=2,
+                                 optimizer=n_opt,
+                                 metric=MSEMetric(),
+                                 gL=[20*nS, 40*nS],
+                                 C=[0.5*nF, 1.5*nF])
+    with pytest.raises(TypeError):
+        results, errors = sf.fit(n_rounds=2,
+                                 optimizer=None,
+                                 metric=MSEMetric(),
+                                 gL=[20*nS, 40*nS],
+                                 C=[0.5*nF, 1.5*nF])
+
 
 
 def test_spikefitter_param_init(setup):
