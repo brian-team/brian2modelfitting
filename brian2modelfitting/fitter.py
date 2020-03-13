@@ -805,13 +805,14 @@ class TraceFitter(Fitter):
         errors = []
         def _callback_wrapper(params, iter, resid, *args, **kwds):
             error = mean(resid**2)
-            params =  {p: float(val) for p, val in params.items()}
+            params = {p: float(val) for p, val in params.items()}
             tested_parameters.append(params)
             errors.append(error)
             best_idx = argmin(errors)
             best_error = errors[best_idx]
             best_params = tested_parameters[best_idx]
-            return callback_func(params, errors, best_params, best_error, iter)
+            return callback_func(params, array(errors),
+                                 best_params, best_error, iter)
 
         assert 'Dfun' not in kwds
         if calc_gradient:
