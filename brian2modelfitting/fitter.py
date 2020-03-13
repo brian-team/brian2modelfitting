@@ -292,7 +292,8 @@ class Fitter(metaclass=abc.ABCMeta):
         self.refractory = refractory
 
         self.input = input
-        self.output = array(output)
+        self.output = Quantity(output)
+        self.output_ = array(output)
         self.output_var = output_var
         self.model = model
 
@@ -319,18 +320,22 @@ class Fitter(metaclass=abc.ABCMeta):
         self.param_init = param_init
 
     def setup_simulator(self, network_name, n_neurons, output_var, param_init,
-                        calc_gradient=False, optimize=True, level=1):
+                        calc_gradient=False, optimize=True, online_error=False,
+                        level=1):
         simulator = setup_fit()
 
         namespace = get_full_namespace({'input_var': self.input_traces,
                                         'n_traces': self.n_traces},
                                        level=level+1)
+        if hasattr(self, 't_start'):  # OnlineTraceFitter
+            namespace['t_start'] = self.t_start
         if network_name != 'generate':
             namespace['output_var'] = TimedArray(self.output.transpose(),
                                                  dt=self.dt)
         neurons = self.setup_neuron_group(n_neurons, namespace,
                                           calc_gradient=calc_gradient,
-                                          optimize=optimize)
+                                          optimize=optimize,
+                                          online_error=online_error)
 
         if output_var == 'spikes':
             monitor = SpikeMonitor(neurons, name='monitor')
@@ -352,7 +357,7 @@ class Fitter(metaclass=abc.ABCMeta):
         return simulator
 
     def setup_neuron_group(self, n_neurons, namespace, calc_gradient=False,
-                           optimize=True, name='neurons'):
+                           optimize=True, online_error=False, name='neurons'):
         """
         Setup neuron group, initialize required number of neurons, create
         namespace and initialize the parameters.
@@ -388,6 +393,11 @@ class Fitter(metaclass=abc.ABCMeta):
                                   threshold=self.threshold, reset=self.reset,
                                   refractory=self.refractory, name=name,
                                   namespace=namespace, dt=self.dt, **kwds)
+        if online_error:
+            neurons.run_regularly('total_error += (' + self.output_var +
+                                  '-output_var(t,i % n_traces))**2 * int(t>=t_start)',
+                                  when='end')
+
         return neurons
 
     @abc.abstractmethod
@@ -433,7 +443,7 @@ class Fitter(metaclass=abc.ABCMeta):
         return results, parameters, errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
-            restart=False, level=0, **params):
+            restart=False, online_error=False, level=0, **params):
         """
         Run the optimization algorithm for given amount of rounds with given
         number of samples drawn. Return best set of parameters and
@@ -457,6 +467,9 @@ class Fitter(metaclass=abc.ABCMeta):
         restart: bool
             Flag that reinitializes the Fitter to reset the optimization.
             With restart True user is allowed to change optimizer/metric.
+        online_error: bool, optional
+            Whether to calculate the squared error between target trace and
+            simulated trace online. Defaults to ``False``.
         **params
             bounds for each parameter
         level : `int`, optional
@@ -499,6 +512,7 @@ class Fitter(metaclass=abc.ABCMeta):
         if self.simulator is None or self.simulator.current_net != 'fit':
             self.simulator = self.setup_simulator('fit', self.n_neurons,
                                                   output_var=self.output_var,
+                                                  online_error=online_error,
                                                   param_init=self.param_init,
                                                   level=level+1)
 
@@ -654,7 +668,7 @@ class TraceFitter(Fitter):
         traces = reshape(traces, (traces.shape[0]//self.n_traces,
                                   self.n_traces,
                                   -1))
-        errors = metric.calc(traces, self.output, self.dt)
+        errors = metric.calc(traces, self.output_, self.dt)
         return errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
@@ -798,7 +812,7 @@ class TraceFitter(Fitter):
             self.simulator.run(self.duration, param_dic,
                                self.parameter_names, name='refine')
             trace = getattr(self.simulator.monitor, self.output_var+'_')
-            residual = trace[:, t_start_steps:] - self.output[:, t_start_steps:]
+            residual = trace[:, t_start_steps:] - self.output_[:, t_start_steps:]
             return residual.flatten() * normalization
 
         def _calc_gradient(params):
@@ -928,6 +942,16 @@ class OnlineTraceFitter(Fitter):
             self.param_init = param_init
 
         self.simulator = None
+
+    def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
+            restart=False, level=0, **params):
+        return super(OnlineTraceFitter, self).fit(optimizer, metric=metric,
+                                                  n_rounds=n_rounds,
+                                                  callback=callback,
+                                                  restart=restart,
+                                                  online_error=True,
+                                                  level=level+1,
+                                                  **params)
 
     def calc_errors(self, metric=None):
         """Calculates error in online fashion.To be used inside optim_iter."""
