@@ -620,7 +620,7 @@ class Fitter(metaclass=abc.ABCMeta):
             fits = get_spikes(self.simulator.monitor,
                               1, self.n_traces)[0]  # a single "sample"
         else:
-            fits = getattr(self.simulator.monitor, output_var)
+            fits = getattr(self.simulator.monitor, output_var)[:]
 
         return fits
 
