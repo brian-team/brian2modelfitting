@@ -367,6 +367,41 @@ def test_fitter_refine_errors(setup):
         # Missing bounds
         tf.refine({'g': 5*nS})
 
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_callback(setup, caplog):
+    dt, tf = setup
+
+    calls = []
+    def our_callback(params, errors, best_params, best_error, index):
+        calls.append(index)
+        assert isinstance(params, dict)
+        assert isinstance(errors, np.ndarray)
+        assert isinstance(best_params, dict)
+        assert isinstance(best_error, float)
+        assert isinstance(index, int)
+
+    tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS], callback=our_callback)
+    assert len(calls)
+
+    # Use scipy's iter_cb instead of our callback mechanism
+
+    calls = []
+    def iter_cb(params, iter, resid, *args, **kws):
+        calls.append(iter)
+        assert isinstance(params, lmfit.Parameters)
+        assert isinstance(iter, int)
+        assert isinstance(resid, np.ndarray)
+
+    tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS], iter_cb=iter_cb)
+    assert len(caplog.records) == 1
+    assert len(calls)
+
+    calls.clear()
+    tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS], iter_cb=iter_cb,
+              callback=None)
+    assert len(caplog.records) == 1  # no additional warning
+    assert len(calls)
+
 
 def test_fit_restart(setup):
     dt, tf = setup
