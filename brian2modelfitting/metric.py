@@ -8,7 +8,7 @@ except ImportError:
     warnings.warn('eFEL package not found.')
 from itertools import repeat
 from brian2 import Hz, second, Quantity, ms, us
-from brian2.units.fundamentalunits import check_units, in_unit
+from brian2.units.fundamentalunits import check_units, in_unit, DIMENSIONLESS
 from numpy import (array, sum, square, reshape, abs, amin, digitize,
                    rint, arange, atleast_2d, NaN, float64, split, shape,)
 
@@ -135,6 +135,29 @@ class Metric(metaclass=abc.ABCMeta):
         """
         self.t_start = t_start
         self.normalization = 1/normalization
+
+    def get_dimensions(self, output_dim):
+        """
+        The physical dimensions of the error. In metrics such as `MSEMetric`,
+        this depends on the dimensions of the output variable (e.g. if the
+        output variable has units of volts, the mean squared error will have
+        units of volt²); in other metrics, e.g. `FeatureMetric`, this cannot
+        be defined in a meaningful way since the metric combines different
+        types of errors. In cases where defining dimensions is not meaningful,
+        this method should return `DIMENSIONLESS`.
+
+        Parameters
+        ----------
+        output_dim : `.Dimension`
+            The dimensions of the output variable.
+
+        Returns
+        -------
+        dim : `.Dimension`
+            The physical dimensions of the error.
+        """
+        return DIMENSIONLESS
+
 
     @abc.abstractmethod
     def get_features(self, model_results, target_results, dt):
@@ -354,6 +377,9 @@ class MSEMetric(TraceMetric):
 
     def get_errors(self, features):
         return features.mean(axis=1)
+
+    def get_dimensions(self, output_dim):
+        return output_dim**2
 
 
 class FeatureMetric(TraceMetric):
