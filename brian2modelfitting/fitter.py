@@ -558,6 +558,8 @@ class Fitter(metaclass=abc.ABCMeta):
 
     @property
     def best_params(self):
+        if self._best_params is None:
+            return None
         if self.use_units:
             params_with_units = {p: Quantity(v, dim=self.model[p].dim)
                                  for p, v in self._best_params.items()}
@@ -567,6 +569,8 @@ class Fitter(metaclass=abc.ABCMeta):
 
     @property
     def best_error(self):
+        if self._best_error is None:
+            return None
         if self.use_units:
             error_dim = self.metric.get_dimensions(self.output_dim)
             return Quantity(self._best_error, dim=error_dim)
@@ -617,7 +621,7 @@ class Fitter(metaclass=abc.ABCMeta):
                 temp_data = params[j]
                 res_dict = dict()
 
-                for i, n in enumerate(names[:-1]):
+                for i, n in enumerate(names):
                     if use_units:
                         res_dict[n] = Quantity(temp_data[i], dim=dim[n])
                     else:
@@ -629,7 +633,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
         elif format == 'dict':
             res_dict = dict()
-            for i, n in enumerate(names[:-1]):
+            for i, n in enumerate(names):
                 if use_units:
                     res_dict[n] = Quantity(params[:, i], dim=dim[n])
                 else:
