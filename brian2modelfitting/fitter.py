@@ -535,7 +535,9 @@ class Fitter(metaclass=abc.ABCMeta):
                     output_dim = DIMENSIONLESS
                 else:
                     output_dim = self.output_dim
-                error_dim = self.metric.get_dimensions(output_dim)
+                # Correct the units for the normalization factor
+                error_dim = self.metric.get_normalized_dimensions(output_dim)
+                best_error = Quantity(float(self.best_error), dim=error_dim)
                 errors = Quantity(errors, dim=error_dim)
                 param_dicts = [{p: Quantity(v, dim=self.model[p].dim)
                                 for p, v in zip(self.parameter_names,
@@ -545,13 +547,13 @@ class Fitter(metaclass=abc.ABCMeta):
                 param_dicts = [{p: v for p, v in zip(self.parameter_names,
                                                      one_param_set)}
                                for one_param_set in parameters]
+                best_error = self.best_error
 
             if callback(param_dicts,
                         errors,
                         self.best_params,
-                        self.best_error,
+                        best_error,
                         index) is True:
-                print('Stopping simulation')
                 break
 
         return self.best_params, self.best_error
@@ -916,7 +918,7 @@ class TraceFitter(Fitter):
             error = mean(resid**2)
             errors.append(error)
             if self.use_units:
-                error_dim = self.output_dim**2
+                error_dim = self.output_dim**2 * get_dimensions(normalization)**2
                 all_errors = Quantity(errors, dim=error_dim)
                 params = {p: Quantity(val, dim=self.model[p].dim)
                           for p, val in params.items()}
