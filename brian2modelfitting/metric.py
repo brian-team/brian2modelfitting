@@ -7,8 +7,8 @@ try:
 except ImportError:
     warnings.warn('eFEL package not found.')
 from itertools import repeat
-from brian2 import Hz, second, Quantity, ms, us
-from brian2.units.fundamentalunits import check_units, in_unit
+from brian2 import Hz, second, Quantity, ms, us, get_dimensions
+from brian2.units.fundamentalunits import check_units, in_unit, DIMENSIONLESS
 from numpy import (array, sum, square, reshape, abs, amin, digitize,
                    rint, arange, atleast_2d, NaN, float64, split, shape,)
 
@@ -136,6 +136,46 @@ class Metric(metaclass=abc.ABCMeta):
         self.t_start = t_start
         self.normalization = 1/normalization
 
+    def get_dimensions(self, output_dim):
+        """
+        The physical dimensions of the error. In metrics such as `MSEMetric`,
+        this depends on the dimensions of the output variable (e.g. if the
+        output variable has units of volts, the mean squared error will have
+        units of volt²); in other metrics, e.g. `FeatureMetric`, this cannot
+        be defined in a meaningful way since the metric combines different
+        types of errors. In cases where defining dimensions is not meaningful,
+        this method should return `DIMENSIONLESS`.
+
+        Parameters
+        ----------
+        output_dim : `.Dimension`
+            The dimensions of the output variable.
+
+        Returns
+        -------
+        dim : `.Dimension`
+            The physical dimensions of the error.
+        """
+        return DIMENSIONLESS
+
+    def get_normalized_dimensions(self, output_dim):
+        """
+        The physical dimensions of the normalized error. This will be
+        the same as the dimensions returned by `~.Metric.get_dimensions` if
+        the ``normalization`` is not used or set to a dimensionless value.
+
+        Parameters
+        ----------
+        output_dim : `.Dimension`
+            The dimensions of the output variable.
+
+        Returns
+        -------
+        dim : `.Dimension`
+            The physical dimensions of the normalized error.
+        """
+        return DIMENSIONLESS
+
     @abc.abstractmethod
     def get_features(self, model_results, target_results, dt):
         """
@@ -226,8 +266,8 @@ class TraceMetric(Metric):
             ``(n_samples, )``.
         """
         start_steps = int(round(self.t_start/dt))
-        features = self.get_features(model_traces[:, :, start_steps:] * self.normalization,
-                                     data_traces[:, start_steps:] * self.normalization,
+        features = self.get_features(model_traces[:, :, start_steps:] * float(self.normalization),
+                                     data_traces[:, start_steps:] * float(self.normalization),
                                      dt)
         errors = self.get_errors(features)
 
@@ -309,7 +349,7 @@ class SpikeMetric(Metric):
             model_spikes = relevant_model_spikes
             data_spikes = relevant_data_spikes
         features = self.get_features(model_spikes, data_spikes, dt)
-        errors = self.get_errors(features) * self.normalization
+        errors = self.get_errors(features) * float(self.normalization)
 
         return errors
 
@@ -355,6 +395,11 @@ class MSEMetric(TraceMetric):
     def get_errors(self, features):
         return features.mean(axis=1)
 
+    def get_dimensions(self, output_dim):
+        return output_dim**2
+
+    def get_normalized_dimensions(self, output_dim):
+        return output_dim**2 * get_dimensions(self.normalization)**2
 
 class FeatureMetric(TraceMetric):
     def __init__(self, stim_times, feat_list, weights=None, combine=None,
@@ -457,7 +502,7 @@ class FeatureMetric(TraceMetric):
                 sample_error += total
             errors.append(sample_error)
 
-        return array(errors) * self.normalization
+        return array(errors) * float(self.normalization)
 
 
 class GammaFactor(SpikeMetric):
@@ -509,7 +554,7 @@ class GammaFactor(SpikeMetric):
                                       rate_correction=self.rate_correction)
                 gf_for_sample.append(gf)
             all_gf.append(gf_for_sample)
-        return array(all_gf) * self.normalization
+        return array(all_gf) * float(self.normalization)
 
     def get_errors(self, features):
         errors = features.mean(axis=1)

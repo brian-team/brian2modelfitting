@@ -4,8 +4,8 @@ from types import FunctionType
 
 def callback_text(params, errors, best_params, best_error, index):
     """Default callback print-out for Fitters"""
-    param_str = ', '.join([f"{p}={v}" for p, v in sorted(best_params.items())])
-    print(f"Round {index}: Best parameters {param_str} (error: {best_error})")
+    param_str = ', '.join([f"{p}={v!s}" for p, v in sorted(best_params.items())])
+    print(f"Round {index}: Best parameters {param_str} (error: {best_error!s})")
 
 
 def callback_none(params, errors, best_params, best_error, index):
