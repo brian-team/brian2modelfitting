@@ -26,9 +26,9 @@ def test_get_gamma_factor():
     gf1 = get_gamma_factor(src2, trg, delta=0.5*ms, time=12*ms, dt=0.1*ms)
     gf2 = get_gamma_factor(src, src2, delta=0.5*ms, time=5*ms, dt=0.1*ms)
 
-    assert_equal(gf0, -1)
-    assert gf1 > 0  # Since data rate = 2 * model rate
-    assert gf2 > -1
+    assert_equal(gf0, 0)
+    assert gf1 > 1  # Since data rate = 2 * model rate
+    assert gf2 > 0
 
     gf0 = get_gamma_factor(trg, trg, delta=0.5*ms, time=12*ms, dt=0.1*ms,
                            rate_correction=False)
@@ -88,15 +88,15 @@ def test_calc_gf():
     assert_raises(DimensionMismatchError, GammaFactor, delta=10*mV)
     assert_raises(DimensionMismatchError, GammaFactor, time=10)
 
-    model_spikes = [[np.array([1, 5, 8]), np.array([2, 3, 8, 9])],  # Correct rate
-                    [np.array([1, 5]), np.array([0, 2, 3, 8, 9])]]  # Wrong rate
-    data_spikes = [np.array([0, 5, 9]), np.array([1, 3, 5, 6])]
+    model_spikes = [[np.array([1, 5, 8])*1e-3, np.array([2, 3, 8, 9])*1e-3],  # Correct rate
+                    [np.array([1, 5])*1e-3, np.array([0, 2, 3, 8, 9])*1e-3]]  # Wrong rate
+    data_spikes = [np.array([0, 5, 9])*1e-3, np.array([1, 3, 5, 6])*1e-3]
 
     gf = GammaFactor(delta=0.5*ms, time=10*ms)
     errors = gf.calc([data_spikes]*5, data_spikes, 0.1*ms)
-    assert_almost_equal(errors, np.ones(5)*-1)
+    assert_almost_equal(errors, np.zeros(5))
     errors = gf.calc(model_spikes, data_spikes, 0.1*ms)
-    assert errors[0] > -1  # correct rate
+    assert errors[0] > 0  # correct rate
     assert errors[1] > errors[0]
 
     gf = GammaFactor(delta=0.5*ms, time=10*ms, rate_correction=False)
@@ -104,6 +104,15 @@ def test_calc_gf():
     assert_almost_equal(errors, np.zeros(5))
     errors = gf.calc(model_spikes, data_spikes, 0.1*ms)
     assert all(errors > 0)
+
+
+def test_calc_gf_t_start():
+    # Spikes starting at 3ms are identical to data
+    model_spikes = [[np.array([1, 5, 9])*1e-3, np.array([2, 3, 5, 6])*1e-3],
+                    [np.array([5, 9])*1e-3, np.array([3, 5, 6])*1e-3]]
+    data_spikes = [np.array([0, 5, 9])*1e-3, np.array([1, 3, 5, 6])*1e-3]
+    gf = GammaFactor(delta=0.5 * ms, time=10 * ms, t_start=2.5*ms)
+    assert_almost_equal(gf.calc(model_spikes, data_spikes, 0.1*ms), 0)
 
 
 def test_get_features_mse():
@@ -147,7 +156,7 @@ def test_get_features_gamma():
 
     features = gf.get_features([data_spikes]*3, data_spikes, 0.1*ms)
     assert_equal(np.shape(features), (3, 2))
-    assert_almost_equal(features, np.ones((3, 2))*-1)
+    assert_almost_equal(features, np.zeros((3, 2)))
 
 
 def test_get_errors_gamma():
