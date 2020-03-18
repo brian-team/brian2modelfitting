@@ -762,6 +762,12 @@ class TraceFitter(Fitter):
         if not isinstance(metric, TraceMetric):
             raise TypeError("You can only use TraceMetric child metric with "
                             "TraceFitter")
+        if metric.t_weights is not None:
+            if not metric.t_weights.shape == (self.output.shape[1], ):
+                raise ValueError("The 't_weights' argument of the metric has "
+                                 "to be a one-dimensional array of length "
+                                 f"{self.output.shape[1]} but has shape "
+                                 f"{metric.t_weights.shape}")
         self.bounds = dict(params)
         best_params, error = super().fit(optimizer, metric, n_rounds,
                                          callback, restart,

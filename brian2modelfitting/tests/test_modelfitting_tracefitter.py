@@ -316,6 +316,26 @@ def test_fitter_fit_tstart(setup_constant):
     # Fit should be close to 20mV
     assert np.abs(params['c'] - 20*mV) < 1*mV
 
+
+def test_fitter_fit_tsteps(setup_constant):
+    dt, tf = setup_constant
+
+    with pytest.raises(ValueError):
+        # Incorrect weight size
+        tf.fit(n_rounds=10, optimizer=n_opt,
+               metric=MSEMetric(t_weights=np.ones(101)),
+               c=[0 * mV, 30 * mV])
+
+    # Ignore the first 50 steps at 10mV
+    weights = np.ones(100)
+    weights[:50] = 0
+    params, result = tf.fit(n_rounds=10, optimizer=n_opt,
+                            metric=MSEMetric(t_weights=weights),
+                            c=[0 * mV, 30 * mV])
+    # Fit should be close to 20mV
+    assert np.abs(params['c'] - 20*mV) < 1*mV
+
+
 @pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine(setup):
     dt, tf = setup
