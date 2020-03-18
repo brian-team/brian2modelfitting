@@ -83,6 +83,37 @@ def test_calc_mse_t_start():
     assert_equal(mse.calc(inp, out, 0.1*ms), np.zeros(5))
 
 
+def test_calc_mse_t_weights():
+    with pytest.raises(ValueError):
+        MSEMetric(t_start=1*ms, t_weights=np.ones(20))
+    weights = np.ones(20)
+    weights[:10] = 0
+    mse = MSEMetric(t_weights=weights)
+    out = np.random.rand(2, 20)
+    inp = np.random.rand(5, 2, 20)
+
+    errors = mse.calc(inp, out, 0.1*ms)
+    assert_equal(np.shape(errors), (5,))
+    assert(np.all(errors > 0))
+    # Everything before 1ms should be ignored, so having the same values for
+    # the rest should give an error of 0
+    inp[:, :, 10:] = out[None, :, 10:]
+    assert_equal(mse.calc(inp, out, 0.1*ms), np.zeros(5))
+
+
+def test_calc_mse_t_weights2():
+    mse = MSEMetric()
+    mse_weighted = MSEMetric(t_weights=2*np.ones(20))
+    out = np.random.rand(2, 20)
+    inp = np.random.rand(5, 2, 20)
+
+    errors = mse.calc(inp, out, 0.1*ms)
+    assert_equal(np.shape(errors), (5,))
+    assert(np.all(errors > 0))
+    errors_weighted = mse_weighted.calc(inp, out, 0.1*ms)
+    assert_almost_equal(errors_weighted, 2*errors)
+
+
 def test_calc_gf():
     assert_raises(TypeError, GammaFactor)
     assert_raises(DimensionMismatchError, GammaFactor, delta=10*mV)
