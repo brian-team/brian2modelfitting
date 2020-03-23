@@ -39,6 +39,20 @@ calculation.
   metric = MSEMetric(t_start=5*ms)
 
 
+Alternatively, the user can specify a weight vector emphasizing/de-emphasizing
+certain parts of the trace. For example, to ignore the first 5ms and to weigh
+the error between 10 and 15ms twice as high as the rest:
+
+.. code:: python
+
+  # total trace length = 50ms
+  weights = np.ones(int(50*ms/dt))
+  weights[:int(5*ms/dt)] = 0
+  weights[int(10*ms/dt):int(15*ms/dt)] = 2
+  metric = MSEMetric(t_weights=weights)
+
+Note that the ``t_weights`` argument cannot be combined with ``t_start``.
+
 In `~brian2modelfitting.fitter.OnlineTraceFitter`,
 the mean square error gets calculated in online manner, with no need of
 specifying a metric object.
