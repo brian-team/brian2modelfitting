@@ -293,8 +293,6 @@ class Fitter(metaclass=abc.ABCMeta):
         self.refractory = refractory
 
         self.input = input
-        self.output = Quantity(output)
-        self.output_ = array(output)
         self.output_var = output_var
         if output_var == 'spikes':
             self.output_dim = DIMENSIONLESS
@@ -337,7 +335,7 @@ class Fitter(metaclass=abc.ABCMeta):
                                        level=level+1)
         if hasattr(self, 't_start'):  # OnlineTraceFitter
             namespace['t_start'] = self.t_start
-        if network_name != 'generate':
+        if network_name != 'generate' and self.output_var != 'spikes':
             namespace['output_var'] = TimedArray(self.output.transpose(),
                                                  dt=self.dt)
         neurons = self.setup_neuron_group(n_neurons, namespace,
@@ -734,6 +732,8 @@ class TraceFitter(Fitter):
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method,
                          param_init, use_units=use_units)
+        self.output = Quantity(output)
+        self.output_ = array(output)
         # We store the bounds set in TraceFitter.fit, so that Tracefitter.refine
         # can reuse them
         self.bounds = None
@@ -974,6 +974,8 @@ class SpikeFitter(Fitter):
         super().__init__(dt, model, input, output, input_var, 'v',
                          n_samples, threshold, reset, refractory, method,
                          param_init, use_units=use_units)
+        self.output = [Quantity(o) for o in output]
+        self.output_ = [array(o) for o in output]
         self.output_var = 'spikes'
 
         if param_init:
@@ -1021,6 +1023,9 @@ class OnlineTraceFitter(Fitter):
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method,
                          param_init)
+
+        self.output = Quantity(output)
+        self.output_ = array(output)
 
         if output_var not in self.model.names:
             raise NameError("%s is not a model variable" % output_var)
