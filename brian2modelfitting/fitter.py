@@ -5,7 +5,7 @@ import sympy
 from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape, zeros
 
 from brian2.parsing.sympytools import sympy_to_str, str_to_sympy
-from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions
+from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions, fail_for_dimension_mismatch
 from brian2.utils.stringtools import get_identifiers
 
 from brian2 import (NeuronGroup, defaultclock, get_device, Network,
@@ -234,7 +234,7 @@ class Fitter(metaclass=abc.ABCMeta):
     input : `~numpy.ndarray` or `~brian2.units.fundamentalunits.Quantity`
         A 2D array of shape ``(n_traces, time steps)`` given the input that will
         be fed into the model.
-    output : `~numpy.ndarray` or `~brian2.units.fundamentalunits.Quantity` or list
+    output : `~brian2.units.fundamentalunits.Quantity` or list
         Recorded output of the model that the model should reproduce. Should
         be a 2D array of the same shape as the input when fitting traces with
         `TraceFitter`, a list of spike times when fitting spike trains with
@@ -298,6 +298,11 @@ class Fitter(metaclass=abc.ABCMeta):
             self.output_dim = DIMENSIONLESS
         else:
             self.output_dim = model[output_var].dim
+            fail_for_dimension_mismatch(output, self.output_dim,
+                                        'The provided target values '
+                                        '("output") need to have the same '
+                                        'units as the variable '
+                                        '{}'.format(output_var))
         self.model = model
 
         self.use_units = use_units
@@ -307,6 +312,17 @@ class Fitter(metaclass=abc.ABCMeta):
         input_eqs = "{} = input_var(t, i % n_traces) : {}".format(input_var,
                                                                   input_dim)
         self.model += input_eqs
+
+        if output_var != 'spikes':
+            # For approaches that couple the system to the target values,
+            # provide a convenient variable
+            output_expr = 'output_var(t, i % n_traces)'
+            output_dim = ('1' if self.output_dim is DIMENSIONLESS
+                          else repr(self.output_dim))
+            output_eqs = "{}_target = {} : {}".format(output_var,
+                                                      output_expr,
+                                                      output_dim)
+            self.model += output_eqs
 
         input_traces = TimedArray(input.transpose(), dt=dt)
         self.input_traces = input_traces
@@ -335,7 +351,7 @@ class Fitter(metaclass=abc.ABCMeta):
                                        level=level+1)
         if hasattr(self, 't_start'):  # OnlineTraceFitter
             namespace['t_start'] = self.t_start
-        if network_name != 'generate' and self.output_var != 'spikes':
+        if self.output_var != 'spikes':
             namespace['output_var'] = TimedArray(self.output.transpose(),
                                                  dt=self.dt)
         neurons = self.setup_neuron_group(n_neurons, namespace,
@@ -400,8 +416,9 @@ class Fitter(metaclass=abc.ABCMeta):
                                   refractory=self.refractory, name=name,
                                   namespace=namespace, dt=self.dt, **kwds)
         if online_error:
-            neurons.run_regularly('total_error += (' + self.output_var +
-                                  '-output_var(t,i % n_traces))**2 * int(t>=t_start)',
+            neurons.run_regularly('total_error += ({} - {}_target)**2 * '
+                                  'int(t>=t_start)'.format(self.output_var,
+                                                           self.output_var),
                                   when='end')
 
         return neurons
@@ -971,12 +988,11 @@ class SpikeFitter(Fitter):
         """Initialize the fitter."""
         if method is None:
             method = 'exponential_euler'
-        super().__init__(dt, model, input, output, input_var, 'v',
+        super().__init__(dt, model, input, output, input_var, 'spikes',
                          n_samples, threshold, reset, refractory, method,
                          param_init, use_units=use_units)
         self.output = [Quantity(o) for o in output]
         self.output_ = [array(o) for o in output]
-        self.output_var = 'spikes'
 
         if param_init:
             for param, val in param_init.items():
