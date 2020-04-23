@@ -5,7 +5,7 @@ import sympy
 from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape, zeros
 
 from brian2.parsing.sympytools import sympy_to_str, str_to_sympy
-from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions
+from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions, fail_for_dimension_mismatch
 from brian2.utils.stringtools import get_identifiers
 
 from brian2 import (NeuronGroup, defaultclock, get_device, Network,
@@ -234,7 +234,7 @@ class Fitter(metaclass=abc.ABCMeta):
     input : `~numpy.ndarray` or `~brian2.units.fundamentalunits.Quantity`
         A 2D array of shape ``(n_traces, time steps)`` given the input that will
         be fed into the model.
-    output : `~numpy.ndarray` or `~brian2.units.fundamentalunits.Quantity` or list
+    output : `~brian2.units.fundamentalunits.Quantity` or list
         Recorded output of the model that the model should reproduce. Should
         be a 2D array of the same shape as the input when fitting traces with
         `TraceFitter`, a list of spike times when fitting spike trains with
@@ -298,6 +298,11 @@ class Fitter(metaclass=abc.ABCMeta):
             self.output_dim = DIMENSIONLESS
         else:
             self.output_dim = model[output_var].dim
+            fail_for_dimension_mismatch(output, self.output_dim,
+                                        'The provided target values '
+                                        '("output") need to have the same '
+                                        'units as the variable '
+                                        '{}'.format(output_var))
         self.model = model
 
         self.use_units = use_units

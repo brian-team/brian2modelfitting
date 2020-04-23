@@ -12,7 +12,7 @@ except ImportError:
 from numpy.testing.utils import assert_equal
 from brian2 import (zeros, Equations, NeuronGroup, StateMonitor, TimedArray,
                     nS, mV, volt, ms, pA, pF, Quantity, set_device, get_device,
-                    Network, have_same_dimensions)
+                    Network, have_same_dimensions, DimensionMismatchError)
 from brian2.equations.equations import DIFFERENTIAL_EQUATION, SUBEXPRESSION
 from brian2modelfitting import (NevergradOptimizer, TraceFitter, MSEMetric,
                                 OnlineTraceFitter, Simulator, Metric,
@@ -85,7 +85,7 @@ def setup_no_units(request):
 def setup_constant(request):
     dt = 0.1 * ms
     # Membrane potential is constant at 10mV for first 50 steps, then at 20mV
-    out_trace = np.hstack([np.ones(50) * 10 * mV, np.ones(50) * 20 * mV])
+    out_trace = np.hstack([np.ones(50) * 10, np.ones(50) * 20])*mV
     tf = TraceFitter(dt=dt,
                      model=constant_model,
                      input_var='x',
@@ -201,6 +201,15 @@ def test_tracefitter_init_errors(setup):
                     output=[1],
                     input_var='v',
                     output_var='I',)
+
+    with pytest.raises(DimensionMismatchError):
+        tf = TraceFitter(dt=dt,
+                         model=model,
+                         input_var='v',
+                         output_var='I',
+                         input=input_traces,
+                         output=np.array(output_traces),  # no units
+                         n_samples=2)
 
 
 def test_fitter_fit(setup):
@@ -378,7 +387,7 @@ def test_fitter_refine_calc_gradient():
     def exp_fit(x, a, b):
         return a * np.exp(x / b) -70 - a * np.exp(0)
     outputs = np.vstack([exp_fit(np.arange(100), 1.2836869755582263, 51.41761887704586),
-                         exp_fit(np.arange(100), 2.567374463239943,  51.417624003833076)])
+                         exp_fit(np.arange(100), 2.567374463239943,  51.417624003833076)])*volt
 
     model = '''
     dv/dt = (g_L * (E_L - v) + I_e)/Cm : volt
