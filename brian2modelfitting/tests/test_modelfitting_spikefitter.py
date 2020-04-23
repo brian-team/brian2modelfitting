@@ -29,7 +29,7 @@ n_opt = NevergradOptimizer()
 metric = GammaFactor(60*ms, 60*ms)
 
 
-@pytest.fixture()
+@pytest.fixture
 def setup(request):
     dt = 0.01 * ms
     sf = SpikeFitter(model=model, input_var='I', dt=dt,
@@ -45,7 +45,7 @@ def setup(request):
     return dt, sf
 
 
-@pytest.fixture()
+@pytest.fixture
 def setup_spikes(request):
     def fin():
         reinit_devices()

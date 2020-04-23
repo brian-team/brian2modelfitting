@@ -971,12 +971,11 @@ class SpikeFitter(Fitter):
         """Initialize the fitter."""
         if method is None:
             method = 'exponential_euler'
-        super().__init__(dt, model, input, output, input_var, 'v',
+        super().__init__(dt, model, input, output, input_var, 'spikes',
                          n_samples, threshold, reset, refractory, method,
                          param_init, use_units=use_units)
         self.output = [Quantity(o) for o in output]
         self.output_ = [array(o) for o in output]
-        self.output_var = 'spikes'
 
         if param_init:
             for param, val in param_init.items():
