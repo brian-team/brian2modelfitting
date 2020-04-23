@@ -313,6 +313,17 @@ class Fitter(metaclass=abc.ABCMeta):
                                                                   input_dim)
         self.model += input_eqs
 
+        if output_var != 'spikes':
+            # For approaches that couple the system to the target values,
+            # provide a convenient variable
+            output_expr = 'output_var(t, i % n_traces)'
+            output_dim = ('1' if self.output_dim is DIMENSIONLESS
+                          else repr(self.output_dim))
+            output_eqs = "{}_target = {} : {}".format(output_var,
+                                                      output_expr,
+                                                      output_dim)
+            self.model += output_eqs
+
         input_traces = TimedArray(input.transpose(), dt=dt)
         self.input_traces = input_traces
 
@@ -340,7 +351,7 @@ class Fitter(metaclass=abc.ABCMeta):
                                        level=level+1)
         if hasattr(self, 't_start'):  # OnlineTraceFitter
             namespace['t_start'] = self.t_start
-        if network_name != 'generate' and self.output_var != 'spikes':
+        if self.output_var != 'spikes':
             namespace['output_var'] = TimedArray(self.output.transpose(),
                                                  dt=self.dt)
         neurons = self.setup_neuron_group(n_neurons, namespace,
@@ -405,8 +416,9 @@ class Fitter(metaclass=abc.ABCMeta):
                                   refractory=self.refractory, name=name,
                                   namespace=namespace, dt=self.dt, **kwds)
         if online_error:
-            neurons.run_regularly('total_error += (' + self.output_var +
-                                  '-output_var(t,i % n_traces))**2 * int(t>=t_start)',
+            neurons.run_regularly('total_error += ({} - {}_target)**2 * '
+                                  'int(t>=t_start)'.format(self.output_var,
+                                                           self.output_var),
                                   when='end')
 
         return neurons

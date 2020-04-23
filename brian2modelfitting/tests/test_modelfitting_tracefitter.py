@@ -177,6 +177,9 @@ def test_tracefitter_init(setup):
     assert isinstance(tf.input_traces, TimedArray)
     assert isinstance(tf.model, Equations)
 
+    target_var = '{}_target'.format(tf.output_var)
+    assert target_var in tf.model
+    assert tf.model[target_var].dim is tf.output_dim
 
 
 def test_tracefitter_init_errors(setup):

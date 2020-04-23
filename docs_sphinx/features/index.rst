@@ -230,3 +230,13 @@ with each simulation.
   result, error = fitter.fit(optimizer=optimizer,
                              n_rounds=1,
                              gl=[1e-8*siemens*cm**-2 * area, 1e-3*siemens*cm**-2 * area],)
+
+
+Reference the target values in the equations
+--------------------------------------------
+
+A model can refer to the target output values within the equations. For example, if you
+are fitting a membrane potential trace *v* (i.e. `output_var='v'`), then the equations
+can refer to the target trace as `v_target`. This allows you for example to add a coupling
+term like `coupling*(v_target - v)` to the equation for `v`, pulling the trajectory towards the
+correct solution.
