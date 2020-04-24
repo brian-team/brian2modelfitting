@@ -82,8 +82,9 @@ def setup_fit():
     }
     if isinstance(get_device(), CPPStandaloneDevice):
         if device.has_been_run is True:
+            build_options = dict(device.build_options)
             get_device().reinit()
-            get_device().activate()
+            get_device().activate(**build_options)
     return simulators[get_device().__class__.__name__]
 
 
