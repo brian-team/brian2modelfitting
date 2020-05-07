@@ -674,19 +674,19 @@ class Fitter(metaclass=abc.ABCMeta):
             data = concatenate((params, array(errors)[None, :].transpose()), axis=1)
             return DataFrame(data=data, columns=names + ['error'])
 
-    def generate(self, params=None, output_var=None, param_init=None, level=0):
+    def generate(self, output_var=None, params=None, param_init=None, level=0):
         """
         Generates traces for best fit of parameters and all inputs.
         If provided with other parameters provides those.
 
         Parameters
         ----------
-        params: dict
-            Dictionary of parameters to generate fits for.
         output_var: str or sequence of str
             Name of the output variable to be monitored, or the special name
             ``spikes`` to record spikes. Can also be a sequence of names to
             record multiple variables.
+        params: dict
+            Dictionary of parameters to generate fits for.
         param_init: dict
             Dictionary of initial values for the model.
         level : `int`, optional
