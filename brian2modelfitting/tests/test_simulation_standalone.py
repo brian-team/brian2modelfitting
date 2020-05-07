@@ -29,7 +29,7 @@ def setup(request):
     duration = 10 * ms
 
     neurons = NeuronGroup(1, model, name='neurons')
-    monitor = StateMonitor(neurons, 'I', record=True, name='monitor')
+    monitor = StateMonitor(neurons, 'I', record=True, name='statemonitor')
 
     net = Network(neurons, monitor)
 
@@ -48,7 +48,7 @@ def setup_standalone(request):
     dt = 0.1 * ms
     duration = 10 * ms
     neurons = NeuronGroup(1, model, name='neurons')
-    monitor = StateMonitor(neurons, 'I', record=True, name='monitor')
+    monitor = StateMonitor(neurons, 'I', record=True, name='statemonitor')
 
     net = Network(neurons, monitor)
 
@@ -100,5 +100,5 @@ def test_run_simulation_standalone(setup_standalone):
     sas.initialize(net, var_init=None)
 
     sas.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
-    I = getattr(sas.monitor, 'I')
+    I = getattr(sas.statemonitor, 'I')
     assert_equal(np.shape(I), (1, duration/dt))
