@@ -103,7 +103,7 @@ any input arguments:
 
     fitter = SpikeFitter(...)
     results, error = fitter.fit(...)
-    spikes = fitter.generate_traces()
+    spikes = fitter.generate_spikes()
 
 
 Custom generate
@@ -118,11 +118,23 @@ arguments:
   fitter.generate(params=None, output_var=None, param_init=None, level=0)
 
 Where ``params`` is a dictionary of parameters for which the traces we generate.
-``output_var`` provides an option to pick variable for visualization. With
+``output_var`` provides an option to pick one or more variable for visualization. With
 ``param_init``, user can define the initial values for differential equations.
 ``level`` allows for specification of namespace level from which we get
 the constant parameters of the model.
 
+If ``output_var`` is the name of a single variable name (or the special name ``'spikes'``), a single `~.Quantity`
+(for normal variables) or a list of spikes time arrays (for ``'spikes'``) will be returned. If a list of names is
+provided, then the result is a dictionary with all the results.
+
+.. code:: python
+
+    fitter = TraceFitter(...)
+    results, error = fitter.fit(...)
+    traces = fitter.generate(output_var=['v', 'h', 'n', 'm'])
+    v_trace = traces['v']
+    h_trace = traces['h']
+    ...
 
 
 Results

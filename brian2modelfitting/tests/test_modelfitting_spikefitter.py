@@ -201,3 +201,19 @@ def test_spikefitter_generate(setup):
                          param_init={'v': -70*mV})
     assert isinstance(traces, np.ndarray)
     assert_equal(np.shape(traces), np.shape(inp_trace))
+
+
+def test_spikefitter_generate_multiple_variables(setup):
+    dt, sf = setup
+    results, errors = sf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             gL=[20*nS, 40*nS],
+                             C=[0.5*nF, 1.5*nF])
+    recordings = sf.generate(params=None,
+                             output_var=['v', 'spikes'],
+                             param_init={'v': -70*mV})
+    assert isinstance(recordings, dict)
+    assert set(recordings.keys()) == {'v', 'spikes'}
+    assert_equal(np.shape(recordings['v']), np.shape(inp_trace))
+    assert_equal(np.shape(recordings['spikes'])[0], np.shape(inp_trace)[0])

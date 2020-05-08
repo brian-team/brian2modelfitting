@@ -587,6 +587,20 @@ def test_fitter_generate_traces(setup):
     assert_equal(np.shape(traces), np.shape(output_traces))
 
 
+def test_fitter_generate_traces_multiple_vars(setup):
+    dt, tf = setup
+    results, errors = tf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             g=[1*nS, 30*nS],
+                             restart=False,)
+    traces = tf.generate(output_var=['I', 'g'])
+    assert isinstance(traces, dict)
+    assert set(traces.keys()) == {'I', 'g'}
+    assert_equal(np.shape(traces['I']), np.shape(output_traces))
+    assert_equal(np.shape(traces['g']), np.shape(output_traces))
+
+
 def test_fitter_generate_traces_standalone(setup_standalone):
     dt, tf = setup_standalone
     results, errors = tf.fit(n_rounds=2,
