@@ -9,7 +9,7 @@ try:
     import lmfit
 except ImportError:
     lmfit = None
-from numpy.testing.utils import assert_equal
+from numpy.testing import assert_equal, assert_almost_equal
 from brian2 import (zeros, Equations, NeuronGroup, StateMonitor, TimedArray,
                     nS, mV, volt, ms, pA, pF, Quantity, set_device, get_device,
                     Network, have_same_dimensions, DimensionMismatchError)
@@ -464,7 +464,16 @@ def test_fitter_refine_tsteps(setup_constant):
         # Incorrect weight size
         tf.refine({'c': 5*mV}, c=[0 * mV, 30 * mV],
                   t_weights=np.ones(101))
-
+    with pytest.raises(ValueError):
+        # zero weights
+        tf.refine({'c': 5*mV}, c=[0 * mV, 30 * mV],
+                  t_weights=np.zeros(100))
+    with pytest.raises(ValueError):
+        # negative weights
+        weights = np.ones(100)
+        weights[17] = -1
+        tf.refine({'c': 5*mV}, c=[0 * mV, 30 * mV],
+                  t_weights=weights)
     # Ignore the first 50 steps at 10mV
     weights = np.ones(100)
     weights[:50] = 0
@@ -473,6 +482,41 @@ def test_fitter_refine_tsteps(setup_constant):
 
     # Fit should be close to 20mV
     assert np.abs(params['c'] - 20*mV) < 1*mV
+
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_tsteps_normalization(setup_constant):
+    dt, tf = setup_constant
+
+    model_traces = tf.generate(params={'c': 5 * mV})
+    mse_error = MSEMetric(t_start=50*dt).calc(model_traces[None, : , :], tf.output, dt)
+    all_errors = []
+    def callback(parameters, errors, best_parameters, best_error, index):
+        all_errors.append(float(errors[0]))
+        return True # stop simulation
+
+    # Ignore the first 50 steps at 10mV
+    tf.refine({'c': 5 * mV}, c=[0 * mV, 30 * mV],
+              t_start=50 * dt, callback=callback)
+
+    weights = np.ones(100)
+    weights[:50] = 0
+    tf.refine({'c': 5 * mV}, c=[0 * mV, 30 * mV],
+              t_weights=weights, callback=callback)
+
+    tf.refine({'c': 5 * mV}, c=[0 * mV, 30 * mV],
+              t_weights=weights * 2, callback=callback)
+
+    tf.fit(n_rounds=0, optimizer=n_opt,
+           metric=MSEMetric(t_weights=weights*3),
+           c=[0 * mV, 30 * mV])
+    tf.refine({'c': 5 * mV}, c=[0 * mV, 30 * mV],
+              callback=callback)
+
+    assert_almost_equal(float(mse_error[0]), all_errors[0])
+    assert_almost_equal(all_errors[0], all_errors[1])
+    assert_almost_equal(all_errors[1], all_errors[2])
+    assert_almost_equal(all_errors[2], all_errors[3])
 
 
 @pytest.mark.skipif(lmfit is None, reason="needs lmfit package")

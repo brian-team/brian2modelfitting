@@ -10,7 +10,7 @@ from itertools import repeat
 from brian2 import Hz, second, Quantity, ms, us, get_dimensions
 from brian2.units.fundamentalunits import check_units, in_unit, DIMENSIONLESS
 from numpy import (array, sum, abs, amin, digitize, rint, arange, inf, NaN,
-                   clip)
+                   clip, mean)
 
 
 def firing_rate(spikes):
@@ -108,6 +108,16 @@ def calc_eFEL(traces, inp_times, feat_list, dt):
 
     results = efel.getFeatureValues(out_traces, feat_list)
     return results
+
+
+def normalize_weights(t_weights):
+    if any(t_weights < 0):
+        raise ValueError("Weights in 't_weights' have to be positive.")
+    mean_weights = mean(t_weights)
+    if mean_weights == 0:
+        raise ValueError("Weights in 't_weights' cannot be all zero.")
+    t_weights = t_weights / mean_weights
+    return t_weights
 
 
 class Metric(metaclass=abc.ABCMeta):
@@ -253,11 +263,12 @@ class TraceMetric(Metric):
         t_weights : `~.ndarray`, optional
             A 1-dimensional array of weights for each time point. This array
             has to have the same size as the input/output traces that are used
-            for fitting. A value of 0 means that data points are ignored, and
-            a value of 1 means that a data point enters into the calculation
-            as usual. Values of > 1 will emphasize the error by the respective
-            factor at that point, a value of < 1 will de-emphasize it. Cannot
-            be combined with ``t_start``.
+            for fitting. A value of 0 means that data points are ignored. The
+            weight values will be normalized so only the relative values matter.
+            For example, an array containing 1s, and 2s, will weigh the
+            regions with 2s twice as high (with resepct to the squared error)
+            as the regions with 1s. Using instead values of 0.5 and 1 would have
+            the same effect. Cannot be combined with ``t_start``.
         normalization : float, optional
             A normalization term that will be used rescale results before
             handing them to the optimization algorithm. Can be useful if the
@@ -271,7 +282,11 @@ class TraceMetric(Metric):
             raise ValueError("Cannot use both 't_weights' and 't_start'.")
         super(TraceMetric, self).__init__(t_start=t_start,
                                           normalization=normalization)
-        self.t_weights = t_weights
+        if t_weights is not None:
+            self.t_weights = normalize_weights(t_weights)
+        else:
+            self.t_weights = None
+
 
     def calc(self, model_traces, data_traces, dt):
         """

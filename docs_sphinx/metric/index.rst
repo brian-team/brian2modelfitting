@@ -41,7 +41,8 @@ calculation.
 
 Alternatively, the user can specify a weight vector emphasizing/de-emphasizing
 certain parts of the trace. For example, to ignore the first 5ms and to weigh
-the error between 10 and 15ms twice as high as the rest:
+the error (in the sense of the squared error) between 10 and 15ms twice as
+high as the rest:
 
 .. code:: python
 

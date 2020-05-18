@@ -85,7 +85,17 @@ def test_calc_mse_t_start():
 
 def test_calc_mse_t_weights():
     with pytest.raises(ValueError):
+        # t_start and t_weights
         MSEMetric(t_start=1*ms, t_weights=np.ones(20))
+    with pytest.raises(ValueError):
+        # all values zero
+        MSEMetric(t_weights=np.zeros(20))
+    with pytest.raises(ValueError):
+        # negative values
+        weights = np.ones(20)
+        weights[17] = -1
+        MSEMetric(t_weights=weights)
+
     weights = np.ones(20)
     weights[:10] = 0
     mse = MSEMetric(t_weights=weights)
@@ -101,17 +111,22 @@ def test_calc_mse_t_weights():
     assert_equal(mse.calc(inp, out, 0.1*ms), np.zeros(5))
 
 
-def test_calc_mse_t_weights2():
-    mse = MSEMetric()
-    mse_weighted = MSEMetric(t_weights=2*np.ones(20))
-    out = np.random.rand(2, 20)
-    inp = np.random.rand(5, 2, 20)
-
-    errors = mse.calc(inp, out, 0.1*ms)
-    assert_equal(np.shape(errors), (5,))
-    assert(np.all(errors > 0))
-    errors_weighted = mse_weighted.calc(inp, out, 0.1*ms)
-    assert_almost_equal(errors_weighted, 2*errors)
+def test_calc_mse_t_weights_normalization():
+    # check that normalization works correctly
+    dt = 0.1*ms
+    metric1 = MSEMetric(t_start=50*dt)
+    weights = np.ones(100)
+    weights[:50] = 0
+    metric2 = MSEMetric(t_weights=weights)
+    weights2 = weights*2  # should not make any difference
+    metric3 = MSEMetric(t_weights=weights2)
+    data_traces = np.random.rand(3, 100)
+    model_traces = np.random.rand(2, 3, 100)
+    error_1 = metric1.calc(model_traces=model_traces, data_traces=data_traces, dt=dt)
+    error_2 = metric2.calc(model_traces=model_traces, data_traces=data_traces, dt=dt)
+    error_3 = metric3.calc(model_traces=model_traces, data_traces=data_traces, dt=dt)
+    assert_almost_equal(error_1, error_2)
+    assert_almost_equal(error_1, error_3)
 
 
 def test_calc_gf():

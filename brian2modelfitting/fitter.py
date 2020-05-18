@@ -2,7 +2,7 @@ import abc
 import numbers
 
 import sympy
-from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape, zeros
+from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape, zeros, sqrt
 
 from brian2.parsing.sympytools import sympy_to_str, str_to_sympy
 from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions, fail_for_dimension_mismatch
@@ -17,7 +17,7 @@ from brian2.devices import set_device, reset_device, device
 from brian2.devices.cpp_standalone.device import CPPStandaloneDevice
 from brian2.core.functions import Function
 from .simulator import RuntimeSimulator, CPPStandaloneSimulator
-from .metric import Metric, SpikeMetric, TraceMetric, MSEMetric
+from .metric import Metric, SpikeMetric, TraceMetric, MSEMetric, normalize_weights
 from .optimizer import Optimizer
 from .utils import callback_setup, make_dic
 
@@ -838,12 +838,13 @@ class TraceFitter(Fitter):
         t_weights : `~.ndarray`, optional
             A 1-dimensional array of weights for each time point. This array
             has to have the same size as the input/output traces that are used
-            for fitting. A value of 0 means that data points are ignored, and
-            a value of 1 means that a data point enters into the calculation
-            as usual. Values of > 1 will emphasize the error by the respective
-            factor at that point, a value of < 1 will de-emphasize it. Cannot
-            be combined with ``t_start``. If not set, will reuse the `t_start`
-            value from the previously used metric.
+            for fitting. A value of 0 means that data points are ignored. The
+            weight values will be normalized so only the relative values matter.
+            For example, an array containing 1s, and 2s, will weigh the
+            regions with 2s twice as high (with respect to the squared error)
+            as the regions with 1s. Using instead values of 0.5 and 1 would have
+            the same effect. Cannot be combined with ``t_start``. If not set, will
+            reuse the `t_weights` value from the previously used metric.
         normalization : float, optional
             A normalization term that will be used rescale results before
             handing them to the optimization algorithm. Can be useful if the
@@ -910,14 +911,18 @@ class TraceFitter(Fitter):
                                 'the fit function first.')
             params = self.best_params
 
-        if t_start is None and t_weights is None:
+        if t_weights is not None:
+            t_weights = normalize_weights(t_weights)
+        elif t_start is None:
             t_weights = getattr(self.metric, 't_weights', None)
             if t_weights is None:
                 t_start = getattr(self.metric, 't_start', 0*second)
             else:
                 t_start = None
+
         if t_start is not None and t_weights is not None:
             raise ValueError("Cannot use both 't_weights' and 't_start'.")
+
         if normalization is None:
             normalization = getattr(self.metric, 'normalization', 1.)
         else:
@@ -957,7 +962,7 @@ class TraceFitter(Fitter):
             if t_weights is None:
                 residual = trace[:, t_start_steps:] - self.output_[:, t_start_steps:]
             else:
-                residual = (trace - self.output_) * t_weights
+                residual = (trace - self.output_) * sqrt(t_weights)
             return residual.flatten() * normalization
 
         def _calc_gradient(params):
@@ -968,7 +973,7 @@ class TraceFitter(Fitter):
                 if t_weights is None:
                     residual = trace[:, t_start_steps:]
                 else:
-                    residual = trace*t_weights
+                    residual = trace * sqrt(t_weights)
                 residuals.append(residual.flatten() * normalization)
             gradient = array(residuals)
             return gradient.T
