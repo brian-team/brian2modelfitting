@@ -9,8 +9,8 @@ except ImportError:
 from itertools import repeat
 from brian2 import Hz, second, Quantity, ms, us, get_dimensions
 from brian2.units.fundamentalunits import check_units, in_unit, DIMENSIONLESS
-from numpy import (array, sum, square, reshape, abs, amin, digitize,
-                   rint, arange, atleast_2d, NaN, float64, split, shape,)
+from numpy import (array, sum, abs, amin, digitize, rint, arange, inf, NaN,
+                   clip)
 
 
 def firing_rate(spikes):
@@ -46,7 +46,7 @@ def get_gamma_factor(model, data, delta, time, dt, rate_correction=True):
     -------
     float
         An error based on the Gamma factor. If ``rate_correction`` is used,
-        then the returned error is :math:`2\frac{\lvert r_\mathrm{data} - r_\mathrm{model}\rvert}{r_\mathrm{data}} - \Gamma`
+        then the returned error is :math:`1 + 2\frac{\lvert r_\mathrm{data} - r_\mathrm{model}\rvert}{r_\mathrm{data}} - \Gamma`
         (with :math:`r_\mathrm{data}` and :math:`r_\mathrm{model}` being the
         firing rates in the data/model, and :math:`\Gamma` the coincidence
         factor). Without ``rate_correction``, the error is
@@ -88,11 +88,12 @@ def get_gamma_factor(model, data, delta, time, dt, rate_correction=True):
     gamma = (coincidences - NCoincAvg)/(norm*(model_length + data_length))
 
     if rate_correction:
-        rate_term = 2*abs((data_rate - model_rate)/data_rate)
+        rate_term = 1 + 2*abs((data_rate - model_rate)/data_rate)
     else:
         rate_term = 1
 
-    return rate_term - gamma
+    return clip(rate_term - gamma, 0, inf)
+
 
 def calc_eFEL(traces, inp_times, feat_list, dt):
     out_traces = []
@@ -442,6 +443,7 @@ class MSEMetric(TraceMetric):
     def get_normalized_dimensions(self, output_dim):
         return output_dim**2 * get_dimensions(self.normalization)**2
 
+
 class FeatureMetric(TraceMetric):
     def __init__(self, stim_times, feat_list, weights=None, combine=None,
                  t_start=0*second, normalization=1.):
@@ -551,8 +553,30 @@ class GammaFactor(SpikeMetric):
     Calculate gamma factors between goal and calculated spike trains, with
     precision delta.
 
-    References:
+    Parameters
+    ----------
+    delta: `~brian2.units.fundamentalunits.Quantity`
+        time window
+    time: `~brian2.units.fundamentalunits.Quantity`
+        total length of experiment
+    rate_correction: bool
+        Whether to include an error term that penalizes differences in firing
+        rate, following `Clopath et al., Neurocomputing (2007)
+        <https://doi.org/10.1016/j.neucom.2006.10.047>`_. Defaults to
+        ``True``.
 
+    Notes
+    -----
+    The gamma factor is commonly defined as 1 for a perfect match and 0 for
+    a match not better than random (negative values are possible if the match
+    is *worse* than expected by chance). Since we use the gamma factor as an
+    error to be minimized, the calculated term is actually r - gamma_factor,
+    where r is 1 if ``rate_correction`` is ``False``, or a rate-difference
+    dependent term if ``rate_correction` is ``True``. In both cases, the best
+    possible error value (i.e. for a perfect match between spike trains) is 0.
+
+    References
+    ----------
     * `R. Jolivet et al. “A Benchmark Test for a Quantitative Assessment of
       Simple Neuron Models.” Journal of Neuroscience Methods, 169, no. 2 (2008):
       417–24. <https://doi.org/10.1016/j.jneumeth.2007.11.006>`_
@@ -560,25 +584,13 @@ class GammaFactor(SpikeMetric):
       Threshold Type: Adaptive Exponential Integrate-and-Fire Model with
       Two Compartments.” Neurocomputing, 70, no. 10 (2007): 1668–73.
       <https://doi.org/10.1016/j.neucom.2006.10.047>`_
+
+
     """
 
     @check_units(delta=second, time=second, t_start=0*second)
     def __init__(self, delta, time, t_start=0*second, normalization=1.,
                  rate_correction=True):
-        """
-        Initialize the metric with time window delta and time step dt output
-
-        Parameters
-        ----------
-        delta: `~brian2.units.fundamentalunits.Quantity`
-            time window
-        time: `~brian2.units.fundamentalunits.Quantity`
-            total length of experiment
-        rate_correciton: bool
-            Whether to include an error term that penalizes differences in firing
-            rate, following `Clopath et al., Neurocomputing (2007)
-            <https://doi.org/10.1016/j.neucom.2006.10.047>`_.
-        """
         super(GammaFactor, self).__init__(t_start=t_start,
                                           normalization=normalization)
         self.delta = delta

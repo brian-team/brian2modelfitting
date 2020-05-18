@@ -5,7 +5,7 @@ import sympy
 from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape, zeros
 
 from brian2.parsing.sympytools import sympy_to_str, str_to_sympy
-from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions
+from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions, fail_for_dimension_mismatch
 from brian2.utils.stringtools import get_identifiers
 
 from brian2 import (NeuronGroup, defaultclock, get_device, Network,
@@ -82,8 +82,9 @@ def setup_fit():
     }
     if isinstance(get_device(), CPPStandaloneDevice):
         if device.has_been_run is True:
+            build_options = dict(device.build_options)
             get_device().reinit()
-            get_device().activate()
+            get_device().activate(**build_options)
     return simulators[get_device().__class__.__name__]
 
 
@@ -234,7 +235,7 @@ class Fitter(metaclass=abc.ABCMeta):
     input : `~numpy.ndarray` or `~brian2.units.fundamentalunits.Quantity`
         A 2D array of shape ``(n_traces, time steps)`` given the input that will
         be fed into the model.
-    output : `~numpy.ndarray` or `~brian2.units.fundamentalunits.Quantity` or list
+    output : `~brian2.units.fundamentalunits.Quantity` or list
         Recorded output of the model that the model should reproduce. Should
         be a 2D array of the same shape as the input when fitting traces with
         `TraceFitter`, a list of spike times when fitting spike trains with
@@ -293,13 +294,16 @@ class Fitter(metaclass=abc.ABCMeta):
         self.refractory = refractory
 
         self.input = input
-        self.output = Quantity(output)
-        self.output_ = array(output)
         self.output_var = output_var
         if output_var == 'spikes':
             self.output_dim = DIMENSIONLESS
         else:
             self.output_dim = model[output_var].dim
+            fail_for_dimension_mismatch(output, self.output_dim,
+                                        'The provided target values '
+                                        '("output") need to have the same '
+                                        'units as the variable '
+                                        '{}'.format(output_var))
         self.model = model
 
         self.use_units = use_units
@@ -309,6 +313,17 @@ class Fitter(metaclass=abc.ABCMeta):
         input_eqs = "{} = input_var(t, i % n_traces) : {}".format(input_var,
                                                                   input_dim)
         self.model += input_eqs
+
+        if output_var != 'spikes':
+            # For approaches that couple the system to the target values,
+            # provide a convenient variable
+            output_expr = 'output_var(t, i % n_traces)'
+            output_dim = ('1' if self.output_dim is DIMENSIONLESS
+                          else repr(self.output_dim))
+            output_eqs = "{}_target = {} : {}".format(output_var,
+                                                      output_expr,
+                                                      output_dim)
+            self.model += output_eqs
 
         input_traces = TimedArray(input.transpose(), dt=dt)
         self.input_traces = input_traces
@@ -337,25 +352,30 @@ class Fitter(metaclass=abc.ABCMeta):
                                        level=level+1)
         if hasattr(self, 't_start'):  # OnlineTraceFitter
             namespace['t_start'] = self.t_start
-        if network_name != 'generate':
+
+        if self.output_var != 'spikes':
             namespace['output_var'] = TimedArray(self.output.transpose(),
                                                  dt=self.dt)
         neurons = self.setup_neuron_group(n_neurons, namespace,
                                           calc_gradient=calc_gradient,
                                           optimize=optimize,
                                           online_error=online_error)
+        network = Network(neurons)
+        if isinstance(output_var, str):
+            output_var = [output_var]
+        if 'spikes' in output_var:
+            network.add(SpikeMonitor(neurons, name='spikemonitor'))
 
-        if output_var == 'spikes':
-            monitor = SpikeMonitor(neurons, name='monitor')
-        else:
-            record_vars = [output_var]
-            if calc_gradient:
-                record_vars.extend([f'S_{output_var}_{p}'
-                                    for p in self.parameter_names])
-            monitor = StateMonitor(neurons, record_vars, record=True,
-                                   name='monitor', dt=self.dt)
-
-        network = Network(neurons, monitor)
+        record_vars = [v for v in output_var if v != 'spikes']
+        if calc_gradient:
+            if not len(output_var) == 1:
+                raise AssertionError('Cannot calculate gradient with multiple '
+                                     'output variables.')
+            record_vars.extend([f'S_{output_var[0]}_{p}'
+                                for p in self.parameter_names])
+        if len(record_vars):
+            network.add(StateMonitor(neurons, record_vars, record=True,
+                                     name='statemonitor', dt=self.dt))
 
         if calc_gradient:
             param_init = dict(param_init)
@@ -402,8 +422,9 @@ class Fitter(metaclass=abc.ABCMeta):
                                   refractory=self.refractory, name=name,
                                   namespace=namespace, dt=self.dt, **kwds)
         if online_error:
-            neurons.run_regularly('total_error += (' + self.output_var +
-                                  '-output_var(t,i % n_traces))**2 * int(t>=t_start)',
+            neurons.run_regularly('total_error += ({} - {}_target)**2 * '
+                                  'int(t>=t_start)'.format(self.output_var,
+                                                           self.output_var),
                                   when='end')
 
         return neurons
@@ -653,18 +674,19 @@ class Fitter(metaclass=abc.ABCMeta):
             data = concatenate((params, array(errors)[None, :].transpose()), axis=1)
             return DataFrame(data=data, columns=names + ['error'])
 
-    def generate(self, params=None, output_var=None, param_init=None, level=0):
+    def generate(self, output_var=None, params=None, param_init=None, level=0):
         """
         Generates traces for best fit of parameters and all inputs.
         If provided with other parameters provides those.
 
         Parameters
         ----------
+        output_var: str or sequence of str
+            Name of the output variable to be monitored, or the special name
+            ``spikes`` to record spikes. Can also be a sequence of names to
+            record multiple variables.
         params: dict
             Dictionary of parameters to generate fits for.
-        output_var: str
-            Name of the output variable to be monitored, or the special name
-            ``spikes`` to record spikes.
         param_init: dict
             Dictionary of initial values for the model.
         level : `int`, optional
@@ -675,7 +697,9 @@ class Fitter(metaclass=abc.ABCMeta):
         fit
             Either a 2D `.Quantity` with the recorded output variable over time,
             with shape <number of input traces> × <number of time steps>, or
-            a list of spike times for each input trace.
+            a list of spike times for each input trace. If several names were
+            given as ``output_var``, then the result is a dictionary with the
+            names of the variable as the key.
         """
         if params is None:
             params = self.best_params
@@ -696,12 +720,19 @@ class Fitter(metaclass=abc.ABCMeta):
         self.simulator.run(self.duration, param_dic, self.parameter_names,
                            name='generate')
 
+        if not isinstance(output_var, str):
+            fits = {name: self._simulation_result(name) for name in output_var}
+        else:
+            fits = self._simulation_result(output_var)
+
+        return fits
+
+    def _simulation_result(self, output_var):
         if output_var == 'spikes':
-            fits = get_spikes(self.simulator.monitor,
+            fits = get_spikes(self.simulator.spikemonitor,
                               1, self.n_traces)[0]  # a single "sample"
         else:
-            fits = getattr(self.simulator.monitor, output_var)[:]
-
+            fits = getattr(self.simulator.statemonitor, output_var)[:]
         return fits
 
 
@@ -734,6 +765,8 @@ class TraceFitter(Fitter):
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method,
                          param_init, use_units=use_units)
+        self.output = Quantity(output)
+        self.output_ = array(output)
         # We store the bounds set in TraceFitter.fit, so that Tracefitter.refine
         # can reuse them
         self.bounds = None
@@ -748,7 +781,7 @@ class TraceFitter(Fitter):
         Returns errors after simulation with StateMonitor.
         To be used inside `optim_iter`.
         """
-        traces = getattr(self.simulator.networks['fit']['monitor'],
+        traces = getattr(self.simulator.networks['fit']['statemonitor'],
                          self.output_var+'_')
         # Reshape traces for easier calculation of error
         traces = reshape(traces, (traces.shape[0]//self.n_traces,
@@ -920,17 +953,17 @@ class TraceFitter(Fitter):
                                       self.parameter_names, self.n_traces, 1)
             self.simulator.run(self.duration, param_dic,
                                self.parameter_names, name='refine')
-            trace = getattr(self.simulator.monitor, self.output_var+'_')
+            trace = getattr(self.simulator.statemonitor, self.output_var+'_')
             if t_weights is None:
                 residual = trace[:, t_start_steps:] - self.output_[:, t_start_steps:]
             else:
-                residual = (trace - self.output_)*t_weights
+                residual = (trace - self.output_) * t_weights
             return residual.flatten() * normalization
 
         def _calc_gradient(params):
             residuals = []
             for name in self.parameter_names:
-                trace = getattr(self.simulator.monitor,
+                trace = getattr(self.simulator.statemonitor,
                                 f'S_{self.output_var}_{name}_')
                 if t_weights is None:
                     residual = trace[:, t_start_steps:]
@@ -999,10 +1032,11 @@ class SpikeFitter(Fitter):
         """Initialize the fitter."""
         if method is None:
             method = 'exponential_euler'
-        super().__init__(dt, model, input, output, input_var, 'v',
+        super().__init__(dt, model, input, output, input_var, 'spikes',
                          n_samples, threshold, reset, refractory, method,
                          param_init, use_units=use_units)
-        self.output_var = 'spikes'
+        self.output = [Quantity(o) for o in output]
+        self.output_ = [array(o) for o in output]
 
         if param_init:
             for param, val in param_init.items():
@@ -1018,7 +1052,7 @@ class SpikeFitter(Fitter):
         Returns errors after simulation with SpikeMonitor.
         To be used inside optim_iter.
         """
-        spikes = get_spikes(self.simulator.networks['fit']['monitor'],
+        spikes = get_spikes(self.simulator.networks['fit']['spikemonitor'],
                             self.n_samples, self.n_traces)
         errors = metric.calc(spikes, self.output, self.dt)
         return errors
@@ -1049,6 +1083,9 @@ class OnlineTraceFitter(Fitter):
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method,
                          param_init)
+
+        self.output = Quantity(output)
+        self.output_ = array(output)
 
         if output_var not in self.model.names:
             raise NameError("%s is not a model variable" % output_var)

@@ -57,7 +57,8 @@ class Simulator(metaclass=abc.ABCMeta):
         self.var_init = None
 
     neurons = property(lambda self: self.networks[self.current_net]['neurons'])
-    monitor = property(lambda self: self.networks[self.current_net]['monitor'])
+    statemonitor = property(lambda self: self.networks[self.current_net]['statemonitor'])
+    spikemonitor = property(lambda self: self.networks[self.current_net]['spikemonitor'])
 
     def initialize(self, network, var_init, name='fit'):
         """
@@ -67,7 +68,8 @@ class Simulator(metaclass=abc.ABCMeta):
         ----------
         network: `~brian2.core.network.Network`
             Network consisting of a `~brian2.groups.neurongroup.NeuronGroup`
-            named ``neurons`` and a monitor named ``monitor``.
+            named ``neurons`` and either a monitor named ``spikemonitor``
+            or a monitor named ``statemonitor``(or both).
         var_init: dict
             dictionary to initialize the variable states
         name: `str`, optional
@@ -77,9 +79,9 @@ class Simulator(metaclass=abc.ABCMeta):
         if 'neurons' not in network:
             raise KeyError('Expected a group named "neurons" in the '
                            'network.')
-        if 'monitor' not in network:
-            raise KeyError('Expected a monitor named "monitor" in the '
-                           'network.')
+        if 'statemonitor' not in network and 'spikemonitor' not in network:
+            raise KeyError('Expected a monitor named "spikemonitor" or '
+                           '"statemonitor" in the network.')
         self.networks[name] = network
         self.current_net = None  # will be set in run
         self.var_init = var_init

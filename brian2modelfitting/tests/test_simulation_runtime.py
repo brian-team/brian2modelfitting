@@ -39,7 +39,7 @@ def setup(request):
     duration = 10 * ms
 
     neurons = NeuronGroup(1, model, name='neurons')
-    monitor = StateMonitor(neurons, 'I', record=True, name='monitor')
+    monitor = StateMonitor(neurons, 'I', record=True, name='statemonitor')
 
     net = Network(neurons, monitor)
 
@@ -91,7 +91,7 @@ def test_run_simulation_runtime(setup):
     rts.initialize(net, var_init=None)
 
     rts.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
-    I = getattr(rts.networks['fit']['monitor'], 'I')
+    I = getattr(rts.statemonitor, 'I')
     assert_equal(np.shape(I), (1, duration/dt))
 
 
@@ -100,12 +100,12 @@ def test_run_simulation_runtime_var_init(setup):
     start_scope()
 
     neurons = NeuronGroup(1, model2, name='neurons')
-    monitor = StateMonitor(neurons, 'v', record=True, name='monitor')
+    monitor = StateMonitor(neurons, 'v', record=True, name='statemonitor')
     net = Network(neurons, monitor)
 
     rts = RuntimeSimulator()
     rts.initialize(net, var_init={'v': -60*mV})
 
     rts.run(duration, {'gL': 100, 'C': 10}, ['gL', 'C'])
-    v = getattr(rts.networks['fit']['monitor'], 'v')
+    v = getattr(rts.statemonitor, 'v')
     assert_equal(np.shape(v), (1, duration/dt))
