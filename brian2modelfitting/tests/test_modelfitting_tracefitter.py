@@ -92,7 +92,7 @@ def setup_constant(request):
                      output_var='v',
                      input=(np.zeros(100)*mV)[None, :],
                      output=out_trace[None, :],
-                     n_samples=100,)
+                     n_samples=100)
 
     def fin():
         reinit_devices()
@@ -111,7 +111,26 @@ def setup_online(request):
                             output_var='I',
                             input=input_traces,
                             output=output_traces,
-                            n_samples=10,)
+                            n_samples=10)
+
+    def fin():
+        reinit_devices()
+    request.addfinalizer(fin)
+
+    return dt, otf
+
+@pytest.fixture
+def setup_online_constant(request):
+    dt = 0.1 * ms
+    # Membrane potential is constant at 10mV for first 50 steps, then at 20mV
+    out_trace = np.hstack([np.ones(50) * 10, np.ones(50) * 20])*mV
+    otf = OnlineTraceFitter(dt=dt,
+                            model=constant_model,
+                            input_var='x',
+                            output_var='v',
+                            input=(np.zeros(100) * mV)[None, :],
+                            output=out_trace[None, :],
+                            n_samples=100)
 
     def fin():
         reinit_devices()
@@ -868,3 +887,23 @@ def test_onlinetracefitter_generate_traces(setup_online):
     traces = otf.generate_traces()
     assert isinstance(traces, np.ndarray)
     assert_equal(np.shape(traces), np.shape(output_traces))
+
+
+def test_onlinetracefitter_fit_tstart():
+    dt = 0.1 * ms
+    # Membrane potential is constant at 10mV for first 50 steps, then at 20mV
+    out_trace = np.hstack([np.ones(50) * 10, np.ones(50) * 20]) * mV
+    otf = OnlineTraceFitter(dt=dt,
+                            model=constant_model,
+                            input_var='x',
+                            output_var='v',
+                            input=(np.zeros(100) * mV)[None, :],
+                            output=out_trace[None, :],
+                            n_samples=100,
+                            t_start=50*dt)
+
+    # Ignore the first 50 steps at 10mV
+    params, result = otf.fit(n_rounds=10, optimizer=n_opt,
+                             c=[0 * mV, 30 * mV])
+    # Fit should be close to 20mV
+    assert np.abs(params['c'] - 20*mV) < 1*mV
