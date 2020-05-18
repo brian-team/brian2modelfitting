@@ -445,12 +445,47 @@ def test_fitter_refine_tstart(setup_constant):
 
 
 @pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_tsteps(setup_constant):
+    dt, tf = setup_constant
+
+    with pytest.raises(ValueError):
+        # Incorrect weight size
+        tf.refine({'c': 5*mV}, c=[0 * mV, 30 * mV],
+                  t_weights=np.ones(101))
+
+    # Ignore the first 50 steps at 10mV
+    weights = np.ones(100)
+    weights[:50] = 0
+    params, result = tf.refine({'c': 5*mV}, c=[0 * mV, 30 * mV],
+                               t_weights=weights)
+
+    # Fit should be close to 20mV
+    assert np.abs(params['c'] - 20*mV) < 1*mV
+
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine_reuse_tstart(setup_constant):
     dt, tf = setup_constant
 
     # Ignore the first 50 steps at 10mV but do not actually fit (0 rounds)
     params, result = tf.fit(n_rounds=0, optimizer=n_opt,
                             metric=MSEMetric(t_start=50*dt),
+                            c=[0 * mV, 30 * mV])
+    # t_start should be reused
+    params, result = tf.refine({'c': 5 * mV}, c=[0 * mV, 30 * mV])
+
+    # Fit should be close to 20mV
+    assert np.abs(params['c'] - 20 * mV) < 1 * mV
+
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_reuse_tsteps(setup_constant):
+    dt, tf = setup_constant
+    weights = np.ones(100)
+    weights[:50] = 0
+    # Ignore the first 50 steps at 10mV but do not actually fit (0 rounds)
+    params, result = tf.fit(n_rounds=0, optimizer=n_opt,
+                            metric=MSEMetric(t_weights=weights),
                             c=[0 * mV, 30 * mV])
     # t_start should be reused
     params, result = tf.refine({'c': 5 * mV}, c=[0 * mV, 30 * mV])
@@ -469,6 +504,12 @@ def test_fitter_refine_errors(setup):
     with pytest.raises(TypeError):
         # Missing bounds
         tf.refine({'g': 5*nS})
+
+    with pytest.raises(ValueError):
+        # Specify both weights and t_start
+        tf.refine({'c': 5 * mV}, c=[0 * mV, 30 * mV],
+                  t_start=10*ms, t_weights=np.ones(100))
+
 
 @pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_callback(setup, caplog):

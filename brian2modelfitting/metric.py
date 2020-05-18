@@ -267,7 +267,7 @@ class TraceMetric(Metric):
             default, i.e. defaults to 1.
         """
         if t_weights is not None and t_start != 0*second:
-            raise ValueError("Cannot use both 't_weigths' and 't_start'.")
+            raise ValueError("Cannot use both 't_weights' and 't_start'.")
         super(TraceMetric, self).__init__(t_start=t_start,
                                           normalization=normalization)
         self.t_weights = t_weights

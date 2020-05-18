@@ -781,7 +781,7 @@ class TraceFitter(Fitter):
                              param_init=param_init, level=level+1)
         return fits
 
-    def refine(self, params=None, t_start=None, normalization=None,
+    def refine(self, params=None, t_start=None, t_weights=None, normalization=None,
                callback='text', calc_gradient=False, optimize=True,
                level=0, **kwds):
         """
@@ -799,9 +799,18 @@ class TraceFitter(Fitter):
             refinement. If not given, the best parameters found so far by
             `~.TraceFitter.fit` will be used.
         t_start : `~brian2.units.fundamentalunits.Quantity`, optional
-            Initial simulation/model time that should be ignored for the error
-            calculation. If not set, will reuse the `t_start` value from the
+            Start of time window considered for calculating the fit error.
+            If not set, will reuse the `t_start` value from the
             previously used metric.
+        t_weights : `~.ndarray`, optional
+            A 1-dimensional array of weights for each time point. This array
+            has to have the same size as the input/output traces that are used
+            for fitting. A value of 0 means that data points are ignored, and
+            a value of 1 means that a data point enters into the calculation
+            as usual. Values of > 1 will emphasize the error by the respective
+            factor at that point, a value of < 1 will de-emphasize it. Cannot
+            be combined with ``t_start``. If not set, will reuse the `t_start`
+            value from the previously used metric.
         normalization : float, optional
             A normalization term that will be used rescale results before
             handing them to the optimization algorithm. Can be useful if the
@@ -868,8 +877,14 @@ class TraceFitter(Fitter):
                                 'the fit function first.')
             params = self.best_params
 
-        if t_start is None:
-            t_start = getattr(self.metric, 't_start', 0*second)
+        if t_start is None and t_weights is None:
+            t_weights = getattr(self.metric, 't_weights', None)
+            if t_weights is None:
+                t_start = getattr(self.metric, 't_start', 0*second)
+            else:
+                t_start = None
+        if t_start is not None and t_weights is not None:
+            raise ValueError("Cannot use both 't_weights' and 't_start'.")
         if normalization is None:
             normalization = getattr(self.metric, 'normalization', 1.)
         else:
@@ -897,7 +912,8 @@ class TraceFitter(Fitter):
                                               optimize=optimize,
                                               level=level+1)
 
-        t_start_steps = int(round(t_start / self.dt))
+        if t_weights is None:
+            t_start_steps = int(round(t_start / self.dt))
 
         def _calc_error(params):
             param_dic = get_param_dic([params[p] for p in self.parameter_names],
@@ -905,7 +921,10 @@ class TraceFitter(Fitter):
             self.simulator.run(self.duration, param_dic,
                                self.parameter_names, name='refine')
             trace = getattr(self.simulator.monitor, self.output_var+'_')
-            residual = trace[:, t_start_steps:] - self.output_[:, t_start_steps:]
+            if t_weights is None:
+                residual = trace[:, t_start_steps:] - self.output_[:, t_start_steps:]
+            else:
+                residual = (trace - self.output_)*t_weights
             return residual.flatten() * normalization
 
         def _calc_gradient(params):
@@ -913,7 +932,10 @@ class TraceFitter(Fitter):
             for name in self.parameter_names:
                 trace = getattr(self.simulator.monitor,
                                 f'S_{self.output_var}_{name}_')
-                residual = trace[:, t_start_steps:]
+                if t_weights is None:
+                    residual = trace[:, t_start_steps:]
+                else:
+                    residual = trace*t_weights
                 residuals.append(residual.flatten() * normalization)
             gradient = array(residuals)
             return gradient.T
