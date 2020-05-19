@@ -9,7 +9,7 @@ try:
     import lmfit
 except ImportError:
     lmfit = None
-from numpy.testing.utils import assert_equal
+from numpy.testing import assert_equal, assert_almost_equal
 from brian2 import (zeros, Equations, NeuronGroup, StateMonitor, TimedArray,
                     nS, mV, volt, ms, pA, pF, Quantity, set_device, get_device,
                     Network, have_same_dimensions, DimensionMismatchError)
@@ -92,7 +92,7 @@ def setup_constant(request):
                      output_var='v',
                      input=(np.zeros(100)*mV)[None, :],
                      output=out_trace[None, :],
-                     n_samples=100,)
+                     n_samples=100)
 
     def fin():
         reinit_devices()
@@ -111,7 +111,26 @@ def setup_online(request):
                             output_var='I',
                             input=input_traces,
                             output=output_traces,
-                            n_samples=10,)
+                            n_samples=10)
+
+    def fin():
+        reinit_devices()
+    request.addfinalizer(fin)
+
+    return dt, otf
+
+@pytest.fixture
+def setup_online_constant(request):
+    dt = 0.1 * ms
+    # Membrane potential is constant at 10mV for first 50 steps, then at 20mV
+    out_trace = np.hstack([np.ones(50) * 10, np.ones(50) * 20])*mV
+    otf = OnlineTraceFitter(dt=dt,
+                            model=constant_model,
+                            input_var='x',
+                            output_var='v',
+                            input=(np.zeros(100) * mV)[None, :],
+                            output=out_trace[None, :],
+                            n_samples=100)
 
     def fin():
         reinit_devices()
@@ -328,6 +347,26 @@ def test_fitter_fit_tstart(setup_constant):
     # Fit should be close to 20mV
     assert np.abs(params['c'] - 20*mV) < 1*mV
 
+
+def test_fitter_fit_tsteps(setup_constant):
+    dt, tf = setup_constant
+
+    with pytest.raises(ValueError):
+        # Incorrect weight size
+        tf.fit(n_rounds=10, optimizer=n_opt,
+               metric=MSEMetric(t_weights=np.ones(101)),
+               c=[0 * mV, 30 * mV])
+
+    # Ignore the first 50 steps at 10mV
+    weights = np.ones(100)
+    weights[:50] = 0
+    params, result = tf.fit(n_rounds=10, optimizer=n_opt,
+                            metric=MSEMetric(t_weights=weights),
+                            c=[0 * mV, 30 * mV])
+    # Fit should be close to 20mV
+    assert np.abs(params['c'] - 20*mV) < 1*mV
+
+
 @pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine(setup):
     dt, tf = setup
@@ -437,12 +476,91 @@ def test_fitter_refine_tstart(setup_constant):
 
 
 @pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_tsteps(setup_constant):
+    dt, tf = setup_constant
+
+    with pytest.raises(ValueError):
+        # Incorrect weight size
+        tf.refine({'c': 5*mV}, c=[0 * mV, 30 * mV],
+                  t_weights=np.ones(101))
+    with pytest.raises(ValueError):
+        # zero weights
+        tf.refine({'c': 5*mV}, c=[0 * mV, 30 * mV],
+                  t_weights=np.zeros(100))
+    with pytest.raises(ValueError):
+        # negative weights
+        weights = np.ones(100)
+        weights[17] = -1
+        tf.refine({'c': 5*mV}, c=[0 * mV, 30 * mV],
+                  t_weights=weights)
+    # Ignore the first 50 steps at 10mV
+    weights = np.ones(100)
+    weights[:50] = 0
+    params, result = tf.refine({'c': 5*mV}, c=[0 * mV, 30 * mV],
+                               t_weights=weights)
+
+    # Fit should be close to 20mV
+    assert np.abs(params['c'] - 20*mV) < 1*mV
+
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_tsteps_normalization(setup_constant):
+    dt, tf = setup_constant
+
+    model_traces = tf.generate(params={'c': 5 * mV})
+    mse_error = MSEMetric(t_start=50*dt).calc(model_traces[None, : , :], tf.output, dt)
+    all_errors = []
+    def callback(parameters, errors, best_parameters, best_error, index):
+        all_errors.append(float(errors[0]))
+        return True # stop simulation
+
+    # Ignore the first 50 steps at 10mV
+    tf.refine({'c': 5 * mV}, c=[0 * mV, 30 * mV],
+              t_start=50 * dt, callback=callback)
+
+    weights = np.ones(100)
+    weights[:50] = 0
+    tf.refine({'c': 5 * mV}, c=[0 * mV, 30 * mV],
+              t_weights=weights, callback=callback)
+
+    tf.refine({'c': 5 * mV}, c=[0 * mV, 30 * mV],
+              t_weights=weights * 2, callback=callback)
+
+    tf.fit(n_rounds=0, optimizer=n_opt,
+           metric=MSEMetric(t_weights=weights*3),
+           c=[0 * mV, 30 * mV])
+    tf.refine({'c': 5 * mV}, c=[0 * mV, 30 * mV],
+              callback=callback)
+
+    assert_almost_equal(float(mse_error[0]), all_errors[0])
+    assert_almost_equal(all_errors[0], all_errors[1])
+    assert_almost_equal(all_errors[1], all_errors[2])
+    assert_almost_equal(all_errors[2], all_errors[3])
+
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine_reuse_tstart(setup_constant):
     dt, tf = setup_constant
 
     # Ignore the first 50 steps at 10mV but do not actually fit (0 rounds)
     params, result = tf.fit(n_rounds=0, optimizer=n_opt,
                             metric=MSEMetric(t_start=50*dt),
+                            c=[0 * mV, 30 * mV])
+    # t_start should be reused
+    params, result = tf.refine({'c': 5 * mV}, c=[0 * mV, 30 * mV])
+
+    # Fit should be close to 20mV
+    assert np.abs(params['c'] - 20 * mV) < 1 * mV
+
+
+@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
+def test_fitter_refine_reuse_tsteps(setup_constant):
+    dt, tf = setup_constant
+    weights = np.ones(100)
+    weights[:50] = 0
+    # Ignore the first 50 steps at 10mV but do not actually fit (0 rounds)
+    params, result = tf.fit(n_rounds=0, optimizer=n_opt,
+                            metric=MSEMetric(t_weights=weights),
                             c=[0 * mV, 30 * mV])
     # t_start should be reused
     params, result = tf.refine({'c': 5 * mV}, c=[0 * mV, 30 * mV])
@@ -461,6 +579,12 @@ def test_fitter_refine_errors(setup):
     with pytest.raises(TypeError):
         # Missing bounds
         tf.refine({'g': 5*nS})
+
+    with pytest.raises(ValueError):
+        # Specify both weights and t_start
+        tf.refine({'c': 5 * mV}, c=[0 * mV, 30 * mV],
+                  t_start=10*ms, t_weights=np.ones(100))
+
 
 @pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_callback(setup, caplog):
@@ -763,3 +887,23 @@ def test_onlinetracefitter_generate_traces(setup_online):
     traces = otf.generate_traces()
     assert isinstance(traces, np.ndarray)
     assert_equal(np.shape(traces), np.shape(output_traces))
+
+
+def test_onlinetracefitter_fit_tstart():
+    dt = 0.1 * ms
+    # Membrane potential is constant at 10mV for first 50 steps, then at 20mV
+    out_trace = np.hstack([np.ones(50) * 10, np.ones(50) * 20]) * mV
+    otf = OnlineTraceFitter(dt=dt,
+                            model=constant_model,
+                            input_var='x',
+                            output_var='v',
+                            input=(np.zeros(100) * mV)[None, :],
+                            output=out_trace[None, :],
+                            n_samples=100,
+                            t_start=50*dt)
+
+    # Ignore the first 50 steps at 10mV
+    params, result = otf.fit(n_rounds=10, optimizer=n_opt,
+                             c=[0 * mV, 30 * mV])
+    # Fit should be close to 20mV
+    assert np.abs(params['c'] - 20*mV) < 1*mV

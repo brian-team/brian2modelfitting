@@ -2,7 +2,7 @@ import abc
 import numbers
 
 import sympy
-from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape, zeros
+from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape, zeros, sqrt
 
 from brian2.parsing.sympytools import sympy_to_str, str_to_sympy
 from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions, fail_for_dimension_mismatch
@@ -17,7 +17,7 @@ from brian2.devices import set_device, reset_device, device
 from brian2.devices.cpp_standalone.device import CPPStandaloneDevice
 from brian2.core.functions import Function
 from .simulator import RuntimeSimulator, CPPStandaloneSimulator
-from .metric import Metric, SpikeMetric, TraceMetric, MSEMetric
+from .metric import Metric, SpikeMetric, TraceMetric, MSEMetric, normalize_weights
 from .optimizer import Optimizer
 from .utils import callback_setup, make_dic
 
@@ -795,6 +795,12 @@ class TraceFitter(Fitter):
         if not isinstance(metric, TraceMetric):
             raise TypeError("You can only use TraceMetric child metric with "
                             "TraceFitter")
+        if metric.t_weights is not None:
+            if not metric.t_weights.shape == (self.output.shape[1], ):
+                raise ValueError("The 't_weights' argument of the metric has "
+                                 "to be a one-dimensional array of length "
+                                 f"{self.output.shape[1]} but has shape "
+                                 f"{metric.t_weights.shape}")
         self.bounds = dict(params)
         best_params, error = super().fit(optimizer, metric, n_rounds,
                                          callback, restart,
@@ -808,7 +814,7 @@ class TraceFitter(Fitter):
                              param_init=param_init, level=level+1)
         return fits
 
-    def refine(self, params=None, t_start=None, normalization=None,
+    def refine(self, params=None, t_start=None, t_weights=None, normalization=None,
                callback='text', calc_gradient=False, optimize=True,
                level=0, **kwds):
         """
@@ -826,9 +832,19 @@ class TraceFitter(Fitter):
             refinement. If not given, the best parameters found so far by
             `~.TraceFitter.fit` will be used.
         t_start : `~brian2.units.fundamentalunits.Quantity`, optional
-            Initial simulation/model time that should be ignored for the error
-            calculation. If not set, will reuse the `t_start` value from the
+            Start of time window considered for calculating the fit error.
+            If not set, will reuse the `t_start` value from the
             previously used metric.
+        t_weights : `~.ndarray`, optional
+            A 1-dimensional array of weights for each time point. This array
+            has to have the same size as the input/output traces that are used
+            for fitting. A value of 0 means that data points are ignored. The
+            weight values will be normalized so only the relative values matter.
+            For example, an array containing 1s, and 2s, will weigh the
+            regions with 2s twice as high (with respect to the squared error)
+            as the regions with 1s. Using instead values of 0.5 and 1 would have
+            the same effect. Cannot be combined with ``t_start``. If not set, will
+            reuse the `t_weights` value from the previously used metric.
         normalization : float, optional
             A normalization term that will be used rescale results before
             handing them to the optimization algorithm. Can be useful if the
@@ -895,8 +911,18 @@ class TraceFitter(Fitter):
                                 'the fit function first.')
             params = self.best_params
 
-        if t_start is None:
-            t_start = getattr(self.metric, 't_start', 0*second)
+        if t_weights is not None:
+            t_weights = normalize_weights(t_weights)
+        elif t_start is None:
+            t_weights = getattr(self.metric, 't_weights', None)
+            if t_weights is None:
+                t_start = getattr(self.metric, 't_start', 0*second)
+            else:
+                t_start = None
+
+        if t_start is not None and t_weights is not None:
+            raise ValueError("Cannot use both 't_weights' and 't_start'.")
+
         if normalization is None:
             normalization = getattr(self.metric, 'normalization', 1.)
         else:
@@ -924,7 +950,8 @@ class TraceFitter(Fitter):
                                               optimize=optimize,
                                               level=level+1)
 
-        t_start_steps = int(round(t_start / self.dt))
+        if t_weights is None:
+            t_start_steps = int(round(t_start / self.dt))
 
         def _calc_error(params):
             param_dic = get_param_dic([params[p] for p in self.parameter_names],
@@ -932,7 +959,10 @@ class TraceFitter(Fitter):
             self.simulator.run(self.duration, param_dic,
                                self.parameter_names, name='refine')
             trace = getattr(self.simulator.statemonitor, self.output_var+'_')
-            residual = trace[:, t_start_steps:] - self.output_[:, t_start_steps:]
+            if t_weights is None:
+                residual = trace[:, t_start_steps:] - self.output_[:, t_start_steps:]
+            else:
+                residual = (trace - self.output_) * sqrt(t_weights)
             return residual.flatten() * normalization
 
         def _calc_gradient(params):
@@ -940,7 +970,10 @@ class TraceFitter(Fitter):
             for name in self.parameter_names:
                 trace = getattr(self.simulator.statemonitor,
                                 f'S_{self.output_var}_{name}_')
-                residual = trace[:, t_start_steps:]
+                if t_weights is None:
+                    residual = trace[:, t_start_steps:]
+                else:
+                    residual = trace * sqrt(t_weights)
                 residuals.append(residual.flatten() * normalization)
             gradient = array(residuals)
             return gradient.T
@@ -1047,10 +1080,10 @@ class SpikeFitter(Fitter):
 
 
 class OnlineTraceFitter(Fitter):
-    """Input nad output have to have the same dimensions."""
     def __init__(self, model, input_var, input, output_var, output, dt,
                  n_samples=30,  method=None, reset=None, refractory=False,
-                 threshold=None, level=0, param_init=None, t_start=0*second):
+                 threshold=None, param_init=None,
+                 t_start=0*second):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method,
