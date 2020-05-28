@@ -474,7 +474,8 @@ class Fitter(metaclass=abc.ABCMeta):
         return results, parameters, errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
-            restart=False, online_error=False, level=0, **params):
+            restart=False, online_error=False, start_iteration=None,
+            level=0, **params):
         """
         Run the optimization algorithm for given amount of rounds with given
         number of samples drawn. Return best set of parameters and
@@ -501,7 +502,12 @@ class Fitter(metaclass=abc.ABCMeta):
         online_error: bool, optional
             Whether to calculate the squared error between target trace and
             simulated trace online. Defaults to ``False``.
-         level : `int`, optional
+        start_iteration: int, optional
+            A value for the ``iteration`` variable at the first iteration.
+            If not given, will use 0 for the first call of ``fit`` (and for
+            later calls when ``restart`` is specified). Later calls will
+            continue to increase the value from the previous calls.
+        level : `int`, optional
             How much farther to go down in the stack to find the namespace.
         **params
             bounds for each parameter
@@ -527,8 +533,12 @@ class Fitter(metaclass=abc.ABCMeta):
             if optimizer is not self.optimizer:
                 raise Exception("You can not change the optimizer between fits")
 
+        if start_iteration is not None:
+            self.iteration = start_iteration
+
         if self.optimizer is None or restart is True:
-            self.iteration = 0
+            if start_iteration is None:
+                self.iteration = 0
             optimizer.initialize(self.parameter_names, popsize=self.n_samples,
                                  **params)
 
@@ -804,7 +814,7 @@ class TraceFitter(Fitter):
         return errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
-            restart=False, level=0, **params):
+            restart=False, start_iteration=None, level=0, **params):
         if not isinstance(metric, TraceMetric):
             raise TypeError("You can only use TraceMetric child metric with "
                             "TraceFitter")
@@ -817,6 +827,7 @@ class TraceFitter(Fitter):
         self.bounds = dict(params)
         best_params, error = super().fit(optimizer, metric, n_rounds,
                                          callback, restart,
+                                         start_iteration=start_iteration,
                                          level=level+1,
                                          **params)
         return best_params, error
@@ -831,7 +842,7 @@ class TraceFitter(Fitter):
 
     def refine(self, params=None, t_start=None, t_weights=None, normalization=None,
                callback='text', calc_gradient=False, optimize=True,
-               level=0, **kwds):
+               start_iteration=None, level=0, **kwds):
         """
         Refine the fitting results with a sequentially operating minimization
         algorithm. Uses the `lmfit <https://lmfit.github.io/lmfit-py/>`_
@@ -889,6 +900,10 @@ class TraceFitter(Fitter):
             in the rare case that such a sensitivity variable needs to be
             initialized to a non-zero value. Only taken into account if
             ``calc_gradient`` is ``True``. Defaults to ``True``.
+        start_iteration: int, optional
+            A value for the ``iteration`` variable at the first iteration.
+            If not given, it will continue to increase the value from previous
+            calls to `~.Fitter.fit` or `~.TraceFitter.refine`.
         level : int, optional
             How much farther to go down in the stack to find the namespace.
         kwds
@@ -967,6 +982,9 @@ class TraceFitter(Fitter):
 
         if t_weights is None:
             t_start_steps = int(round(t_start / self.dt))
+
+        if start_iteration is not None:
+            self.iteration = start_iteration
 
         def _calc_error(params):
             param_dic = get_param_dic([params[p] for p in self.parameter_names],
@@ -1080,12 +1098,14 @@ class SpikeFitter(Fitter):
         return errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
-            restart=False, level=0, **params):
+            restart=False, start_iteration=None, level=0, **params):
         if not isinstance(metric, SpikeMetric):
             raise TypeError("You can only use SpikeMetric child metric with "
                             "SpikeFitter")
         best_params, error = super().fit(optimizer, metric, n_rounds,
-                                         callback, restart, level=level+1,
+                                         callback, restart,
+                                         start_iteration=start_iteration,
+                                         level=level+1,
                                          **params)
         return best_params, error
 
@@ -1135,13 +1155,14 @@ class OnlineTraceFitter(Fitter):
         self.simulator = None
 
     def fit(self, optimizer, n_rounds=1, callback='text',
-            restart=False, level=0, **params):
+            restart=False, start_iteration=None, level=0, **params):
         metric = MSEMetric()  # not used, but makes error dimensions correct
         return super(OnlineTraceFitter, self).fit(optimizer, metric=metric,
                                                   n_rounds=n_rounds,
                                                   callback=callback,
                                                   restart=restart,
                                                   online_error=True,
+                                                  start_iteration=start_iteration,
                                                   level=level+1,
                                                   **params)
 
