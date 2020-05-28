@@ -307,7 +307,7 @@ class Fitter(metaclass=abc.ABCMeta):
         self.model = model
 
         self.use_units = use_units
-
+        self.iteration = 0
         input_dim = get_dimensions(input)
         input_dim = '1' if input_dim is DIMENSIONLESS else repr(input_dim)
         input_eqs = "{} = input_var(t, i % n_traces) : {}".format(input_var,
@@ -408,7 +408,8 @@ class Fitter(metaclass=abc.ABCMeta):
         kwds = {}
         if self.method is not None:
             kwds['method'] = self.method
-        neurons = NeuronGroup(n_neurons, self.model,
+        model = self.model + Equations('iteration : integer (constant, shared)')
+        neurons = NeuronGroup(n_neurons, model,
                               threshold=self.threshold, reset=self.reset,
                               refractory=self.refractory, name=name,
                               namespace=namespace, dt=self.dt, **kwds)
@@ -417,7 +418,7 @@ class Fitter(metaclass=abc.ABCMeta):
                                                         parameters=self.parameter_names,
                                                         optimize=optimize,
                                                         namespace=namespace)
-            neurons = NeuronGroup(n_neurons, self.model + sensitivity_eqs,
+            neurons = NeuronGroup(n_neurons, model + sensitivity_eqs,
                                   threshold=self.threshold, reset=self.reset,
                                   refractory=self.refractory, name=name,
                                   namespace=namespace, dt=self.dt, **kwds)
@@ -461,7 +462,8 @@ class Fitter(metaclass=abc.ABCMeta):
 
         d_param = get_param_dic(parameters, self.parameter_names,
                                 self.n_traces, self.n_samples)
-        self.simulator.run(self.duration, d_param, self.parameter_names)
+        self.simulator.run(self.duration, d_param, self.parameter_names,
+                           iteration=self.iteration)
 
         errors = self.calc_errors(metric)
 
@@ -526,6 +528,7 @@ class Fitter(metaclass=abc.ABCMeta):
                 raise Exception("You can not change the optimizer between fits")
 
         if self.optimizer is None or restart is True:
+            self.iteration = 0
             optimizer.initialize(self.parameter_names, popsize=self.n_samples,
                                  **params)
 
@@ -548,6 +551,7 @@ class Fitter(metaclass=abc.ABCMeta):
         for index in range(n_rounds):
             best_params, parameters, errors = self.optimization_iter(optimizer,
                                                                      metric)
+            self.iteration += 1
             self._best_error = nanmin(self.optimizer.errors)
             # create output variables
             self._best_params = make_dic(self.parameter_names, best_params)
@@ -674,7 +678,8 @@ class Fitter(metaclass=abc.ABCMeta):
             data = concatenate((params, array(errors)[None, :].transpose()), axis=1)
             return DataFrame(data=data, columns=names + ['error'])
 
-    def generate(self, output_var=None, params=None, param_init=None, level=0):
+    def generate(self, output_var=None, params=None, param_init=None,
+                 iteration=1e9, level=0):
         """
         Generates traces for best fit of parameters and all inputs.
         If provided with other parameters provides those.
@@ -689,6 +694,14 @@ class Fitter(metaclass=abc.ABCMeta):
             Dictionary of parameters to generate fits for.
         param_init: dict
             Dictionary of initial values for the model.
+        iteration: int, optional
+            Value for the ``iteration`` variable provided to the simulation.
+            Defaults to a high value (1e9). This is based on the assumption
+            that the model implements some coupling of the fitted variable to
+            the target variable, and that this coupling inversely depends on
+            the iteration number. In this case, one would usually want to
+            switch off the coupling when generating traces/spikes for given
+            parameters.
         level : `int`, optional
             How much farther to go down in the stack to find the namespace.
 
@@ -718,7 +731,7 @@ class Fitter(metaclass=abc.ABCMeta):
         param_dic = get_param_dic([params[p] for p in self.parameter_names],
                                   self.parameter_names, self.n_traces, 1)
         self.simulator.run(self.duration, param_dic, self.parameter_names,
-                           name='generate')
+                           iteration=iteration, name='generate')
 
         if not isinstance(output_var, str):
             fits = {name: self._simulation_result(name) for name in output_var}
@@ -808,10 +821,12 @@ class TraceFitter(Fitter):
                                          **params)
         return best_params, error
 
-    def generate_traces(self, params=None, param_init=None, level=0):
+    def generate_traces(self, params=None, param_init=None, iteration=1e9,
+                        level=0):
         """Generates traces for best fit of parameters and all inputs"""
         fits = self.generate(params=params, output_var=self.output_var,
-                             param_init=param_init, level=level+1)
+                             param_init=param_init, iteration=iteration,
+                             level=level+1)
         return fits
 
     def refine(self, params=None, t_start=None, t_weights=None, normalization=None,
@@ -957,7 +972,9 @@ class TraceFitter(Fitter):
             param_dic = get_param_dic([params[p] for p in self.parameter_names],
                                       self.parameter_names, self.n_traces, 1)
             self.simulator.run(self.duration, param_dic,
-                               self.parameter_names, name='refine')
+                               self.parameter_names, iteration=self.iteration,
+                               name='refine')
+            self.iteration += 1
             trace = getattr(self.simulator.statemonitor, self.output_var+'_')
             if t_weights is None:
                 residual = trace[:, t_start_steps:] - self.output_[:, t_start_steps:]
@@ -1072,10 +1089,11 @@ class SpikeFitter(Fitter):
                                          **params)
         return best_params, error
 
-    def generate_spikes(self, params=None, param_init=None, level=0):
+    def generate_spikes(self, params=None, param_init=None, iteration=1e9, level=0):
         """Generates traces for best fit of parameters and all inputs"""
         fits = self.generate(params=params, output_var='spikes',
-                             param_init=param_init, level=level+1)
+                             param_init=param_init, iteration=iteration,
+                             level=level+1)
         return fits
 
 

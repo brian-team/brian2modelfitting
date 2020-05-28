@@ -25,6 +25,7 @@ model2 = Equations('''
                   I = 20* nA :amp
                   gL: siemens (constant)
                   C: farad (constant)
+                  iteration : integer (constant, shared)
                   ''',
                   EL=-70*mV,
                   VT=-50*mV,
@@ -83,18 +84,6 @@ def test_initialize_simulation_runtime(setup):
     assert_raises(TypeError, rts.initialize, Network)
 
 
-def test_run_simulation_runtime(setup):
-    net, dt, duration = setup
-    start_scope()
-
-    rts = RuntimeSimulator()
-    rts.initialize(net, var_init=None)
-
-    rts.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
-    I = getattr(rts.statemonitor, 'I')
-    assert_equal(np.shape(I), (1, duration/dt))
-
-
 def test_run_simulation_runtime_var_init(setup):
     _, dt, duration = setup
     start_scope()
@@ -106,6 +95,6 @@ def test_run_simulation_runtime_var_init(setup):
     rts = RuntimeSimulator()
     rts.initialize(net, var_init={'v': -60*mV})
 
-    rts.run(duration, {'gL': 100, 'C': 10}, ['gL', 'C'])
+    rts.run(duration, {'gL': 100, 'C': 10}, ['gL', 'C'], iteration=0)
     v = getattr(rts.statemonitor, 'v')
     assert_equal(np.shape(v), (1, duration/dt))

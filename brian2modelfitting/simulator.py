@@ -87,7 +87,7 @@ class Simulator(metaclass=abc.ABCMeta):
         self.var_init = var_init
 
     @abc.abstractmethod
-    def run(self, duration, params, params_names, name):
+    def run(self, duration, params, params_names, iteration, name):
         """
         Restores the network, sets neurons to required parameters and runs
         the simulation
@@ -110,11 +110,12 @@ class RuntimeSimulator(Simulator):
         super(RuntimeSimulator, self).initialize(network, var_init, name)
         network.store()
 
-    def run(self, duration, params, params_names, name='fit'):
+    def run(self, duration, params, params_names, iteration, name='fit'):
         self.current_net = name
         network = self.networks[name]
         network.restore()
         self.neurons.set_states(params, units=False)
+        self.neurons.iteration = iteration
         if self.var_init is not None:
             for k, v in self.var_init.items():
                 self.neurons.__setattr__(k, v)
@@ -129,20 +130,24 @@ class CPPStandaloneSimulator(Simulator):
         super(CPPStandaloneSimulator, self).__init__()
         self.params_init = None
 
-    def run(self, duration, params, params_names, name='fit'):
+    def run(self, duration, params, params_names, iteration, name='fit'):
         """
         Simulation has to be run in two stages in order to initialize the
         code generation
         """
         self.current_net = name
         network = self.networks[name]
+        # Include the iteration index in the parameters
+        params_names = sorted(params_names) + ['iteration']
+        params = dict(params)
+        params.update({'iteration': iteration})
         if not device.has_been_run:
             self.params_init = initialize_neurons(params_names, self.neurons,
                                                   params)
             if self.var_init is not None:
                 for k, v in self.var_init.items():
                     self.neurons.__setattr__(k, v)
-
+            self.neurons.iteration = iteration
             network.run(duration, namespace={})
         else:
             set_states(self.params_init, params)
