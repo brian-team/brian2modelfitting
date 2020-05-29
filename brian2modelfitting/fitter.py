@@ -262,7 +262,7 @@ class Fitter(metaclass=abc.ABCMeta):
         refractory after a spike (e.g. 'v > -20*mV')
     method: `str`, optional
         Integration method
-    penalty_term : str, `~numpy.ndarray`, or float, optional
+    penalty : str, `~numpy.ndarray`, or float, optional
         The name of a variable or subexpression in the model that will be
         added to the error at the end of each iteration. Note that only
         the term at the end of the simulation is taken into account, so
@@ -274,7 +274,7 @@ class Fitter(metaclass=abc.ABCMeta):
     """
     def __init__(self, dt, model, input, output, input_var, output_var,
                  n_samples, threshold, reset, refractory, method, param_init,
-                 penalty_term, use_units=True):
+                 penalty, use_units=True):
         """Initialize the fitter."""
 
         if dt is None:
@@ -299,7 +299,7 @@ class Fitter(metaclass=abc.ABCMeta):
         self.threshold = threshold
         self.reset = reset
         self.refractory = refractory
-        self.penalty_term = penalty_term
+        self.penalty = penalty
 
         self.input = input
         self.output_var = output_var
@@ -451,7 +451,7 @@ class Fitter(metaclass=abc.ABCMeta):
         """
         pass
 
-    def optimization_iter(self, optimizer, metric, penalty_term):
+    def optimization_iter(self, optimizer, metric, penalty):
         """
         Function performs all operations required for one iteration of
         optimization. Drawing parameters, setting them to simulator and
@@ -461,7 +461,7 @@ class Fitter(metaclass=abc.ABCMeta):
         ----------
         optimizer : `Optimizer`
         metric : `Metric`
-        penalty_term : str, `~numpy.ndarray`, or float, optional
+        penalty : str, `~numpy.ndarray`, or float, optional
             The name of a variable or subexpression in the model that will be
             added to the error at the end of each iteration. Note that only
             the term at the end of the simulation is taken into account, so
@@ -486,15 +486,15 @@ class Fitter(metaclass=abc.ABCMeta):
                            iteration=self.iteration)
 
         errors = self.calc_errors(metric)
-        penalty = None
-        if isinstance(penalty_term, str):
-            penalty = getattr(self.simulator.neurons, penalty_term)
-        elif penalty_term is not None:
-            penalty = penalty_term
-        if not self.use_units and penalty is not None:
-            penalty = array(penalty)
-        if penalty is not None:
-            errors += penalty
+        error_penalty = None
+        if isinstance(penalty, str):
+            error_penalty = getattr(self.simulator.neurons, penalty)
+        elif penalty is not None:
+            error_penalty = penalty
+        if not self.use_units and error_penalty is not None:
+            error_penalty = array(error_penalty)
+        if error_penalty is not None:
+            errors += error_penalty
 
         optimizer.tell(parameters, errors)
 
@@ -504,7 +504,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
             restart=False, online_error=False, start_iteration=None,
-            penalty_term=None, level=0, **params):
+            penalty=None, level=0, **params):
         """
         Run the optimization algorithm for given amount of rounds with given
         number of samples drawn. Return best set of parameters and
@@ -536,7 +536,7 @@ class Fitter(metaclass=abc.ABCMeta):
             If not given, will use 0 for the first call of ``fit`` (and for
             later calls when ``restart`` is specified). Later calls will
             continue to increase the value from the previous calls.
-        penalty_term : str, `~numpy.ndarray`, or float, optional
+        penalty : str, `~numpy.ndarray`, or float, optional
             The name of a variable or subexpression in the model that will be
             added to the error at the end of each iteration. Note that only
             the term at the end of the simulation is taken into account, so
@@ -573,13 +573,13 @@ class Fitter(metaclass=abc.ABCMeta):
         if start_iteration is not None:
             self.iteration = start_iteration
 
-        if penalty_term is None:
-            penalty_term = self.penalty_term
+        if penalty is None:
+            penalty = self.penalty
 
-        if isinstance(penalty_term, ndarray):
-            penalty_term = broadcast_to(penalty_term,
-                                        (self.n_samples, self.n_traces),
-                                        subok=True)
+        if isinstance(penalty, ndarray):
+            penalty = broadcast_to(penalty,
+                                   (self.n_samples, self.n_traces),
+                                   subok=True)
 
         if self.optimizer is None or restart is True:
             if start_iteration is None:
@@ -606,7 +606,7 @@ class Fitter(metaclass=abc.ABCMeta):
         for index in range(n_rounds):
             best_params, parameters, errors = self.optimization_iter(optimizer,
                                                                      metric,
-                                                                     penalty_term)
+                                                                     penalty)
             self.iteration += 1
             self._best_error = nanmin(self.optimizer.errors)
             # create output variables
@@ -830,10 +830,10 @@ class TraceFitter(Fitter):
     """
     def __init__(self, model, input_var, input, output_var, output, dt,
                  n_samples=30, method=None, reset=None, refractory=False,
-                 threshold=None, param_init=None, penalty_term=None, use_units=True):
+                 threshold=None, param_init=None, penalty=None, use_units=True):
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method,
-                         param_init, penalty_term=penalty_term, use_units=use_units)
+                         param_init, penalty=penalty, use_units=use_units)
         self.output = Quantity(output)
         self.output_ = array(output)
         # We store the bounds set in TraceFitter.fit, so that Tracefitter.refine
@@ -860,7 +860,7 @@ class TraceFitter(Fitter):
         return errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
-            restart=False, start_iteration=None, penalty_term=None,
+            restart=False, start_iteration=None, penalty=None,
             level=0, **params):
         if not isinstance(metric, TraceMetric):
             raise TypeError("You can only use TraceMetric child metric with "
@@ -875,7 +875,7 @@ class TraceFitter(Fitter):
         best_params, error = super().fit(optimizer, metric, n_rounds,
                                          callback, restart,
                                          start_iteration=start_iteration,
-                                         penalty_term=penalty_term,
+                                         penalty=penalty,
                                          level=level+1,
                                          **params)
         return best_params, error
@@ -1115,14 +1115,14 @@ class TraceFitter(Fitter):
 class SpikeFitter(Fitter):
     def __init__(self, model, input, output, dt, reset, threshold,
                  input_var='I', refractory=False, n_samples=30,
-                 method=None, param_init=None, penalty_term=None,
+                 method=None, param_init=None, penalty=None,
                  use_units=True):
         """Initialize the fitter."""
         if method is None:
             method = 'exponential_euler'
         super().__init__(dt, model, input, output, input_var, 'spikes',
                          n_samples, threshold, reset, refractory, method,
-                         param_init, penalty_term=penalty_term,
+                         param_init, penalty=penalty,
                          use_units=use_units)
         self.output = [Quantity(o) for o in output]
         self.output_ = [array(o) for o in output]
@@ -1147,7 +1147,7 @@ class SpikeFitter(Fitter):
         return errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
-            restart=False, start_iteration=None, penalty_term=None,
+            restart=False, start_iteration=None, penalty=None,
             level=0, **params):
         if not isinstance(metric, SpikeMetric):
             raise TypeError("You can only use SpikeMetric child metric with "
@@ -1155,7 +1155,7 @@ class SpikeFitter(Fitter):
         best_params, error = super().fit(optimizer, metric, n_rounds,
                                          callback, restart,
                                          start_iteration=start_iteration,
-                                         penalty_term=penalty_term,
+                                         penalty=penalty,
                                          level=level+1,
                                          **params)
         return best_params, error
@@ -1170,13 +1170,13 @@ class SpikeFitter(Fitter):
 
 class OnlineTraceFitter(Fitter):
     def __init__(self, model, input_var, input, output_var, output, dt,
-                 n_samples=30,  method=None, reset=None, refractory=False,
+                 n_samples=30, method=None, reset=None, refractory=False,
                  threshold=None, param_init=None,
-                 t_start=0*second, penalty_term=None):
+                 t_start=0*second, penalty=None):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method,
-                         param_init, penalty_term=penalty_term)
+                         param_init, penalty=penalty)
 
         self.output = Quantity(output)
         self.output_ = array(output)
@@ -1206,7 +1206,7 @@ class OnlineTraceFitter(Fitter):
         self.simulator = None
 
     def fit(self, optimizer, n_rounds=1, callback='text',
-            restart=False, start_iteration=None, penalty_term=None,
+            restart=False, start_iteration=None, penalty=None,
             level=0, **params):
         metric = MSEMetric()  # not used, but makes error dimensions correct
         return super(OnlineTraceFitter, self).fit(optimizer, metric=metric,
@@ -1214,7 +1214,7 @@ class OnlineTraceFitter(Fitter):
                                                   callback=callback,
                                                   restart=restart,
                                                   online_error=True,
-                                                  penalty_term=penalty_term,
+                                                  penalty=penalty,
                                                   start_iteration=start_iteration,
                                                   level=level+1,
                                                   **params)
