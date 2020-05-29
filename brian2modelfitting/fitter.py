@@ -842,7 +842,7 @@ class TraceFitter(Fitter):
 
     def refine(self, params=None, t_start=None, t_weights=None, normalization=None,
                callback='text', calc_gradient=False, optimize=True,
-               start_iteration=None, level=0, **kwds):
+               iteration=1e9, level=0, **kwds):
         """
         Refine the fitting results with a sequentially operating minimization
         algorithm. Uses the `lmfit <https://lmfit.github.io/lmfit-py/>`_
@@ -900,10 +900,13 @@ class TraceFitter(Fitter):
             in the rare case that such a sensitivity variable needs to be
             initialized to a non-zero value. Only taken into account if
             ``calc_gradient`` is ``True``. Defaults to ``True``.
-        start_iteration: int, optional
-            A value for the ``iteration`` variable at the first iteration.
-            If not given, it will continue to increase the value from previous
-            calls to `~.Fitter.fit` or `~.TraceFitter.refine`.
+        iteration: int, optional
+            Value for the ``iteration`` variable provided to the simulation.
+            Defaults to a high value (1e9). This is based on the assumption
+            that the model implements some coupling of the fitted variable to
+            the target variable, and that this coupling inversely depends on
+            the iteration number. In this case, one would usually want to
+            switch off the coupling when refining the solution.
         level : int, optional
             How much farther to go down in the stack to find the namespace.
         kwds
@@ -983,16 +986,12 @@ class TraceFitter(Fitter):
         if t_weights is None:
             t_start_steps = int(round(t_start / self.dt))
 
-        if start_iteration is not None:
-            self.iteration = start_iteration
-
         def _calc_error(params):
             param_dic = get_param_dic([params[p] for p in self.parameter_names],
                                       self.parameter_names, self.n_traces, 1)
             self.simulator.run(self.duration, param_dic,
-                               self.parameter_names, iteration=self.iteration,
+                               self.parameter_names, iteration=iteration,
                                name='refine')
-            self.iteration += 1
             trace = getattr(self.simulator.statemonitor, self.output_var+'_')
             if t_weights is None:
                 residual = trace[:, t_start_steps:] - self.output_[:, t_start_steps:]
