@@ -262,13 +262,11 @@ class Fitter(metaclass=abc.ABCMeta):
         refractory after a spike (e.g. 'v > -20*mV')
     method: `str`, optional
         Integration method
-    penalty : str, `~numpy.ndarray`, or float, optional
+    penalty : str, optional
         The name of a variable or subexpression in the model that will be
         added to the error at the end of each iteration. Note that only
         the term at the end of the simulation is taken into account, so
-        this term should not be varying in time. Alternatively, a fixed
-        value can be given: either a single number or an array of shape
-        ``(n_samples, n_traces)``.
+        this term should not be varying in time.
     param_init: `dict`, optional
         Dictionary of variables to be initialized with respective values
     """
@@ -461,13 +459,11 @@ class Fitter(metaclass=abc.ABCMeta):
         ----------
         optimizer : `Optimizer`
         metric : `Metric`
-        penalty : str, `~numpy.ndarray`, or float, optional
+        penalty : str, optional
             The name of a variable or subexpression in the model that will be
             added to the error at the end of each iteration. Note that only
             the term at the end of the simulation is taken into account, so
-            this term should not be varying in time. Alternatively, a fixed
-            value can be given: either a single number or an array of shape
-            ``(n_samples, n_traces)``.
+            this term should not be varying in time.
 
         Returns
         -------
@@ -486,14 +482,16 @@ class Fitter(metaclass=abc.ABCMeta):
                            iteration=self.iteration)
 
         errors = self.calc_errors(metric)
-        error_penalty = None
-        if isinstance(penalty, str):
-            error_penalty = getattr(self.simulator.neurons, penalty)
-        elif penalty is not None:
-            error_penalty = penalty
-        if not self.use_units and error_penalty is not None:
-            error_penalty = array(error_penalty)
-        if error_penalty is not None:
+
+        if penalty is not None:
+            error_penalty = getattr(self.simulator.neurons, penalty + '_')
+            if self.use_units:
+                error_dim = metric.get_dimensions(self.output_dim)
+                penalty_dim = self.simulator.neurons.variables[penalty].dim
+                fail_for_dimension_mismatch(error_dim, penalty_dim,
+                                            error_message='The term used as penalty has to have '
+                                                          'the same units as the error.')
+
             errors += error_penalty
 
         optimizer.tell(parameters, errors)
@@ -536,14 +534,12 @@ class Fitter(metaclass=abc.ABCMeta):
             If not given, will use 0 for the first call of ``fit`` (and for
             later calls when ``restart`` is specified). Later calls will
             continue to increase the value from the previous calls.
-        penalty : str, `~numpy.ndarray`, or float, optional
+        penalty : str, optional
             The name of a variable or subexpression in the model that will be
             added to the error at the end of each iteration. Note that only
             the term at the end of the simulation is taken into account, so
-            this term should not be varying in time. Alternatively, a fixed
-            value can be given: either a single number or an array of shape
-            ``(n_samples, n_traces)``. If not given, will reuse the value
-            specified during ``Fitter`` initialization.
+            this term should not be varying in time. If not given, will reuse
+            the value specified during ``Fitter`` initialization.
         level : `int`, optional
             How much farther to go down in the stack to find the namespace.
         **params
@@ -575,11 +571,6 @@ class Fitter(metaclass=abc.ABCMeta):
 
         if penalty is None:
             penalty = self.penalty
-
-        if isinstance(penalty, ndarray):
-            penalty = broadcast_to(penalty,
-                                   (self.n_samples, self.n_traces),
-                                   subok=True)
 
         if self.optimizer is None or restart is True:
             if start_iteration is None:

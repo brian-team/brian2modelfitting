@@ -42,6 +42,12 @@ constant_model = Equations('''
     v = c + x: volt
     c : volt (constant)''')
 
+all_constant_model = Equations('''
+    v = 10*mV + x: volt
+    c : volt (constant)
+    penalty_fixed = 10*mV**2: volt**2
+    penalty_wrong_unit = 10*mV : volt''')
+
 n_opt = NevergradOptimizer()
 metric = MSEMetric()
 
@@ -92,10 +98,31 @@ def setup_constant(request):
                      output_var='v',
                      input=(np.zeros(100)*mV)[None, :],
                      output=out_trace[None, :],
-                     n_samples=100)
+                     n_samples=70)
 
     def fin():
         reinit_devices()
+    request.addfinalizer(fin)
+
+    return dt, tf
+
+@pytest.fixture
+def setup_all_constant(request):
+    dt = 0.1 * ms
+    # Membrane potential is constant at 10mV all the time and
+    # does not depend on the parameter
+    out_trace = np.ones((2, 100)) * 10 * mV
+    tf = TraceFitter(dt=dt,
+                     model=all_constant_model,
+                     input_var='x',
+                     output_var='v',
+                     input=(np.zeros((2, 100)) * mV),
+                     output=out_trace,
+                     n_samples=70)
+
+    def fin():
+        reinit_devices()
+
     request.addfinalizer(fin)
 
     return dt, tf
@@ -366,6 +393,24 @@ def test_fitter_fit_tsteps(setup_constant):
                             c=[0 * mV, 30 * mV])
     # Fit should be close to 20mV
     assert np.abs(params['c'] - 20*mV) < 1*mV
+
+
+def test_fitter_fit_penalty(setup_all_constant):
+    dt, tf = setup_all_constant
+
+    params, result = tf.fit(n_rounds=2, optimizer=n_opt,
+                            metric=metric,
+                            c=[19.9*mV, 20.1*mV],  # real error is minimal
+                            callback=None,
+                            penalty='penalty_fixed')
+    assert abs(float(result - 10*mV**2)) < 1e-6
+
+    with pytest.raises(DimensionMismatchError):
+        params, result = tf.fit(n_rounds=2, optimizer=n_opt,
+                                c=[19.9 * mV, 20.1 * mV],  # real error is minimal
+                                metric=metric,
+                                callback=None,
+                                penalty='penalty_wrong_unit')
 
 
 @pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
