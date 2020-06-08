@@ -245,6 +245,7 @@ def test_fitter_fit(setup):
     attr_fit = ['optimizer', 'metric', 'best_params']
     for attr in attr_fit:
         assert hasattr(tf, attr)
+    assert tf.simulator.neurons.iteration == 1
 
     assert isinstance(tf.metric, Metric)
     assert isinstance(tf.optimizer, Optimizer)
@@ -628,17 +629,44 @@ def test_fit_restart(setup):
                              optimizer=n_opt,
                              metric=metric,
                              g=[1*nS, 30*nS])
+    assert tf.simulator.neurons.iteration == 1
 
     results, errors = tf.fit(n_rounds=2,
                              optimizer=n_opt,
                              metric=metric,
                              g=[1*nS, 30*nS])
+    assert tf.simulator.neurons.iteration == 3
 
     results, errors = tf.fit(n_rounds=2,
                              restart=True,
                              optimizer=n_opt,
                              metric=metric,
                              g=[1*nS, 30*nS])
+    assert tf.simulator.neurons.iteration == 1
+
+
+def test_fit_set_start_iteration(setup):
+    dt, tf = setup
+    results, errors = tf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             g=[1 * nS, 30 * nS],
+                             start_iteration=17)
+    assert tf.simulator.neurons.iteration == 18
+
+    results, errors = tf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=metric,
+                             g=[1 * nS, 30 * nS])
+    assert tf.simulator.neurons.iteration == 20
+
+    results, errors = tf.fit(n_rounds=2,
+                             restart=True,
+                             optimizer=n_opt,
+                             metric=metric,
+                             g=[1 * nS, 30 * nS],
+                             start_iteration=5)
+    assert tf.simulator.neurons.iteration == 6
 
 
 def test_fit_continue_with_generate(setup):
@@ -863,7 +891,7 @@ def test_onlinetracefitter_fit(setup_online):
                               optimizer=n_opt,
                               g=[1*nS, 30*nS],
                               restart=False,)
-    print(otf.best_params)
+    assert otf.simulator.neurons.iteration == 1
     attr_fit = ['optimizer', 'metric', 'best_params']
     for attr in attr_fit:
         assert hasattr(otf, attr)
