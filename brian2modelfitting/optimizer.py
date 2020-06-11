@@ -137,7 +137,7 @@ class NevergradOptimizer(Optimizer):
                  **kwds):
         super(Optimizer, self).__init__()
 
-        if method not in list(registry.keys()):
+        if method not in registry:
             raise AssertionError("Unknown to Nevergrad optimization method:"
                                  + method)
         self.tested_parameters = []
@@ -149,7 +149,7 @@ class NevergradOptimizer(Optimizer):
     def initialize(self, parameter_names, popsize, **params):
         self.tested_parameters = []
         self.errors = []
-        for param in params.keys():
+        for param in params:
             if param not in parameter_names:
                 raise ValueError("Parameter %s must be defined as a parameter "
                                  "in the model" % param)
@@ -159,9 +159,9 @@ class NevergradOptimizer(Optimizer):
         instruments = []
         for i, name in enumerate(parameter_names):
             assert len(bounds[i]) == 2
-            vars()[name] = inst.var.Array(1).asscalar().bounded(np.array([bounds[i][0]]),
-                                                                np.array([bounds[i][1]]))
-            instruments.append(vars()[name])
+            instrumentation = inst.var.Array(1).asscalar().bounded(np.array([bounds[i][0]]),
+                                                                   np.array([bounds[i][1]]))
+            instruments.append(instrumentation)
 
         instrum = inst.Instrumentation(*instruments)
         self.optim = optimizerlib.registry[self.method](instrumentation=instrum,
@@ -239,8 +239,8 @@ class SkoptOptimizer(Optimizer):
 
         instruments = []
         for i, name in enumerate(parameter_names):
-            vars()[name] = Real(*np.asarray(bounds[i]), transform='normalize')
-            instruments.append(vars()[name])
+            instrumentation = Real(*np.asarray(bounds[i]), transform='normalize')
+            instruments.append(instrumentation)
 
         self.optim = skoptOptimizer(
             dimensions=instruments,
