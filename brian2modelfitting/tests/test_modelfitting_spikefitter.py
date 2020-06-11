@@ -126,7 +126,7 @@ def test_spikefitter_fit(setup):
                              metric=metric,
                              gL=[20*nS, 40*nS],
                              C=[0.5*nF, 1.5*nF])
-
+    assert sf.simulator.neurons.iteration == 1
     attr_fit = ['optimizer', 'metric', 'best_params']
     for attr in attr_fit:
         assert hasattr(sf, attr)

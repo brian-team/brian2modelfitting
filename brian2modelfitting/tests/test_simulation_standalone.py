@@ -23,7 +23,7 @@ model = Equations('''
 empty_net = Network()
 
 
-@pytest.fixture()
+@pytest.fixture
 def setup(request):
     dt = 0.1 * ms
     duration = 10 * ms
@@ -40,14 +40,14 @@ def setup(request):
     return net, dt, duration
 
 
-@pytest.fixture()
+@pytest.fixture
 def setup_standalone(request):
     # Workaround to avoid issues with Network instances still around
     Network.__instances__().clear()
     set_device('cpp_standalone', directory=None)
     dt = 0.1 * ms
     duration = 10 * ms
-    neurons = NeuronGroup(1, model, name='neurons')
+    neurons = NeuronGroup(1, model + Equations('iteration: integer (constant, shared)'), name='neurons')
     monitor = StateMonitor(neurons, 'I', record=True, name='statemonitor')
 
     net = Network(neurons, monitor)
@@ -99,6 +99,6 @@ def test_run_simulation_standalone(setup_standalone):
     sas = CPPStandaloneSimulator()
     sas.initialize(net, var_init=None)
 
-    sas.run(duration, {'g': 100, 'E': 10}, ['g', 'E'])
+    sas.run(duration, {'g': 100, 'E': 10}, ['g', 'E'], iteration=0)
     I = getattr(sas.statemonitor, 'I')
     assert_equal(np.shape(I), (1, duration/dt))

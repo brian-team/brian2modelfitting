@@ -2,7 +2,7 @@ import abc
 import numbers
 
 import sympy
-from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape, zeros, sqrt
+from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape, zeros, sqrt, ndarray, broadcast_to
 
 from brian2.parsing.sympytools import sympy_to_str, str_to_sympy
 from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions, fail_for_dimension_mismatch
@@ -262,12 +262,17 @@ class Fitter(metaclass=abc.ABCMeta):
         refractory after a spike (e.g. 'v > -20*mV')
     method: `str`, optional
         Integration method
+    penalty : str, optional
+        The name of a variable or subexpression in the model that will be
+        added to the error at the end of each iteration. Note that only
+        the term at the end of the simulation is taken into account, so
+        this term should not be varying in time.
     param_init: `dict`, optional
         Dictionary of variables to be initialized with respective values
     """
     def __init__(self, dt, model, input, output, input_var, output_var,
                  n_samples, threshold, reset, refractory, method, param_init,
-                 use_units=True):
+                 penalty, use_units=True):
         """Initialize the fitter."""
 
         if dt is None:
@@ -292,6 +297,7 @@ class Fitter(metaclass=abc.ABCMeta):
         self.threshold = threshold
         self.reset = reset
         self.refractory = refractory
+        self.penalty = penalty
 
         self.input = input
         self.output_var = output_var
@@ -307,7 +313,7 @@ class Fitter(metaclass=abc.ABCMeta):
         self.model = model
 
         self.use_units = use_units
-
+        self.iteration = 0
         input_dim = get_dimensions(input)
         input_dim = '1' if input_dim is DIMENSIONLESS else repr(input_dim)
         input_eqs = "{} = input_var(t, i % n_traces) : {}".format(input_var,
@@ -408,7 +414,8 @@ class Fitter(metaclass=abc.ABCMeta):
         kwds = {}
         if self.method is not None:
             kwds['method'] = self.method
-        neurons = NeuronGroup(n_neurons, self.model,
+        model = self.model + Equations('iteration : integer (constant, shared)')
+        neurons = NeuronGroup(n_neurons, model,
                               threshold=self.threshold, reset=self.reset,
                               refractory=self.refractory, name=name,
                               namespace=namespace, dt=self.dt, **kwds)
@@ -417,7 +424,7 @@ class Fitter(metaclass=abc.ABCMeta):
                                                         parameters=self.parameter_names,
                                                         optimize=optimize,
                                                         namespace=namespace)
-            neurons = NeuronGroup(n_neurons, self.model + sensitivity_eqs,
+            neurons = NeuronGroup(n_neurons, model + sensitivity_eqs,
                                   threshold=self.threshold, reset=self.reset,
                                   refractory=self.refractory, name=name,
                                   namespace=namespace, dt=self.dt, **kwds)
@@ -442,11 +449,21 @@ class Fitter(metaclass=abc.ABCMeta):
         """
         pass
 
-    def optimization_iter(self, optimizer, metric):
+    def optimization_iter(self, optimizer, metric, penalty):
         """
         Function performs all operations required for one iteration of
         optimization. Drawing parameters, setting them to simulator and
         calulating the error.
+
+        Parameters
+        ----------
+        optimizer : `Optimizer`
+        metric : `Metric`
+        penalty : str, optional
+            The name of a variable or subexpression in the model that will be
+            added to the error at the end of each iteration. Note that only
+            the term at the end of the simulation is taken into account, so
+            this term should not be varying in time.
 
         Returns
         -------
@@ -461,9 +478,21 @@ class Fitter(metaclass=abc.ABCMeta):
 
         d_param = get_param_dic(parameters, self.parameter_names,
                                 self.n_traces, self.n_samples)
-        self.simulator.run(self.duration, d_param, self.parameter_names)
+        self.simulator.run(self.duration, d_param, self.parameter_names,
+                           iteration=self.iteration)
 
         errors = self.calc_errors(metric)
+
+        if penalty is not None:
+            error_penalty = getattr(self.simulator.neurons, penalty + '_')
+            if self.use_units:
+                error_dim = metric.get_dimensions(self.output_dim)
+                penalty_dim = self.simulator.neurons.variables[penalty].dim
+                fail_for_dimension_mismatch(error_dim, penalty_dim,
+                                            error_message='The term used as penalty has to have '
+                                                          'the same units as the error.')
+
+            errors += error_penalty
 
         optimizer.tell(parameters, errors)
 
@@ -472,7 +501,8 @@ class Fitter(metaclass=abc.ABCMeta):
         return results, parameters, errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
-            restart=False, online_error=False, level=0, **params):
+            restart=False, online_error=False, start_iteration=None,
+            penalty=None, level=0, **params):
         """
         Run the optimization algorithm for given amount of rounds with given
         number of samples drawn. Return best set of parameters and
@@ -499,7 +529,18 @@ class Fitter(metaclass=abc.ABCMeta):
         online_error: bool, optional
             Whether to calculate the squared error between target trace and
             simulated trace online. Defaults to ``False``.
-         level : `int`, optional
+        start_iteration: int, optional
+            A value for the ``iteration`` variable at the first iteration.
+            If not given, will use 0 for the first call of ``fit`` (and for
+            later calls when ``restart`` is specified). Later calls will
+            continue to increase the value from the previous calls.
+        penalty : str, optional
+            The name of a variable or subexpression in the model that will be
+            added to the error at the end of each iteration. Note that only
+            the term at the end of the simulation is taken into account, so
+            this term should not be varying in time. If not given, will reuse
+            the value specified during ``Fitter`` initialization.
+        level : `int`, optional
             How much farther to go down in the stack to find the namespace.
         **params
             bounds for each parameter
@@ -525,7 +566,15 @@ class Fitter(metaclass=abc.ABCMeta):
             if optimizer is not self.optimizer:
                 raise Exception("You can not change the optimizer between fits")
 
+        if start_iteration is not None:
+            self.iteration = start_iteration
+
+        if penalty is None:
+            penalty = self.penalty
+
         if self.optimizer is None or restart is True:
+            if start_iteration is None:
+                self.iteration = 0
             optimizer.initialize(self.parameter_names, popsize=self.n_samples,
                                  **params)
 
@@ -547,7 +596,9 @@ class Fitter(metaclass=abc.ABCMeta):
         # Run Optimization Loop
         for index in range(n_rounds):
             best_params, parameters, errors = self.optimization_iter(optimizer,
-                                                                     metric)
+                                                                     metric,
+                                                                     penalty)
+            self.iteration += 1
             self._best_error = nanmin(self.optimizer.errors)
             # create output variables
             self._best_params = make_dic(self.parameter_names, best_params)
@@ -674,7 +725,8 @@ class Fitter(metaclass=abc.ABCMeta):
             data = concatenate((params, array(errors)[None, :].transpose()), axis=1)
             return DataFrame(data=data, columns=names + ['error'])
 
-    def generate(self, output_var=None, params=None, param_init=None, level=0):
+    def generate(self, output_var=None, params=None, param_init=None,
+                 iteration=1e9, level=0):
         """
         Generates traces for best fit of parameters and all inputs.
         If provided with other parameters provides those.
@@ -689,6 +741,14 @@ class Fitter(metaclass=abc.ABCMeta):
             Dictionary of parameters to generate fits for.
         param_init: dict
             Dictionary of initial values for the model.
+        iteration: int, optional
+            Value for the ``iteration`` variable provided to the simulation.
+            Defaults to a high value (1e9). This is based on the assumption
+            that the model implements some coupling of the fitted variable to
+            the target variable, and that this coupling inversely depends on
+            the iteration number. In this case, one would usually want to
+            switch off the coupling when generating traces/spikes for given
+            parameters.
         level : `int`, optional
             How much farther to go down in the stack to find the namespace.
 
@@ -718,7 +778,7 @@ class Fitter(metaclass=abc.ABCMeta):
         param_dic = get_param_dic([params[p] for p in self.parameter_names],
                                   self.parameter_names, self.n_traces, 1)
         self.simulator.run(self.duration, param_dic, self.parameter_names,
-                           name='generate')
+                           iteration=iteration, name='generate')
 
         if not isinstance(output_var, str):
             fits = {name: self._simulation_result(name) for name in output_var}
@@ -761,10 +821,10 @@ class TraceFitter(Fitter):
     """
     def __init__(self, model, input_var, input, output_var, output, dt,
                  n_samples=30, method=None, reset=None, refractory=False,
-                 threshold=None, param_init=None, use_units=True):
+                 threshold=None, param_init=None, penalty=None, use_units=True):
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method,
-                         param_init, use_units=use_units)
+                         param_init, penalty=penalty, use_units=use_units)
         self.output = Quantity(output)
         self.output_ = array(output)
         # We store the bounds set in TraceFitter.fit, so that Tracefitter.refine
@@ -791,7 +851,8 @@ class TraceFitter(Fitter):
         return errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
-            restart=False, level=0, **params):
+            restart=False, start_iteration=None, penalty=None,
+            level=0, **params):
         if not isinstance(metric, TraceMetric):
             raise TypeError("You can only use TraceMetric child metric with "
                             "TraceFitter")
@@ -804,19 +865,23 @@ class TraceFitter(Fitter):
         self.bounds = dict(params)
         best_params, error = super().fit(optimizer, metric, n_rounds,
                                          callback, restart,
+                                         start_iteration=start_iteration,
+                                         penalty=penalty,
                                          level=level+1,
                                          **params)
         return best_params, error
 
-    def generate_traces(self, params=None, param_init=None, level=0):
+    def generate_traces(self, params=None, param_init=None, iteration=1e9,
+                        level=0):
         """Generates traces for best fit of parameters and all inputs"""
         fits = self.generate(params=params, output_var=self.output_var,
-                             param_init=param_init, level=level+1)
+                             param_init=param_init, iteration=iteration,
+                             level=level+1)
         return fits
 
     def refine(self, params=None, t_start=None, t_weights=None, normalization=None,
                callback='text', calc_gradient=False, optimize=True,
-               level=0, **kwds):
+               iteration=1e9, level=0, **kwds):
         """
         Refine the fitting results with a sequentially operating minimization
         algorithm. Uses the `lmfit <https://lmfit.github.io/lmfit-py/>`_
@@ -874,6 +939,13 @@ class TraceFitter(Fitter):
             in the rare case that such a sensitivity variable needs to be
             initialized to a non-zero value. Only taken into account if
             ``calc_gradient`` is ``True``. Defaults to ``True``.
+        iteration: int, optional
+            Value for the ``iteration`` variable provided to the simulation.
+            Defaults to a high value (1e9). This is based on the assumption
+            that the model implements some coupling of the fitted variable to
+            the target variable, and that this coupling inversely depends on
+            the iteration number. In this case, one would usually want to
+            switch off the coupling when refining the solution.
         level : int, optional
             How much farther to go down in the stack to find the namespace.
         kwds
@@ -957,7 +1029,8 @@ class TraceFitter(Fitter):
             param_dic = get_param_dic([params[p] for p in self.parameter_names],
                                       self.parameter_names, self.n_traces, 1)
             self.simulator.run(self.duration, param_dic,
-                               self.parameter_names, name='refine')
+                               self.parameter_names, iteration=iteration,
+                               name='refine')
             trace = getattr(self.simulator.statemonitor, self.output_var+'_')
             if t_weights is None:
                 residual = trace[:, t_start_steps:] - self.output_[:, t_start_steps:]
@@ -1033,13 +1106,15 @@ class TraceFitter(Fitter):
 class SpikeFitter(Fitter):
     def __init__(self, model, input, output, dt, reset, threshold,
                  input_var='I', refractory=False, n_samples=30,
-                 method=None, param_init=None, use_units=True):
+                 method=None, param_init=None, penalty=None,
+                 use_units=True):
         """Initialize the fitter."""
         if method is None:
             method = 'exponential_euler'
         super().__init__(dt, model, input, output, input_var, 'spikes',
                          n_samples, threshold, reset, refractory, method,
-                         param_init, use_units=use_units)
+                         param_init, penalty=penalty,
+                         use_units=use_units)
         self.output = [Quantity(o) for o in output]
         self.output_ = [array(o) for o in output]
 
@@ -1063,31 +1138,36 @@ class SpikeFitter(Fitter):
         return errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
-            restart=False, level=0, **params):
+            restart=False, start_iteration=None, penalty=None,
+            level=0, **params):
         if not isinstance(metric, SpikeMetric):
             raise TypeError("You can only use SpikeMetric child metric with "
                             "SpikeFitter")
         best_params, error = super().fit(optimizer, metric, n_rounds,
-                                         callback, restart, level=level+1,
+                                         callback, restart,
+                                         start_iteration=start_iteration,
+                                         penalty=penalty,
+                                         level=level+1,
                                          **params)
         return best_params, error
 
-    def generate_spikes(self, params=None, param_init=None, level=0):
+    def generate_spikes(self, params=None, param_init=None, iteration=1e9, level=0):
         """Generates traces for best fit of parameters and all inputs"""
         fits = self.generate(params=params, output_var='spikes',
-                             param_init=param_init, level=level+1)
+                             param_init=param_init, iteration=iteration,
+                             level=level+1)
         return fits
 
 
 class OnlineTraceFitter(Fitter):
     def __init__(self, model, input_var, input, output_var, output, dt,
-                 n_samples=30,  method=None, reset=None, refractory=False,
+                 n_samples=30, method=None, reset=None, refractory=False,
                  threshold=None, param_init=None,
-                 t_start=0*second):
+                 t_start=0*second, penalty=None):
         """Initialize the fitter."""
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method,
-                         param_init)
+                         param_init, penalty=penalty)
 
         self.output = Quantity(output)
         self.output_ = array(output)
@@ -1117,13 +1197,16 @@ class OnlineTraceFitter(Fitter):
         self.simulator = None
 
     def fit(self, optimizer, n_rounds=1, callback='text',
-            restart=False, level=0, **params):
+            restart=False, start_iteration=None, penalty=None,
+            level=0, **params):
         metric = MSEMetric()  # not used, but makes error dimensions correct
         return super(OnlineTraceFitter, self).fit(optimizer, metric=metric,
                                                   n_rounds=n_rounds,
                                                   callback=callback,
                                                   restart=restart,
                                                   online_error=True,
+                                                  penalty=penalty,
+                                                  start_iteration=start_iteration,
                                                   level=level+1,
                                                   **params)
 

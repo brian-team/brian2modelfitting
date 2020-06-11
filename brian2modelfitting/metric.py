@@ -266,7 +266,7 @@ class TraceMetric(Metric):
             for fitting. A value of 0 means that data points are ignored. The
             weight values will be normalized so only the relative values matter.
             For example, an array containing 1s, and 2s, will weigh the
-            regions with 2s twice as high (with resepct to the squared error)
+            regions with 2s twice as high (with respect to the squared error)
             as the regions with 1s. Using instead values of 0.5 and 1 would have
             the same effect. Cannot be combined with ``t_start``.
         normalization : float, optional
@@ -286,7 +286,6 @@ class TraceMetric(Metric):
             self.t_weights = normalize_weights(t_weights)
         else:
             self.t_weights = None
-
 
     def calc(self, model_traces, data_traces, dt):
         """
