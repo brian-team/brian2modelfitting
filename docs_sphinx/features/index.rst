@@ -163,6 +163,10 @@ Results can be returned in one of the following formats:
  - ``'dict'`` returns a dictionary of arrays with corresponding parameters (including units) and errors
  - ``'dataframe'`` returns a `~pandas.DataFrame` (without units)
 
+The use of units (only relevant for formats ``'list'`` and ``'dict'``) can be switched
+on or off with the ``use_units`` argument. If it is not specified, it will default to
+the value used during the initialization of the `Fitter` (which itself defaults to
+``True``).
 
 Example output:
 ~~~~~~~~~~~~~~~
