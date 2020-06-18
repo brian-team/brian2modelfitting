@@ -7,9 +7,6 @@ import sys
 
 from setuptools import setup, find_packages
 
-if sys.version_info < (3, 6):
-    raise RuntimeError('Only Python versions >= 3.6 are supported')
-
 def readme():
     with open('README.md') as f:
         return f.read()
@@ -37,6 +34,7 @@ setup(name='brian2modelfitting',
       provides=['brian2modelfitting'],
       extras_require={'test': ['pytest'],
                       'docs': ['sphinx>=1.8']},
+      python_requires='>=3.6',
       use_2to3=False,
       zip_safe=False,
       description='Modelfitting Toolbox for the Brian 2 simulator',
