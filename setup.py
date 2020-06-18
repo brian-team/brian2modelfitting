@@ -31,7 +31,8 @@ setup(name='brian2modelfitting',
                         'nevergrad>=0.2,<=0.3',
                         'scikit-optimize',
                         'efel',
-                        'tqdm'
+                        'tqdm',
+                        'lmfit'
                         ],
       provides=['brian2modelfitting'],
       extras_require={'test': ['pytest'],
