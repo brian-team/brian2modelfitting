@@ -260,6 +260,35 @@ def test_tracefitter_init_errors(setup):
                          output=np.array(output_traces),  # no units
                          n_samples=2)
 
+from nevergrad.optimization import registry as nevergrad_registry
+@pytest.mark.parametrize('method', sorted(nevergrad_registry.keys()))
+def test_fitter_fit_methods(method):
+    dt = 0.01 * ms
+    model = Equations('''
+        I = g*(v-E) : amp
+        g : siemens (constant)
+        E : volt (constant)
+        ''')
+    tf = TraceFitter(dt=dt,
+                     model=model,
+                     input_var='v',
+                     output_var='I',
+                     input=input_traces,
+                     output=output_traces,
+                     n_samples=30)
+    # # Skip some very slow methods (TODO: check what is going on)
+    if method.startswith('chainBO'):
+        pytest.skip(f'Skipping slow method {method}')
+    optimizer = NevergradOptimizer(method)
+    # Just make sure that it can run at all
+    tf.fit(n_rounds=2,
+           optimizer=optimizer,
+           metric=metric,
+           g=[1*nS, 30*nS],
+           E=[-60*mV, -20*mV],
+           callback=None)
+
+
 
 def test_fitter_fit(setup):
     dt, tf = setup
