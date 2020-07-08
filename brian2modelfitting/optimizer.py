@@ -2,6 +2,8 @@ import abc
 import numpy as np
 import warnings
 
+from brian2.utils.logger import get_logger
+
 # Prevent sklearn from adding a filter by monkey-patching the warnings module
 # TODO: Remove when we depend on a newer version of scikit-learn (with
 #       https://github.com/scikit-learn/scikit-learn/pull/15080 merged)
@@ -15,6 +17,7 @@ warnings.filterwarnings = _filterwarnings
 from nevergrad import instrumentation as inst
 from nevergrad.optimization import optimizerlib, registry
 
+logger = get_logger(__name__)
 
 def calc_bounds(parameter_names, **params):
     """
@@ -45,7 +48,7 @@ class Optimizer(metaclass=abc.ABCMeta):
     Fitter.
     """
     @abc.abstractmethod
-    def initialize(self, parameter_names, popsize, **params):
+    def initialize(self, parameter_names, popsize, rounds, **params):
         """
         Initialize the instrumentation for the optimization, based on
         parameters, creates bounds for variables and attaches them to the
@@ -57,10 +60,19 @@ class Optimizer(metaclass=abc.ABCMeta):
             list of parameter names in use
         popsize: int
             population size
+        rounds: int
+            Number of rounds (for budget calculation)
         **params
             bounds for each parameter
+
+        Returns
+        -------
+        popsize : int
+            The actual population size that will be used by the algorithm.
+            Does not always correspond to ``popsize``, since some algorithms
+            have minimal/maximal population sizes.
         """
-        pass
+        return popsize
 
     @abc.abstractmethod
     def ask(self, n_samples):
@@ -146,7 +158,7 @@ class NevergradOptimizer(Optimizer):
         self.use_nevergrad_recommendation = use_nevergrad_recommendation
         self.kwds = kwds
 
-    def initialize(self, parameter_names, popsize, **params):
+    def initialize(self, parameter_names, popsize, rounds, **params):
         self.tested_parameters = []
         self.errors = []
         for param in params:
@@ -164,10 +176,33 @@ class NevergradOptimizer(Optimizer):
             instruments.append(instrumentation)
 
         instrum = inst.Instrumentation(*instruments)
-        self.optim = optimizerlib.registry[self.method](instrumentation=instrum,
-                                                        **self.kwds)
+        nevergrad_method = optimizerlib.registry[self.method]
+        if nevergrad_method.no_parallelization and popsize > 1:
+            logger.warn(f'Sample size {popsize} requested, but Nevergrad\'s '
+                        f'\'{self.method}\' algorithm does not support '
+                        f'parallelization. Will run the algorithm '
+                        f'sequentially.',
+                        name_suffix='no_parallelization')
+            popsize = 1
 
-        self.optim._llambda = popsize  # TODO: more elegant way once possible
+        budget = rounds*popsize
+        self.optim = nevergrad_method(instrumentation=instrum,
+                                      num_workers=popsize,
+                                      budget=budget,
+                                      **self.kwds)
+        if hasattr(self.optim, 'llambda'):
+            optimizer_pop_size = self.optim.llambda
+        elif hasattr(self.optim, 'es') and hasattr(self.optim.es, 'popsize'):
+            # For CMA algorithm
+            optimizer_pop_size = self.optim.es.popsize
+        else:
+            optimizer_pop_size = popsize
+        if optimizer_pop_size != popsize:
+            logger.warn(f'Sample size {popsize} requested, but Nevergrad\'s '
+                        f'\'{self.method}\' algorithm will use '
+                        f'{optimizer_pop_size}.', name_suffix='sample_size')
+
+        return optimizer_pop_size
 
     def ask(self, n_samples):
         self.candidates, parameters = [], []
@@ -227,7 +262,7 @@ class SkoptOptimizer(Optimizer):
         self.tested_parameters = []
         self.errors = []
 
-    def initialize(self, parameter_names, popsize, **params):
+    def initialize(self, parameter_names, popsize, rounds, **params):
         self.tested_parameters = []
         self.errors = []
         for param in params.keys():
@@ -246,6 +281,8 @@ class SkoptOptimizer(Optimizer):
             dimensions=instruments,
             base_estimator=self.method,
             **self.kwds)
+
+        return popsize
 
     def ask(self, n_samples):
         return self.optim.ask(n_points=n_samples)

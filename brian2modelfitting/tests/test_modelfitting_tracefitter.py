@@ -61,7 +61,7 @@ def setup(request):
                      output_var='I',
                      input=input_traces,
                      output=output_traces,
-                     n_samples=2,)
+                     n_samples=30)
 
     def fin():
         reinit_devices()
@@ -259,6 +259,35 @@ def test_tracefitter_init_errors(setup):
                          input=input_traces,
                          output=np.array(output_traces),  # no units
                          n_samples=2)
+
+from nevergrad.optimization import registry as nevergrad_registry
+@pytest.mark.parametrize('method', sorted(nevergrad_registry.keys()))
+def test_fitter_fit_methods(method):
+    dt = 0.01 * ms
+    model = Equations('''
+        I = g*(v-E) : amp
+        g : siemens (constant)
+        E : volt (constant)
+        ''')
+    tf = TraceFitter(dt=dt,
+                     model=model,
+                     input_var='v',
+                     output_var='I',
+                     input=input_traces,
+                     output=output_traces,
+                     n_samples=30)
+    # Skip all BO methods for now (TODO: check what is going on)
+    if 'BO' in method:
+        pytest.skip(f'Skipping method {method}')
+    optimizer = NevergradOptimizer(method)
+    # Just make sure that it can run at all
+    tf.fit(n_rounds=2,
+           optimizer=optimizer,
+           metric=metric,
+           g=[1*nS, 30*nS],
+           E=[-60*mV, -20*mV],
+           callback=None)
+
 
 
 def test_fitter_fit(setup):
@@ -762,14 +791,14 @@ def test_fit_restart_change(setup):
                              optimizer=n_opt,
                              metric=metric,
                              g=[1*nS, 30*nS],
-                             restart=False,)
+                             restart=False)
 
     n_opt2 = NevergradOptimizer('PSO')
     results2, errors2 = tf.fit(n_rounds=2,
                                optimizer=n_opt2,
                                metric=metric,
                                g=[1*nS, 30*nS],
-                               restart=True,)
+                               restart=True)
 
 
 def test_fitter_generate_traces(setup):
@@ -826,7 +855,7 @@ def test_fitter_results(setup, caplog):
     assert isinstance(params_list[0]['g'], Quantity)
     assert 'g' in params_list[0].keys()
     assert 'error' in params_list[0].keys()
-    assert_equal(np.shape(params_list), (4,))
+    assert_equal(np.shape(params_list), (tf.n_samples*2,))
     assert_equal(len(params_list[0]), 2)
     assert have_same_dimensions(params_list[0]['g'].dim, nS)
 
@@ -836,15 +865,15 @@ def test_fitter_results(setup, caplog):
     assert 'error' in params_dic.keys()
     assert isinstance(params_dic['g'], Quantity)
     assert_equal(len(params_dic), 2)
-    assert_equal(np.shape(params_dic['g']), (4,))
-    assert_equal(np.shape(params_dic['error']), (4,))
+    assert_equal(np.shape(params_dic['g']), (tf.n_samples * 2,))
+    assert_equal(np.shape(params_dic['error']), (tf.n_samples * 2,))
 
     # Should raise a warning because dataframe cannot have units
     assert len(caplog.records) == 0
     params_df = tf.results(format='dataframe')
     assert len(caplog.records) == 1
     assert isinstance(params_df, pd.DataFrame)
-    assert_equal(params_df.shape, (4, 2))
+    assert_equal(params_df.shape, (tf.n_samples * 2, 2))
     assert 'g' in params_df.keys()
     assert 'error' in params_df.keys()
 
@@ -863,7 +892,7 @@ def test_fitter_results_no_units(setup_no_units, caplog):
     assert isinstance(params_list[0]['g'], float)
     assert 'g' in params_list[0].keys()
     assert 'error' in params_list[0].keys()
-    assert_equal(np.shape(params_list), (4,))
+    assert_equal(np.shape(params_list), (tf.n_samples * 2,))
     assert_equal(len(params_list[0]), 2)
 
     params_dic = tf.results(format='dict')
@@ -872,12 +901,12 @@ def test_fitter_results_no_units(setup_no_units, caplog):
     assert 'error' in params_dic.keys()
     assert isinstance(params_dic['g'], np.ndarray)
     assert_equal(len(params_dic), 2)
-    assert_equal(np.shape(params_dic['g']), (4,))
-    assert_equal(np.shape(params_dic['error']), (4,))
+    assert_equal(np.shape(params_dic['g']), (tf.n_samples * 2,))
+    assert_equal(np.shape(params_dic['error']), (tf.n_samples * 2,))
 
     params_df = tf.results(format='dataframe')
     assert isinstance(params_df, pd.DataFrame)
-    assert_equal(params_df.shape, (4, 2))
+    assert_equal(params_df.shape, (tf.n_samples * 2, 2))
     assert 'g' in params_df.keys()
     assert 'error' in params_df.keys()
 
