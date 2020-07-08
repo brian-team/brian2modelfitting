@@ -174,17 +174,22 @@ class NevergradOptimizer(Optimizer):
             instruments.append(instrumentation)
 
         instrum = inst.Instrumentation(*instruments)
-        optim_func = optimizerlib.registry[self.method]
         self.optim = optimizerlib.registry[self.method](instrumentation=instrum,
                                                         num_workers=popsize,
                                                         **self.kwds)
-
-        if self.optim.llambda != popsize:
+        if hasattr(self.optim, 'llambda'):
+            optimizer_pop_size = self.optim.llambda
+        elif hasattr(self.optim, 'es') and hasattr(self.optim.es, 'popsize'):
+            # For CMA algorithm
+            optimizer_pop_size = self.optim.es.popsize
+        else:
+            optimizer_pop_size = popsize
+        if optimizer_pop_size != popsize:
             logger.warn(f'Sample size {popsize} requested, but Nevergrad\'s '
                         f'\'{self.method}\' algorithm will use '
-                        f'{self.optim.llambda}.', name_suffix='sample_size')
+                        f'{optimizer_pop_size}.', name_suffix='sample_size')
 
-        return self.optim.llambda
+        return optimizer_pop_size
 
     def ask(self, n_samples):
         self.candidates, parameters = [], []
