@@ -48,7 +48,7 @@ class Optimizer(metaclass=abc.ABCMeta):
     Fitter.
     """
     @abc.abstractmethod
-    def initialize(self, parameter_names, popsize, **params):
+    def initialize(self, parameter_names, popsize, rounds, **params):
         """
         Initialize the instrumentation for the optimization, based on
         parameters, creates bounds for variables and attaches them to the
@@ -60,6 +60,8 @@ class Optimizer(metaclass=abc.ABCMeta):
             list of parameter names in use
         popsize: int
             population size
+        rounds: int
+            Number of rounds (for budget calculation)
         **params
             bounds for each parameter
 
@@ -156,7 +158,7 @@ class NevergradOptimizer(Optimizer):
         self.use_nevergrad_recommendation = use_nevergrad_recommendation
         self.kwds = kwds
 
-    def initialize(self, parameter_names, popsize, **params):
+    def initialize(self, parameter_names, popsize, rounds, **params):
         self.tested_parameters = []
         self.errors = []
         for param in params:
@@ -182,8 +184,11 @@ class NevergradOptimizer(Optimizer):
                         f'sequentially.',
                         name_suffix='no_parallelization')
             popsize = 1
+
+        budget = rounds*popsize
         self.optim = nevergrad_method(instrumentation=instrum,
                                       num_workers=popsize,
+                                      budget=budget,
                                       **self.kwds)
         if hasattr(self.optim, 'llambda'):
             optimizer_pop_size = self.optim.llambda
@@ -257,7 +262,7 @@ class SkoptOptimizer(Optimizer):
         self.tested_parameters = []
         self.errors = []
 
-    def initialize(self, parameter_names, popsize, **params):
+    def initialize(self, parameter_names, popsize, rounds, **params):
         self.tested_parameters = []
         self.errors = []
         for param in params.keys():

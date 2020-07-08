@@ -46,38 +46,39 @@ def test_calc_bounds():
 
 def test_initialize_nevergrad():
     n_opt = NevergradOptimizer()
-    n_opt.initialize({'g'}, g=[1, 30], popsize=30)
+    n_opt.initialize({'g'}, g=[1, 30], popsize=30, rounds=2)
     assert isinstance(n_opt.optim, NOptimzer)
     assert_equal(n_opt.optim.dimension, 1)
 
-    n_opt.initialize(['g', 'E'], g=[1, 30], E=[2, 20], popsize=30)
+    n_opt.initialize(['g', 'E'], g=[1, 30], E=[2, 20], popsize=30, rounds=2)
     assert isinstance(n_opt.optim, NOptimzer)
     assert_equal(n_opt.optim.dimension, 2)
 
-    assert_raises(AssertionError, n_opt.initialize, ['g'], g=[1], popsize=30)
-    assert_raises(AssertionError, n_opt.initialize, ['g'], g=[[1, 2]], popsize=30)
-    assert_raises(Exception, n_opt.initialize, ['g'], g=[1, 2], E=[1, 2], popsize=30)
-    assert_raises(Exception, n_opt.initialize, ['g', 'E'], g=[1, 2], popsize=30)
+    assert_raises(AssertionError, n_opt.initialize, ['g'], g=[1], popsize=30, rounds=2)
+    assert_raises(AssertionError, n_opt.initialize, ['g'], g=[[1, 2]], popsize=30, rounds=2)
+    assert_raises(Exception, n_opt.initialize, ['g'], g=[1, 2], E=[1, 2], popsize=30, rounds=2)
+    assert_raises(Exception, n_opt.initialize, ['g', 'E'], g=[1, 2], popsize=30, rounds=2)
 
 
 def test_initialize_skopt():
     s_opt = SkoptOptimizer()
-    s_opt.initialize({'g'}, g=[1, 30], popsize=30)
+    s_opt.initialize({'g'}, g=[1, 30], popsize=30, rounds=2)
     assert isinstance(s_opt.optim, SOptimizer)
     assert_equal(len(s_opt.optim.space.dimensions), 1)
 
-    s_opt.initialize({'g', 'E'}, g=[1, 30], E=[2, 20], popsize=30)
+    s_opt.initialize({'g', 'E'}, g=[1, 30], E=[2, 20], popsize=30, rounds=2)
     assert isinstance(s_opt.optim, SOptimizer)
     assert_equal(len(s_opt.optim.space.dimensions), 2)
 
     assert_raises(TypeError, s_opt.initialize, ['g'], g=[1], popsize=30)
-    assert_raises(Exception, s_opt.initialize, ['g'], g=[1, 2], E=[1, 2], popsize=30)
-    assert_raises(Exception, s_opt.initialize, ['g', 'E'], g=[1, 2], popsize=30)
+    assert_raises(Exception, s_opt.initialize, ['g'], g=[1, 2], E=[1, 2], popsize=30, rounds=2)
+    assert_raises(Exception, s_opt.initialize, ['g', 'E'], g=[1, 2], popsize=30, rounds=2)
 
 
 def test_ask_nevergrad():
     n_opt = NevergradOptimizer()
-    n_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3], popsize=30)
+    n_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3],
+                     popsize=30, rounds=2)
 
     n_samples = np.random.randint(1, 30)
     params = n_opt.ask(n_samples)
@@ -91,7 +92,8 @@ def test_ask_nevergrad():
 def test_ask_skopt():
     s_opt = SkoptOptimizer()
     n_samples = 9
-    s_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3], popsize=n_samples)
+    s_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3],
+                     popsize=n_samples, rounds=2)
 
     params = s_opt.ask(n_samples)
     assert_equal(np.shape(params), (n_samples, 3))
@@ -103,7 +105,8 @@ def test_ask_skopt():
 
 def test_tell_nevergrad():
     n_opt = NevergradOptimizer()
-    n_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3], popsize=30)
+    n_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3],
+                     popsize=30, rounds=2)
 
     n_samples = np.random.randint(1, 30)
     data = np.random.rand(n_samples, 3)
@@ -124,7 +127,8 @@ def test_tell_nevergrad():
 def test_tell_skopt():
     s_opt = SkoptOptimizer()
     n_samples = 9
-    s_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3], popsize=n_samples)
+    s_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3],
+                     popsize=n_samples, rounds=2)
 
     params = s_opt.ask(n_samples)
 
@@ -136,7 +140,8 @@ def test_tell_skopt():
 
 def test_recommend_nevergrad():
     n_opt = NevergradOptimizer()
-    n_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3], popsize=30)
+    n_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3],
+                     popsize=30, rounds=2)
 
     n_samples = np.random.randint(1, 30)
     data = np.random.rand(n_samples, 3)
@@ -159,7 +164,8 @@ def test_recommend_nevergrad():
 def test_recommend_skopt():
     s_opt = SkoptOptimizer()
     n_samples = 9
-    s_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3], popsize=n_samples)
+    s_opt.initialize(['a', 'b', 'c'], a=[0, 1], b=[0, 2], c=[0, 3],
+                     popsize=n_samples, rounds=2)
 
     params = s_opt.ask(n_samples)
 

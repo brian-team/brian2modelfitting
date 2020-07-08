@@ -582,6 +582,7 @@ class Fitter(metaclass=abc.ABCMeta):
                 self.iteration = 0
             self.n_samples = optimizer.initialize(self.parameter_names,
                                                   popsize=self._n_samples,
+                                                  rounds=n_rounds,
                                                   **params)
 
         self.optimizer = optimizer
