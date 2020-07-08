@@ -2,6 +2,8 @@ import abc
 import numpy as np
 import warnings
 
+from brian2.utils.logger import get_logger
+
 # Prevent sklearn from adding a filter by monkey-patching the warnings module
 # TODO: Remove when we depend on a newer version of scikit-learn (with
 #       https://github.com/scikit-learn/scikit-learn/pull/15080 merged)
@@ -15,6 +17,7 @@ warnings.filterwarnings = _filterwarnings
 from nevergrad import instrumentation as inst
 from nevergrad.optimization import optimizerlib, registry
 
+logger = get_logger(__name__)
 
 def calc_bounds(parameter_names, **params):
     """
@@ -59,8 +62,15 @@ class Optimizer(metaclass=abc.ABCMeta):
             population size
         **params
             bounds for each parameter
+
+        Returns
+        -------
+        popsize : int
+            The actual population size that will be used by the algorithm.
+            Does not always correspond to ``popsize``, since some algorithms
+            have minimal/maximal population sizes.
         """
-        pass
+        return popsize
 
     @abc.abstractmethod
     def ask(self, n_samples):
@@ -164,10 +174,17 @@ class NevergradOptimizer(Optimizer):
             instruments.append(instrumentation)
 
         instrum = inst.Instrumentation(*instruments)
+        optim_func = optimizerlib.registry[self.method]
         self.optim = optimizerlib.registry[self.method](instrumentation=instrum,
+                                                        num_workers=popsize,
                                                         **self.kwds)
 
-        self.optim._llambda = popsize  # TODO: more elegant way once possible
+        if self.optim.llambda != popsize:
+            logger.warn(f'Sample size {popsize} requested, but Nevergrad\'s '
+                        f'\'{self.method}\' algorithm will use '
+                        f'{self.optim.llambda}.', name_suffix='sample_size')
+
+        return self.optim.llambda
 
     def ask(self, n_samples):
         self.candidates, parameters = [], []
@@ -246,6 +263,8 @@ class SkoptOptimizer(Optimizer):
             dimensions=instruments,
             base_estimator=self.method,
             **self.kwds)
+
+        return popsize
 
     def ask(self, n_samples):
         return self.optim.ask(n_points=n_samples)

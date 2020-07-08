@@ -290,8 +290,9 @@ class Fitter(metaclass=abc.ABCMeta):
         self.parameter_names = model.parameter_names
         self.n_traces, n_steps = input.shape
         self.duration = n_steps * dt
-        self.n_neurons = self.n_traces * n_samples
-
+        # Sample size requested by user
+        self._n_samples = n_samples
+        # Actual sample size used (set in fit())
         self.n_samples = n_samples
         self.method = method
         self.threshold = threshold
@@ -347,6 +348,10 @@ class Fitter(metaclass=abc.ABCMeta):
                 raise ValueError("%s is not a model variable or a "
                                  "parameter in the model" % param)
         self.param_init = param_init
+
+    @property
+    def n_neurons(self):
+        return self.n_traces * self.n_samples
 
     def setup_simulator(self, network_name, n_neurons, output_var, param_init,
                         calc_gradient=False, optimize=True, online_error=False,
@@ -572,11 +577,12 @@ class Fitter(metaclass=abc.ABCMeta):
         if penalty is None:
             penalty = self.penalty
 
-        if self.optimizer is None or restart is True:
+        if self.optimizer is None or restart:
             if start_iteration is None:
                 self.iteration = 0
-            optimizer.initialize(self.parameter_names, popsize=self.n_samples,
-                                 **params)
+            self.n_samples = optimizer.initialize(self.parameter_names,
+                                                  popsize=self._n_samples,
+                                                  **params)
 
         self.optimizer = optimizer
         self.metric = metric
@@ -586,7 +592,9 @@ class Fitter(metaclass=abc.ABCMeta):
         # Check whether we can reuse the current simulator or whether we have
         # to create a new one (only relevant for standalone, but does not hurt
         # for runtime)
-        if self.simulator is None or self.simulator.current_net != 'fit':
+        if (restart or
+                self.simulator is None or
+                self.simulator.current_net != 'fit'):
             self.simulator = self.setup_simulator('fit', self.n_neurons,
                                                   output_var=self.output_var,
                                                   online_error=online_error,
