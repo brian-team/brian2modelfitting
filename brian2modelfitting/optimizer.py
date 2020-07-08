@@ -174,9 +174,17 @@ class NevergradOptimizer(Optimizer):
             instruments.append(instrumentation)
 
         instrum = inst.Instrumentation(*instruments)
-        self.optim = optimizerlib.registry[self.method](instrumentation=instrum,
-                                                        num_workers=popsize,
-                                                        **self.kwds)
+        nevergrad_method = optimizerlib.registry[self.method]
+        if nevergrad_method.no_parallelization and popsize > 1:
+            logger.warn(f'Sample size {popsize} requested, but Nevergrad\'s '
+                        f'\'{self.method}\' algorithm does not support '
+                        f'parallelization. Will run the algorithm '
+                        f'sequentially.',
+                        name_suffix='no_parallelization')
+            popsize = 1
+        self.optim = nevergrad_method(instrumentation=instrum,
+                                      num_workers=popsize,
+                                      **self.kwds)
         if hasattr(self.optim, 'llambda'):
             optimizer_pop_size = self.optim.llambda
         elif hasattr(self.optim, 'es') and hasattr(self.optim.es, 'popsize'):
