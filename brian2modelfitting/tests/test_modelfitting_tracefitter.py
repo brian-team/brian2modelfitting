@@ -223,9 +223,9 @@ def test_tracefitter_init(setup):
     assert isinstance(tf.input_traces, TimedArray)
     assert isinstance(tf.model, Equations)
 
-    target_var = '{}_target'.format(tf.output_var)
+    target_var = '{}_target'.format(tf.output_var[0])
     assert target_var in tf.model
-    assert tf.model[target_var].dim is tf.output_dim
+    assert tf.model[target_var].dim is tf.output_dim[0]
 
 
 def test_tracefitter_init_errors(setup):
@@ -303,7 +303,7 @@ def test_fitter_fit(setup):
         assert hasattr(tf, attr)
     assert tf.simulator.neurons.iteration == 1
 
-    assert isinstance(tf.metric, Metric)
+    assert len(tf.metric) == 1 and isinstance(tf.metric[0], Metric)
     assert isinstance(tf.optimizer, Optimizer)
     assert isinstance(tf.simulator, Simulator)
 
@@ -328,7 +328,7 @@ def test_fitter_fit_no_units(setup_no_units):
     for attr in attr_fit:
         assert hasattr(tf, attr)
 
-    assert isinstance(tf.metric, Metric)
+    assert len(tf.metric) == 1 and isinstance(tf.metric[0], Metric)
     assert isinstance(tf.optimizer, Optimizer)
     assert isinstance(tf.simulator, Simulator)
 
@@ -583,7 +583,7 @@ def test_fitter_refine_tsteps_normalization(setup_constant):
     dt, tf = setup_constant
 
     model_traces = tf.generate(params={'c': 5 * mV})
-    mse_error = MSEMetric(t_start=50*dt).calc(model_traces[None, : , :], tf.output, dt)
+    mse_error = MSEMetric(t_start=50*dt).calc(model_traces[None, : , :], tf.output[0], dt)
     all_errors = []
     def callback(parameters, errors, best_parameters, best_error, index):
         all_errors.append(float(errors[0]))
@@ -970,7 +970,7 @@ def test_onlinetracefitter_fit(setup_online):
     for attr in attr_fit:
         assert hasattr(otf, attr)
 
-    assert isinstance(otf.metric, MSEMetric)
+    assert len(otf.metric) == 1 and isinstance(otf.metric[0], MSEMetric)
     assert isinstance(otf.optimizer, Optimizer)
 
     assert isinstance(results, dict)

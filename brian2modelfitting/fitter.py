@@ -2,7 +2,7 @@ import abc
 import numbers
 
 import sympy
-from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape, zeros, sqrt, ndarray, broadcast_to
+from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape, zeros, sqrt, ndarray, broadcast_to, sum
 
 from brian2.parsing.sympytools import sympy_to_str, str_to_sympy
 from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions, fail_for_dimension_mismatch
@@ -301,16 +301,21 @@ class Fitter(metaclass=abc.ABCMeta):
         self.penalty = penalty
 
         self.input = input
+        if isinstance(output_var, str):
+            output_var = [output_var]
+            output = [output]
         self.output_var = output_var
-        if output_var == 'spikes':
-            self.output_dim = DIMENSIONLESS
-        else:
-            self.output_dim = model[output_var].dim
-            fail_for_dimension_mismatch(output, self.output_dim,
-                                        'The provided target values '
-                                        '("output") need to have the same '
-                                        'units as the variable '
-                                        '{}'.format(output_var))
+        self.output_dim = []
+        for o_var, out in zip(self.output_var, output):
+            if o_var == 'spikes':
+                self.output_dim.append(DIMENSIONLESS)
+            else:
+                self.output_dim.append(model[o_var].dim)
+                fail_for_dimension_mismatch(out, self.output_dim[-1],
+                                            'The provided target values '
+                                            '("output") need to have the same '
+                                            'units as the variable '
+                                            '{}'.format(o_var))
         self.model = model
 
         self.use_units = use_units
@@ -321,16 +326,19 @@ class Fitter(metaclass=abc.ABCMeta):
                                                                   input_dim)
         self.model += input_eqs
 
-        if output_var != 'spikes':
-            # For approaches that couple the system to the target values,
-            # provide a convenient variable
-            output_expr = 'output_var(t, i % n_traces)'
-            output_dim = ('1' if self.output_dim is DIMENSIONLESS
-                          else repr(self.output_dim))
-            output_eqs = "{}_target = {} : {}".format(output_var,
-                                                      output_expr,
-                                                      output_dim)
-            self.model += output_eqs
+        counter = 0
+        for o_var, o_dim in zip(self.output_var, self.output_dim):
+            if o_var != 'spikes':
+                counter += 1
+                # For approaches that couple the system to the target values,
+                # provide a convenient variable
+                output_expr = f'output_var_{counter}(t, i % n_traces)'
+                output_dim = ('1' if o_dim is DIMENSIONLESS
+                              else repr(o_dim))
+                output_eqs = "{}_target = {} : {}".format(o_var,
+                                                          output_expr,
+                                                          output_dim)
+                self.model += output_eqs
 
         input_traces = TimedArray(input.transpose(), dt=dt)
         self.input_traces = input_traces
@@ -363,10 +371,12 @@ class Fitter(metaclass=abc.ABCMeta):
                                        level=level+1)
         if hasattr(self, 't_start'):  # OnlineTraceFitter
             namespace['t_start'] = self.t_start
-
-        if self.output_var != 'spikes':
-            namespace['output_var'] = TimedArray(self.output.transpose(),
-                                                 dt=self.dt)
+        counter = 0
+        for o_var, out in zip(self.output_var, self.output):
+            if self.output_var != 'spikes':
+                counter += 1
+                namespace[f'output_var_{counter}'] = TimedArray(out.transpose(),
+                                                                dt=self.dt)
         neurons = self.setup_neuron_group(n_neurons, namespace,
                                           calc_gradient=calc_gradient,
                                           optimize=optimize,
@@ -435,8 +445,8 @@ class Fitter(metaclass=abc.ABCMeta):
                                   namespace=namespace, dt=self.dt, **kwds)
         if online_error:
             neurons.run_regularly('total_error += ({} - {}_target)**2 * '
-                                  'int(t>=t_start)'.format(self.output_var,
-                                                           self.output_var),
+                                  'int(t>=t_start)'.format(self.output_var[0],
+                                                           self.output_var[0]),
                                   when='end')
 
         return neurons
@@ -454,7 +464,7 @@ class Fitter(metaclass=abc.ABCMeta):
         """
         pass
 
-    def optimization_iter(self, optimizer, metric, penalty):
+    def optimization_iter(self, optimizer, metric, metric_weights, penalty):
         """
         Function performs all operations required for one iteration of
         optimization. Drawing parameters, setting them to simulator and
@@ -486,12 +496,13 @@ class Fitter(metaclass=abc.ABCMeta):
         self.simulator.run(self.duration, d_param, self.parameter_names,
                            iteration=self.iteration)
 
-        errors = self.calc_errors(metric)
+        raw_errors = array(self.calc_errors(metric))
+        errors = sum(raw_errors.T * metric_weights, axis=1)
 
         if penalty is not None:
             error_penalty = getattr(self.simulator.neurons, penalty + '_')
-            if self.use_units:
-                error_dim = metric.get_dimensions(self.output_dim)
+            if self.use_units and len(metric) == 1:
+                error_dim = metric[0].get_dimensions(self.output_dim[0])
                 penalty_dim = self.simulator.neurons.variables[penalty].dim
                 fail_for_dimension_mismatch(error_dim, penalty_dim,
                                             error_message='The term used as penalty has to have '
@@ -505,7 +516,8 @@ class Fitter(metaclass=abc.ABCMeta):
 
         return results, parameters, errors
 
-    def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
+    def fit(self, optimizer, metric=None, metric_weights=None,
+            n_rounds=1, callback='text',
             restart=False, online_error=False, start_iteration=None,
             penalty=None, level=0, **params):
         """
@@ -517,8 +529,10 @@ class Fitter(metaclass=abc.ABCMeta):
         ----------
         optimizer: `~.Optimizer` children
             Child of Optimizer class, specific for each library.
-        metric: `~.Metric` children
+        metric: `~.Metric`, or list of `~.Metric`
             Child of Metric class, specifies optimization metric
+        metric_weights: sequence
+            Weights to sum up the metrics for the different outputs
         n_rounds: int
             Number of rounds to optimize over (feedback provided over each
             round).
@@ -556,15 +570,28 @@ class Fitter(metaclass=abc.ABCMeta):
         error: float
             error value for best parameter set
         """
-        if not (isinstance(metric, Metric) or metric is None):
-            raise TypeError("metric has to be a child of class Metric or None "
-                            "for OnlineTraceFitter")
+        if isinstance(metric, Metric):
+            metric = [metric] * len(self.output_var)
+        if metric is not None:
+            if not len(metric) == len(self.output_var):
+                raise TypeError('List of metrics needs to have as many '
+                                'elements as output variables.')
+            for m in metric:
+                if not (isinstance(m, Metric) or metric is None):
+                    raise TypeError("metric has to be a child of class Metric or None "
+                                    "for OnlineTraceFitter")
+
+        if metric_weights is None:
+            if len(metric) != 1:
+                raise TypeError('Need to provide weights for the metrics.')
+            metric_weights = array([1.])
 
         if not (isinstance(optimizer, Optimizer)) or optimizer is None:
             raise TypeError("metric has to be a child of class Optimizer")
 
         if self.metric is not None and restart is False:
-            if metric is not self.metric:
+            if (len(metric) != len(self.metric) or
+                    any(m1 is not m2 for m1, m2 in zip(metric, self.metric))):
                 raise Exception("You can not change the metric between fits")
 
         if self.optimizer is not None and restart is False:
@@ -587,6 +614,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
         self.optimizer = optimizer
         self.metric = metric
+        self.metric_weights = metric_weights
 
         callback = callback_setup(callback, n_rounds)
 
@@ -606,18 +634,19 @@ class Fitter(metaclass=abc.ABCMeta):
         for index in range(n_rounds):
             best_params, parameters, errors = self.optimization_iter(optimizer,
                                                                      metric,
+                                                                     metric_weights,
                                                                      penalty)
             self.iteration += 1
             self._best_error = nanmin(self.optimizer.errors)
             # create output variables
             self._best_params = make_dic(self.parameter_names, best_params)
-            if self.use_units:
+            if self.use_units and len(self.metric) == 1:
                 if self.output_var == 'spikes':
                     output_dim = DIMENSIONLESS
                 else:
                     output_dim = self.output_dim
                 # Correct the units for the normalization factor
-                error_dim = self.metric.get_normalized_dimensions(output_dim)
+                error_dim = self.metric[0].get_normalized_dimensions(output_dim[0])
                 best_error = Quantity(float(self.best_error), dim=error_dim)
                 errors = Quantity(errors, dim=error_dim)
                 param_dicts = [{p: Quantity(v, dim=self.model[p].dim)
@@ -654,8 +683,8 @@ class Fitter(metaclass=abc.ABCMeta):
     def best_error(self):
         if self._best_error is None:
             return None
-        if self.use_units:
-            error_dim = self.metric.get_dimensions(self.output_dim)
+        if self.use_units and len(self.metric) == 1:
+            error_dim = self.metric[0].get_dimensions(self.output_dim[0])
             return Quantity(self._best_error, dim=error_dim)
         else:
             return self._best_error
@@ -689,8 +718,8 @@ class Fitter(metaclass=abc.ABCMeta):
         params = array(self.optimizer.tested_parameters)
         params = params.reshape(-1, params.shape[-1])
 
-        if use_units:
-            error_dim = self.metric.get_dimensions(self.output_dim)
+        if use_units and len(self.metric) == 1:
+            error_dim = self.metric[0].get_dimensions(self.output_dim[0])
             errors = Quantity(array(self.optimizer.errors).flatten(),
                               dim=error_dim)
         else:
@@ -779,7 +808,8 @@ class Fitter(metaclass=abc.ABCMeta):
             self.param_init.update(param_init)
         if output_var is None:
             output_var = self.output_var
-
+        elif isinstance(output_var, str):
+            output_var = [output_var]
         self.simulator = self.setup_simulator('generate', self.n_traces,
                                               output_var=output_var,
                                               param_init=param_init,
@@ -789,10 +819,10 @@ class Fitter(metaclass=abc.ABCMeta):
         self.simulator.run(self.duration, param_dic, self.parameter_names,
                            iteration=iteration, name='generate')
 
-        if not isinstance(output_var, str):
+        if len(output_var) > 1:
             fits = {name: self._simulation_result(name) for name in output_var}
         else:
-            fits = self._simulation_result(output_var)
+            fits = self._simulation_result(output_var[0])
 
         return fits
 
@@ -834,30 +864,39 @@ class TraceFitter(Fitter):
         super().__init__(dt, model, input, output, input_var, output_var,
                          n_samples, threshold, reset, refractory, method,
                          param_init, penalty=penalty, use_units=use_units)
-        self.output = Quantity(output)
-        self.output_ = array(output)
+        if isinstance(output_var, str):
+            output_var = [output_var]
+        if not isinstance(output, list):
+            output = [output]
+        self.output = [Quantity(o) for o in output]
+        self.output_ = [array(o) for o in output]
         # We store the bounds set in TraceFitter.fit, so that Tracefitter.refine
         # can reuse them
         self.bounds = None
 
-        if output_var not in self.model.names:
-            raise NameError("%s is not a model variable" % output_var)
-        if output.shape != input.shape:
-            raise ValueError("Input and output must have the same size")
+        for o_var in output_var:
+            if o_var not in self.model.names:
+                raise NameError("%s is not a model variable" % o_var)
+        for o in self.output:
+            if o.shape != input.shape:
+                raise ValueError("Input and output must have the same size")
 
     def calc_errors(self, metric):
         """
         Returns errors after simulation with StateMonitor.
         To be used inside `optim_iter`.
         """
-        traces = getattr(self.simulator.networks['fit']['statemonitor'],
-                         self.output_var+'_')
-        # Reshape traces for easier calculation of error
-        traces = reshape(traces, (traces.shape[0]//self.n_traces,
-                                  self.n_traces,
-                                  -1))
-        errors = metric.calc(traces, self.output_, self.dt)
-        return errors
+        all_errors = []
+        for m, o_var, o in zip(metric, self.output_var, self.output_):
+            traces = getattr(self.simulator.networks['fit']['statemonitor'],
+                             o_var+'_')
+            # Reshape traces for easier calculation of error
+            traces = reshape(traces, (traces.shape[0]//self.n_traces,
+                                      self.n_traces,
+                                      -1))
+            errors = m.calc(traces, o, self.dt)
+            all_errors.append(errors)
+        return all_errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
             restart=False, start_iteration=None, penalty=None,
@@ -866,14 +905,17 @@ class TraceFitter(Fitter):
             raise TypeError("You can only use TraceMetric child metric with "
                             "TraceFitter")
         if metric.t_weights is not None:
-            if not metric.t_weights.shape == (self.output.shape[1], ):
+            if not metric.t_weights.shape == (self.output[0].shape[1], ):
                 raise ValueError("The 't_weights' argument of the metric has "
                                  "to be a one-dimensional array of length "
-                                 f"{self.output.shape[1]} but has shape "
+                                 f"{self.output[0].shape[1]} but has shape "
                                  f"{metric.t_weights.shape}")
         self.bounds = dict(params)
-        best_params, error = super().fit(optimizer, metric, n_rounds,
-                                         callback, restart,
+        best_params, error = super().fit(optimizer=optimizer,
+                                         metric=metric,
+                                         n_rounds=n_rounds,
+                                         callback=callback,
+                                         restart=restart,
                                          start_iteration=start_iteration,
                                          penalty=penalty,
                                          level=level+1,
@@ -986,6 +1028,8 @@ class TraceFitter(Fitter):
             import lmfit
         except ImportError:
             raise ImportError('Refinement needs the "lmfit" package.')
+        if len(self.output_var) > 1:
+            raise NotImplementedError('refine currently requires a single output variable.')
         if params is None:
             if self.best_params is None:
                 raise TypeError('You need to either specify parameters or run '
@@ -995,9 +1039,13 @@ class TraceFitter(Fitter):
         if t_weights is not None:
             t_weights = normalize_weights(t_weights)
         elif t_start is None:
-            t_weights = getattr(self.metric, 't_weights', None)
+            if self.metric is not None:
+                t_weights = getattr(self.metric[0], 't_weights', None)
             if t_weights is None:
-                t_start = getattr(self.metric, 't_start', 0*second)
+                if self.metric is not None:
+                    t_start = getattr(self.metric[0], 't_start', 0*second)
+                else:
+                    t_start = 0*second
             else:
                 t_start = None
 
@@ -1005,7 +1053,10 @@ class TraceFitter(Fitter):
             raise ValueError("Cannot use both 't_weights' and 't_start'.")
 
         if normalization is None:
-            normalization = getattr(self.metric, 'normalization', 1.)
+            if self.metric is not None:
+                normalization = getattr(self.metric[0], 'normalization', 1.)
+            else:
+                normalization = 1.
         else:
             normalization = 1/normalization
 
@@ -1040,18 +1091,18 @@ class TraceFitter(Fitter):
             self.simulator.run(self.duration, param_dic,
                                self.parameter_names, iteration=iteration,
                                name='refine')
-            trace = getattr(self.simulator.statemonitor, self.output_var+'_')
+            trace = getattr(self.simulator.statemonitor, self.output_var[0]+'_')
             if t_weights is None:
-                residual = trace[:, t_start_steps:] - self.output_[:, t_start_steps:]
+                residual = trace[:, t_start_steps:] - self.output_[0][:, t_start_steps:]
             else:
-                residual = (trace - self.output_) * sqrt(t_weights)
+                residual = (trace - self.output_[0]) * sqrt(t_weights)
             return residual.flatten() * normalization
 
         def _calc_gradient(params):
             residuals = []
             for name in self.parameter_names:
                 trace = getattr(self.simulator.statemonitor,
-                                f'S_{self.output_var}_{name}_')
+                                f'S_{self.output_var[0]}_{name}_')
                 if t_weights is None:
                     residual = trace[:, t_start_steps:]
                 else:
@@ -1066,7 +1117,7 @@ class TraceFitter(Fitter):
             error = mean(resid**2)
             errors.append(error)
             if self.use_units:
-                error_dim = self.output_dim**2 * get_dimensions(normalization)**2
+                error_dim = self.output_dim[0]**2 * get_dimensions(normalization)**2
                 all_errors = Quantity(errors, dim=error_dim)
                 params = {p: Quantity(val, dim=self.model[p].dim)
                           for p, val in params.items()}
@@ -1143,7 +1194,8 @@ class SpikeFitter(Fitter):
         """
         spikes = get_spikes(self.simulator.networks['fit']['spikemonitor'],
                             self.n_samples, self.n_traces)
-        errors = metric.calc(spikes, self.output, self.dt)
+        assert len(metric) == 1
+        errors = [metric[0].calc(spikes, self.output, self.dt)]
         return errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
@@ -1152,8 +1204,11 @@ class SpikeFitter(Fitter):
         if not isinstance(metric, SpikeMetric):
             raise TypeError("You can only use SpikeMetric child metric with "
                             "SpikeFitter")
-        best_params, error = super().fit(optimizer, metric, n_rounds,
-                                         callback, restart,
+        best_params, error = super().fit(optimizer=optimizer,
+                                         metric=metric,
+                                         n_rounds=n_rounds,
+                                         callback=callback,
+                                         restart=restart,
                                          start_iteration=start_iteration,
                                          penalty=penalty,
                                          level=level+1,
@@ -1178,8 +1233,8 @@ class OnlineTraceFitter(Fitter):
                          n_samples, threshold, reset, refractory, method,
                          param_init, penalty=penalty)
 
-        self.output = Quantity(output)
-        self.output_ = array(output)
+        self.output = [Quantity(output)]
+        self.output_ = [array(output)]
 
         if output_var not in self.model.names:
             raise NameError("%s is not a model variable" % output_var)
@@ -1187,8 +1242,8 @@ class OnlineTraceFitter(Fitter):
             raise ValueError("Input and output must have the same size")
 
         # Replace input variable by TimedArray
-        output_traces = TimedArray(output.transpose(), dt=dt)
-        output_dim = get_dimensions(output)
+        output_traces = TimedArray(self.output[0].transpose(), dt=dt)
+        output_dim = get_dimensions(self.output[0])
         squared_output_dim = ('1' if output_dim is DIMENSIONLESS
                               else repr(output_dim**2))
         error_eqs = Equations('total_error : {}'.format(squared_output_dim))
@@ -1223,7 +1278,7 @@ class OnlineTraceFitter(Fitter):
         """Calculates error in online fashion.To be used inside optim_iter."""
         errors = self.simulator.neurons.total_error/int((self.duration-self.t_start)/defaultclock.dt)
         errors = mean(errors.reshape((self.n_samples, self.n_traces)), axis=1)
-        return array(errors)
+        return [array(errors)]
 
     def generate_traces(self, params=None, param_init=None, level=0):
         """Generates traces for best fit of parameters and all inputs"""
