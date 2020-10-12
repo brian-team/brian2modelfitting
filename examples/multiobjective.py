@@ -2,10 +2,9 @@ import pandas as pd
 import numpy as np
 from brian2 import *
 from brian2modelfitting import *
-
+# set_device('cpp_standalone')  # recommend for speed
 dt = 0.01*ms
 defaultclock.dt = dt
-prefs.codegen.target = 'numpy'
 
 # Generate ground truth data
 area = 20000*umetre**2
@@ -50,7 +49,7 @@ metric = MSEMetric(t_start=5*ms)
 fitter = TraceFitter(model=eqs, input_var='I', output_var=['v', 'm'],
                      input=inp_ar.T, output=[ground_truth_v,
                                              ground_truth_m],
-                     dt=dt, n_samples=30, param_init={'v': 'VT'},
+                     dt=dt, n_samples=60, param_init={'v': 'El'},
                      method='exponential_euler')
 
 res, error = fitter.fit(n_rounds=20,
@@ -63,18 +62,21 @@ res, error = fitter.fit(n_rounds=20,
                         g_kd=[6e-07*siemens, 6e-05*siemens],
                         Cm=[0.1*ufarad*cm**-2 * area, 2*ufarad*cm**-2 * area])
 
-## Show results
-all_output = fitter.results(format='dataframe')
-print(all_output)
+refined_params, _ = fitter.refine(calc_gradient=True)
 
 ## Visualization of the results
-start_scope()
 fits = fitter.generate_traces(params=None, param_init={'v': -65*mV})
+refined_fits = fitter.generate_traces(params=refined_params, param_init={'v': -65*mV})
 
 fig, ax = plt.subplots(2, ncols=5, figsize=(20, 5), sharex=True, sharey='row')
 for idx in range(5):
-    ax[0][idx].plot(ground_truth_v[idx]/mV)
-    ax[0][idx].plot(fits['v'][idx].transpose()/mV)
-    ax[1][idx].plot(ground_truth_m[idx])
-    ax[1][idx].plot(fits['m'][idx].transpose())
+    ax[0][idx].plot(ground_truth_v[idx]/mV, 'k:', alpha=0.75,
+                    label='ground truth')
+    ax[0][idx].plot(fits['v'][idx].transpose()/mV, alpha=0.75, label='fit')
+    ax[0][idx].plot(refined_fits['v'][idx].transpose() / mV, alpha=0.75,
+                    label='refined')
+    ax[1][idx].plot(ground_truth_m[idx], 'k:', alpha=0.75)
+    ax[1][idx].plot(fits['m'][idx].transpose(), alpha=0.75)
+    ax[1][idx].plot(refined_fits['m'][idx].transpose(), alpha=0.75)
+ax[0][0].legend(loc='best')
 plt.show()

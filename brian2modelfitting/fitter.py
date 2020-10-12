@@ -348,6 +348,7 @@ class Fitter(metaclass=abc.ABCMeta):
         self._best_error = None
         self.optimizer = None
         self.metric = None
+        self.metric_weights = None
         if not param_init:
             param_init = {}
         for param, val in param_init.items():
@@ -389,11 +390,9 @@ class Fitter(metaclass=abc.ABCMeta):
 
         record_vars = [v for v in output_var if v != 'spikes']
         if calc_gradient:
-            if not len(output_var) == 1:
-                raise AssertionError('Cannot calculate gradient with multiple '
-                                     'output variables.')
-            record_vars.extend([f'S_{output_var[0]}_{p}'
-                                for p in self.parameter_names])
+            record_vars.extend([f'S_{out_var}_{p}'
+                                for p in self.parameter_names
+                                for out_var in self.output_var])
         if len(record_vars):
             network.add(StateMonitor(neurons, record_vars, record=True,
                                      name='statemonitor', dt=self.dt))
@@ -1028,8 +1027,6 @@ class TraceFitter(Fitter):
             import lmfit
         except ImportError:
             raise ImportError('Refinement needs the "lmfit" package.')
-        if len(self.output_var) > 1:
-            raise NotImplementedError('refine currently requires a single output variable.')
         if params is None:
             if self.best_params is None:
                 raise TypeError('You need to either specify parameters or run '
@@ -1091,23 +1088,40 @@ class TraceFitter(Fitter):
             self.simulator.run(self.duration, param_dic,
                                self.parameter_names, iteration=iteration,
                                name='refine')
-            trace = getattr(self.simulator.statemonitor, self.output_var[0]+'_')
-            if t_weights is None:
-                residual = trace[:, t_start_steps:] - self.output_[0][:, t_start_steps:]
+            one_residual = []
+            if self.metric_weights is not None:
+                metric_weights = self.metric_weights
             else:
-                residual = (trace - self.output_[0]) * sqrt(t_weights)
-            return residual.flatten() * normalization
+                metric_weights = ones(len(self.output_var))
+            for out_var, out, metric_weight in zip(self.output_var,
+                                                   self.output_,
+                                                   metric_weights):
+                trace = getattr(self.simulator.statemonitor, out_var+'_')
+                if t_weights is None:
+                    residual = trace[:, t_start_steps:] - out[:, t_start_steps:]
+                else:
+                    residual = (trace - out) * sqrt(t_weights)
+                one_residual.append(sqrt(metric_weight)*residual)
+            return array(one_residual).flatten() * normalization
 
         def _calc_gradient(params):
             residuals = []
+            if self.metric_weights is not None:
+                metric_weights = self.metric_weights
+            else:
+                metric_weights = ones(len(self.output_var))
             for name in self.parameter_names:
-                trace = getattr(self.simulator.statemonitor,
-                                f'S_{self.output_var[0]}_{name}_')
-                if t_weights is None:
-                    residual = trace[:, t_start_steps:]
-                else:
-                    residual = trace * sqrt(t_weights)
-                residuals.append(residual.flatten() * normalization)
+                one_residual = []
+                for out_var, metric_weight in zip(self.output_var,
+                                                  metric_weights):
+                    trace = getattr(self.simulator.statemonitor,
+                                    f'S_{out_var}_{name}_')
+                    if t_weights is None:
+                        residual = trace[:, t_start_steps:]
+                    else:
+                        residual = trace * sqrt(t_weights)
+                    one_residual.append(sqrt(metric_weight)*residual)
+                residuals.append(array(one_residual).flatten() * normalization)
             gradient = array(residuals)
             return gradient.T
 
@@ -1117,8 +1131,11 @@ class TraceFitter(Fitter):
             error = mean(resid**2)
             errors.append(error)
             if self.use_units:
-                error_dim = self.output_dim[0]**2 * get_dimensions(normalization)**2
-                all_errors = Quantity(errors, dim=error_dim)
+                if len(self.output_var) == 1:
+                    error_dim = self.output_dim[0]**2 * get_dimensions(normalization)**2
+                    all_errors = Quantity(errors, dim=error_dim)
+                else:
+                    all_errors = array(errors)
                 params = {p: Quantity(val, dim=self.model[p].dim)
                           for p, val in params.items()}
             else:
