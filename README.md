@@ -23,5 +23,5 @@ pip install brian2modelfitting
 
 Testing status
 --------------
-[![Build Status](https://travis-ci.org/brian-team/brian2modelfitting.svg?branch=master)](https://travis-ci.org/brian-team/brian2modelfitting) 
+[![Build Status](https://github.com/brian-team/brian2modelfitting/workflows/Tests/badge.svg)](https://github.com/brian-team/brian2modelfitting/actions) 
 [![Coverage Status](https://coveralls.io/repos/github/brian-team/brian2modelfitting/badge.svg?branch=master)](https://coveralls.io/github/brian-team/brian2modelfitting?branch=master)
