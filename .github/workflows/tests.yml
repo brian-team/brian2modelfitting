@@ -38,6 +38,8 @@ jobs:
       run: |
         pytest --cov=brian2modelfitting
     - name: Upload coverage to coveralls
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       if: ${{ matrix.python-version == '3.6' }}
       run: coveralls
 
