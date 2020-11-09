@@ -38,6 +38,6 @@ jobs:
       run: |
         pytest --cov=brian2modelfitting
     - name: Upload coverage to coveralls
-      if: ${{ matrix.python_version == '3.6' }}
+      if: ${{ matrix.python-version == '3.6' }}
       run: coveralls
 
