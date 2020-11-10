@@ -1,5 +1,6 @@
 import abc
 import numbers
+from typing import Sequence
 
 import sympy
 from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape, zeros, sqrt, ndarray, broadcast_to, sum
@@ -900,15 +901,19 @@ class TraceFitter(Fitter):
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
             restart=False, start_iteration=None, penalty=None,
             level=0, **params):
-        if not isinstance(metric, TraceMetric):
-            raise TypeError("You can only use TraceMetric child metric with "
-                            "TraceFitter")
-        if metric.t_weights is not None:
-            if not metric.t_weights.shape == (self.output[0].shape[1], ):
-                raise ValueError("The 't_weights' argument of the metric has "
-                                 "to be a one-dimensional array of length "
-                                 f"{self.output[0].shape[1]} but has shape "
-                                 f"{metric.t_weights.shape}")
+        if not isinstance(metric, Sequence):
+            metric = [metric] * len(self.output_var)
+        for single_metric in metric:
+            if not isinstance(single_metric, TraceMetric):
+                raise TypeError("Metric has to be a 'TraceMetric', but is "
+                                f"type '{type(single_metric)}'.")
+        for single_metric, output in zip(metric, self.output):
+            if single_metric.t_weights is not None:
+                if not single_metric.t_weights.shape == (output.shape[1], ):
+                    raise ValueError("The 't_weights' argument of the metric has "
+                                     "to be a one-dimensional array of length "
+                                     f"{output.shape[1]} but has shape "
+                                     f"{single_metric.t_weights.shape}")
         self.bounds = dict(params)
         best_params, error = super().fit(optimizer=optimizer,
                                          metric=metric,
@@ -1218,9 +1223,12 @@ class SpikeFitter(Fitter):
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
             restart=False, start_iteration=None, penalty=None,
             level=0, **params):
-        if not isinstance(metric, SpikeMetric):
-            raise TypeError("You can only use SpikeMetric child metric with "
-                            "SpikeFitter")
+        if not isinstance(metric, Sequence):
+            metric = [metric] * len(self.output_var)
+        for single_metric in metric:
+            if not isinstance(single_metric, SpikeMetric):
+                raise TypeError("Metric has to be a 'SpikeMetric', but is "
+                                f"type '{type(single_metric)}'.")
         best_params, error = super().fit(optimizer=optimizer,
                                          metric=metric,
                                          n_rounds=n_rounds,
