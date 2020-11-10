@@ -13,7 +13,7 @@ from brian2 import (NeuronGroup, defaultclock, get_device, Network,
                     StateMonitor, SpikeMonitor, second, get_local_namespace,
                     Quantity, get_logger)
 from brian2.input import TimedArray
-from brian2.equations.equations import Equations, SUBEXPRESSION
+from brian2.equations.equations import Equations, SUBEXPRESSION, SingleEquation
 from brian2.devices import set_device, reset_device, device
 from brian2.devices.cpp_standalone.device import CPPStandaloneDevice
 from brian2.core.functions import Function
@@ -439,7 +439,28 @@ class Fitter(metaclass=abc.ABCMeta):
                                                         parameters=self.parameter_names,
                                                         optimize=optimize,
                                                         namespace=namespace)
-            neurons = NeuronGroup(n_neurons, model + sensitivity_eqs,
+            # The sensitivity equations only add variables for variables
+            # defined by differential equations. For output variables that
+            # are given by subexpressions, we also add subexpressions to
+            # calculate their sensitivity.
+            sensititivity_subexpressions = Equations('')
+            for output_var in self.output_var:
+                if output_var in neurons.equations.subexpr_names:
+                    subexpr = neurons.equations[output_var]
+                    for parameter in self.parameter_names:
+                        # FIXME: Deal with subexpressions that depend on other
+                        #        subexpressions
+                        substitutions = {output_var: f'S_{output_var}_{parameter}'}
+                        substitutions.update({diff_eq: f'S_{diff_eq}_{parameter}'
+                                              for diff_eq in neurons.equations.diff_eq_names})
+                        new_eqs = Equations([SingleEquation(subexpr.type,
+                                                            varname=f'S_{output_var}_{parameter}',
+                                                            dimensions=subexpr.dim/neurons.equations[parameter].dim,
+                                                            var_type=subexpr.var_type,
+                                                            expr=subexpr.expr)]).substitute(**substitutions)
+                        sensititivity_subexpressions += new_eqs
+            new_model = model + sensitivity_eqs + sensititivity_subexpressions
+            neurons = NeuronGroup(n_neurons, new_model,
                                   threshold=self.threshold, reset=self.reset,
                                   refractory=self.refractory, name=name,
                                   namespace=namespace, dt=self.dt, **kwds)
