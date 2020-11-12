@@ -11,7 +11,7 @@ from brian2.utils.stringtools import get_identifiers
 
 from brian2 import (NeuronGroup, defaultclock, get_device, Network,
                     StateMonitor, SpikeMonitor, second, get_local_namespace,
-                    Quantity, get_logger)
+                    Quantity, get_logger, Expression)
 from brian2.input import TimedArray
 from brian2.equations.equations import Equations, SUBEXPRESSION, SingleEquation
 from brian2.devices import set_device, reset_device, device
@@ -447,17 +447,35 @@ class Fitter(metaclass=abc.ABCMeta):
             for output_var in self.output_var:
                 if output_var in neurons.equations.subexpr_names:
                     subexpr = neurons.equations[output_var]
+                    sympy_expr = str_to_sympy(subexpr.expr.code, variables=neurons.variables)
                     for parameter in self.parameter_names:
                         # FIXME: Deal with subexpressions that depend on other
                         #        subexpressions
-                        substitutions = {output_var: f'S_{output_var}_{parameter}'}
-                        substitutions.update({diff_eq: f'S_{diff_eq}_{parameter}'
-                                              for diff_eq in neurons.equations.diff_eq_names})
+                        parameter_symbol = sympy.Symbol(parameter, real=True)
+                        referred_vars = {var for var in subexpr.identifiers
+                                         if var in model.diff_eq_names}
+                        var_func_derivatives = {}
+                        # Express all referenced variables as functions of the parameters
+                        new_sympy_expr = sympy_expr
+                        for referred_var in referred_vars:
+                            var_symbol = sympy.Symbol(referred_var, real=True)
+                            var_func = sympy.Function(var_symbol)(parameter_symbol)
+                            var_derivative = sympy.Derivative(var_func, parameter_symbol)
+                            var_func_derivatives[var_symbol] = (var_func, var_derivative)
+                            new_sympy_expr = new_sympy_expr.subs(var_symbol, var_func)
+                        # Differentiate the function with respect to the parameter
+                        diffed = sympy.diff(new_sympy_expr, parameter_symbol)
+                        # Replace the functions/derivatives by the correct symbols
+                        for var, (func, derivative) in var_func_derivatives.items():
+                            diffed = diffed.subs({func: var,
+                                                  derivative: sympy.Symbol(f'S_{var}_{parameter}',
+                                                                           real=True)})
+
                         new_eqs = Equations([SingleEquation(subexpr.type,
                                                             varname=f'S_{output_var}_{parameter}',
                                                             dimensions=subexpr.dim/neurons.equations[parameter].dim,
                                                             var_type=subexpr.var_type,
-                                                            expr=subexpr.expr)]).substitute(**substitutions)
+                                                            expr=Expression(sympy_to_str(diffed)))])
                         sensititivity_subexpressions += new_eqs
             new_model = model + sensitivity_eqs + sensititivity_subexpressions
             neurons = NeuronGroup(n_neurons, new_model,
