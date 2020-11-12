@@ -1,5 +1,6 @@
 import abc
 import numbers
+from distutils.version import LooseVersion
 from typing import Sequence
 
 import sympy
@@ -1210,6 +1211,19 @@ class TraceFitter(Fitter):
             iter_cb = kwds.pop('iter_cb')
         else:
             iter_cb = _callback_wrapper
+
+        # Translate arguments for newer lmfit versions
+        if LooseVersion(lmfit.__version__) >= '1.0.1':
+            max_nfev = kwds.pop('max_nfev', None)
+            args = ['maxfev', 'maxiter']
+            for arg in args:
+                if arg in kwds:
+                    if max_nfev is not None:
+                        raise ValueError('Only specifiy a single \'max_nfev\' argument.')
+                    max_nfev = kwds.pop(arg)
+            if max_nfev:
+                kwds['max_nfev'] = max_nfev
+
         result = lmfit.minimize(_calc_error, parameters,
                                 iter_cb=iter_cb,
                                 **kwds)
