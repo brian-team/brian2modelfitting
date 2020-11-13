@@ -1,24 +1,41 @@
-from tqdm.autonotebook import tqdm
 from types import FunctionType
+
+from brian2.units.fundamentalunits import Quantity
+from tqdm.autonotebook import tqdm
+
 
 
 def callback_text(params, errors, best_params, best_error, index, additional_info):
     """Default callback print-out for Fitters"""
-    param_str = ', '.join([f"{p}={v!s}" for p, v in sorted(best_params.items())])
+    params = []
+    for p, v in sorted(best_params.items()):
+        if isinstance(v, Quantity):
+            params.append(f'{p}={v.in_best_unit(precision=2)}')
+        else:
+            params.append(f'{p}={v:.2g}')
+    param_str = ', '.join(params)
+    if isinstance(best_error, Quantity):
+        best_error_str = best_error.in_best_unit(precision=2)
+    else:
+        best_error_str = f'{best_error:.2g}'
     round = f'Round {index}: '
     if (additional_info and
             'metric_weights' in additional_info and
             len(additional_info['metric_weights'])>1):
-        errors = [f'{weight!s}*{error!s} ({varname})'
-                  for weight, error, varname in zip(additional_info['metric_weights'],
-                                                    additional_info['best_errors'],
-                                                    additional_info['output_var'])]
+        errors = []
+        for weight, error, varname in zip(additional_info['metric_weights'],
+                                          additional_info['best_errors'],
+                                          additional_info['output_var']):
+            if isinstance(error, Quantity):
+                errors.append(f'{weight!s}×{error.in_best_unit(precision=2)} ({varname})')
+            else:
+                errors.append(f'{weight!s}×{error:.2g} ({varname})')
         error_sum = ' + '.join(errors)
         print(f"{round}Best parameters {param_str}\n"
-              f"{' '*len(round)}Best error: {best_error!s} = {error_sum}")
+              f"{' '*len(round)}Best error: {best_error_str} = {error_sum}")
     else:
         print(f"{round}Best parameters {param_str}\n"
-              f"{' '*len(round)}Best error: {best_error!s} ({additional_info['output_var'][0]})")
+              f"{' '*len(round)}Best error: {best_error_str} ({additional_info['output_var'][0]})")
 
 
 def callback_none(params, errors, best_params, best_error, index, additional_info):
