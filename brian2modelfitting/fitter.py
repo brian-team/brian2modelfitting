@@ -1193,7 +1193,11 @@ class TraceFitter(Fitter):
             output_len = self.output[0].size - t_start_steps
             error = tuple(mean(resid[idx*output_len:(idx + 1)*output_len]**2)
                           for idx in range(len(self.output_var)))
-            combined_error = sum(self.metric_weights*array(error))
+            if self.metric_weights is None:
+                metric_weights = ones(len(self.output_var))
+            else:
+                metric_weights = self.metric_weights
+            combined_error = sum(metric_weights*array(error))
             errors.append(error)
             combined_errors.append(combined_error)
 

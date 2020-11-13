@@ -31,7 +31,8 @@ class ProgressBar(object):
     def __init__(self, total=None, **kwds):
         self.t = tqdm(total=total, **kwds)
 
-    def __call__(self, params, errors, best_params, best_error, index):
+    def __call__(self, params, errors, best_params, best_error, index,
+                 additional_info):
         self.t.update(1)
 
 

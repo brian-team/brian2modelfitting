@@ -345,13 +345,15 @@ def test_fitter_fit_callback(setup):
     dt, tf = setup
 
     calls = []
-    def our_callback(params, errors, best_params, best_error, index):
+    def our_callback(params, errors, best_params, best_error, index,
+                     additional_info):
         calls.append(index)
         assert all(isinstance(p, dict) for p in params)
         assert isinstance(errors, np.ndarray)
         assert isinstance(best_params, dict)
         assert isinstance(best_error, Quantity)
         assert isinstance(index, int)
+        assert isinstance(additional_info, dict)
     results, errors = tf.fit(n_rounds=2,
                              optimizer=n_opt,
                              metric=metric,
@@ -362,13 +364,15 @@ def test_fitter_fit_callback(setup):
     # Stop a fit via the callback
 
     calls = []
-    def our_callback(params, errors, best_params, best_error, index):
+    def our_callback(params, errors, best_params, best_error, index,
+                     additional_info):
         calls.append(index)
         assert all(isinstance(p, dict) for p in params)
         assert isinstance(errors, np.ndarray)
         assert isinstance(best_params, dict)
         assert isinstance(best_error, Quantity)
         assert isinstance(index, int)
+        assert isinstance(additional_info, dict)
         return True  # stop
 
     results, errors = tf.fit(n_rounds=2,
@@ -585,8 +589,9 @@ def test_fitter_refine_tsteps_normalization(setup_constant):
     model_traces = tf.generate(params={'c': 5 * mV})
     mse_error = MSEMetric(t_start=50*dt).calc(model_traces[None, : , :], tf.output[0], dt)
     all_errors = []
-    def callback(parameters, errors, best_parameters, best_error, index):
-        all_errors.append(float(errors[0]))
+    def callback(parameters, errors, best_parameters, best_error, index,
+                 additional_args):
+        all_errors.append(float(errors[0][0]))
         return True # stop simulation
 
     # Ignore the first 50 steps at 10mV
@@ -666,13 +671,15 @@ def test_fitter_callback(setup, caplog):
     dt, tf = setup
 
     calls = []
-    def our_callback(params, errors, best_params, best_error, index):
+    def our_callback(params, errors, best_params, best_error, index,
+                     additional_info):
         calls.append(index)
         assert isinstance(params, dict)
-        assert isinstance(errors, np.ndarray)
+        assert isinstance(errors, list)
         assert isinstance(best_params, dict)
         assert isinstance(best_error, Quantity)
         assert isinstance(index, int)
+        assert isinstance(additional_info, dict)
 
     tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS], callback=our_callback)
     assert len(calls)
