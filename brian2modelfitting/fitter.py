@@ -4,7 +4,7 @@ from distutils.version import LooseVersion
 from typing import Sequence
 
 import sympy
-from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape, zeros, sqrt, ndarray, broadcast_to, sum
+from numpy import ones, array, arange, concatenate, mean, argmin, nanargmin, reshape, zeros, sqrt, ndarray, broadcast_to, sum
 
 from brian2.parsing.sympytools import sympy_to_str, str_to_sympy
 from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions, fail_for_dimension_mismatch
@@ -241,14 +241,14 @@ class Fitter(metaclass=abc.ABCMeta):
         Recorded output of the model that the model should reproduce. Should
         be a 2D array of the same shape as the input when fitting traces with
         `TraceFitter`, a list of spike times when fitting spike trains with
-        `SpikeFitter`.
+        `SpikeFitter`. Can also be a list of several output 2D arrays.
     input_var : str
         The name of the input variable in the model. Note that this variable
         should be *used* in the model (e.g. a variable ``I`` that is added as
         a current in the membrane potential equation), but not *defined*.
-    output_var : str
-        The name of the output variable in the model. Only needed when fitting
-        traces with `.TraceFitter`.
+    output_var : str or list of str
+        The name of the output variable in the model or a list of output
+        variables. Only needed when fitting traces with `.TraceFitter`.
     n_samples: int
         Number of parameter samples to be optimized over in a single iteration.
     threshold: `str`, optional
@@ -348,6 +348,8 @@ class Fitter(metaclass=abc.ABCMeta):
         # initialization of attributes used later
         self._best_params = None
         self._best_error = None
+        self._best_raw_error = None
+        self.raw_errors = []
         self.optimizer = None
         self.metric = None
         self.metric_weights = None
@@ -549,7 +551,7 @@ class Fitter(metaclass=abc.ABCMeta):
                                                           'the same units as the error.')
 
             errors += error_penalty
-
+        self.raw_errors.extend(raw_errors.T.tolist())
         optimizer.tell(parameters, errors)
 
         results = optimizer.recommend()
@@ -570,16 +572,19 @@ class Fitter(metaclass=abc.ABCMeta):
         optimizer: `~.Optimizer` children
             Child of Optimizer class, specific for each library.
         metric: `~.Metric`, or list of `~.Metric`
-            Child of Metric class, specifies optimization metric
-        metric_weights: sequence
-            Weights to sum up the metrics for the different outputs
+            Child of Metric class, specifies optimization metric. In the case
+            of multiple fitted output variables, can either be a single
+            `~.Metric` that is applied to all variables, or a list with a
+            `~.Metric` for each variable.
+        metric_weights: sequence, optional
+            Weights to sum up the metrics for the different outputs (if used).
         n_rounds: int
             Number of rounds to optimize over (feedback provided over each
             round).
         callback: `str` or `~typing.Callable`
             Either the name of a provided callback function (``text`` or
             ``progressbar``), or a custom feedback function
-            ``func(parameters, errors, best_parameters, best_error, index)``.
+            ``func(parameters, errors, best_parameters, best_error, index, additional_info)``.
             If this function returns ``True`` the fitting execution is
             interrupted.
         restart: bool
@@ -677,7 +682,9 @@ class Fitter(metaclass=abc.ABCMeta):
                                                                      metric_weights,
                                                                      penalty)
             self.iteration += 1
-            self._best_error = nanmin(self.optimizer.errors)
+            best_idx = nanargmin(self.optimizer.errors)
+            self._best_error = self.optimizer.errors[best_idx]
+            self._best_raw_error = self.raw_errors[best_idx]
             # create output variables
             self._best_params = make_dic(self.parameter_names, best_params)
             if self.use_units and len(self.metric) == 1:
@@ -699,11 +706,16 @@ class Fitter(metaclass=abc.ABCMeta):
                                for one_param_set in parameters]
                 best_error = self.best_error
 
+            additional_info = {'metric_weights': metric_weights,
+                               'best_errors': self._best_raw_error,
+                               'output_var': self.output_var}
+
             if callback(param_dicts,
                         errors,
                         self.best_params,
                         best_error,
-                        index) is True:
+                        index,
+                        additional_info) is True:
                 break
 
         return self.best_params, self.best_error
@@ -1126,6 +1138,13 @@ class TraceFitter(Fitter):
 
         if t_weights is None:
             t_start_steps = int(round(t_start / self.dt))
+        else:
+            t_start_steps = 0
+
+        if self.metric_weights is not None:
+            metric_weights = self.metric_weights
+        else:
+            metric_weights = ones(len(self.output_var))
 
         def _calc_error(params):
             param_dic = get_param_dic([params[p] for p in self.parameter_names],
@@ -1151,10 +1170,6 @@ class TraceFitter(Fitter):
 
         def _calc_gradient(params):
             residuals = []
-            if self.metric_weights is not None:
-                metric_weights = self.metric_weights
-            else:
-                metric_weights = ones(len(self.output_var))
             for name in self.parameter_names:
                 one_residual = []
                 for out_var, metric_weight in zip(self.output_var,
@@ -1172,28 +1187,37 @@ class TraceFitter(Fitter):
 
         tested_parameters = []
         errors = []
+        combined_errors = []
         def _callback_wrapper(params, iter, resid, *args, **kwds):
-            error = mean(resid**2)
+            # TODO: Assumes all the outputs have the same size
+            output_len = self.output[0].size - t_start_steps
+            error = tuple(mean(resid[idx*output_len:(idx + 1)*output_len]**2)
+                          for idx in range(len(self.output_var)))
+            combined_error = sum(self.metric_weights*array(error))
             errors.append(error)
+            combined_errors.append(combined_error)
+
             if self.use_units:
                 if len(self.output_var) == 1:
                     error_dim = self.output_dim[0]**2 * get_dimensions(normalization)**2
-                    all_errors = Quantity(errors, dim=error_dim)
+                    all_errors = Quantity(combined_errors, dim=error_dim)
                 else:
-                    all_errors = array(errors)
+                    all_errors = array(combined_errors)
                 params = {p: Quantity(val, dim=self.model[p].dim)
                           for p, val in params.items()}
             else:
-                all_errors = array(errors)
+                all_errors = array(combined_errors)
                 params = {p: float(val) for p, val in params.items()}
             tested_parameters.append(params)
 
-            best_idx = argmin(errors)
+            best_idx = argmin(combined_errors)
             best_error = all_errors[best_idx]
             best_params = tested_parameters[best_idx]
-
-            return callback_func(params, all_errors,
-                                 best_params, best_error, iter)
+            additional_info = {'metric_weights': metric_weights,
+                               'best_errors': errors[best_idx],
+                               'output_var': self.output_var}
+            return callback_func(params, errors,
+                                 best_params, best_error, iter, additional_info)
 
         assert 'Dfun' not in kwds
         if calc_gradient:
