@@ -10,14 +10,14 @@ def callback_text(params, errors, best_params, best_error, index, additional_inf
     params = []
     for p, v in sorted(best_params.items()):
         if isinstance(v, Quantity):
-            params.append(f'{p}={v.in_best_unit(precision=2)}')
+            params.append(f'{p}={v.in_best_unit(precision=3)}')
         else:
-            params.append(f'{p}={v:.2g}')
+            params.append(f'{p}={v:.3g}')
     param_str = ', '.join(params)
     if isinstance(best_error, Quantity):
-        best_error_str = best_error.in_best_unit(precision=2)
+        best_error_str = best_error.in_best_unit(precision=4)
     else:
-        best_error_str = f'{best_error:.2g}'
+        best_error_str = f'{best_error:.4g}'
     round = f'Round {index}: '
     if (additional_info and
             'metric_weights' in additional_info and
@@ -27,13 +27,13 @@ def callback_text(params, errors, best_params, best_error, index, additional_inf
                                           additional_info['best_errors'],
                                           additional_info['output_var']):
             if isinstance(weight, Quantity):
-                weight_str = weight.in_best_unit(precision=2)
+                weight_str = weight.in_best_unit(precision=3)
             else:
-                weight_str = f'{weight:.2g}'
+                weight_str = f'{weight:.3g}'
             if isinstance(error, Quantity):
-                errors.append(f'{weight_str}×{error.in_best_unit(precision=2)} ({varname})')
+                errors.append(f'{weight_str}×{error.in_best_unit(precision=3)} ({varname})')
             else:
-                errors.append(f'{weight_str}×{error:.2g} ({varname})')
+                errors.append(f'{weight_str}×{error:.3g} ({varname})')
         error_sum = ' + '.join(errors)
         print(f"{round}Best parameters {param_str}\n"
               f"{' '*len(round)}Best error: {best_error_str} = {error_sum}")
