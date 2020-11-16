@@ -1254,12 +1254,13 @@ class TraceFitter(Fitter):
         def _callback_wrapper(params, iter, resid, *args, **kwds):
             # TODO: Assumes all the outputs have the same size
             output_len = self.output[0].size - t_start_steps
-            error = tuple(mean(resid[idx*output_len:(idx + 1)*output_len]**2)
-                          for idx in range(len(self.output_var)))
             if self.metric_weights is None:
                 metric_weights = ones(len(self.output_var))
             else:
                 metric_weights = self.metric_weights
+            error = tuple(mean(resid[idx*output_len:(idx + 1)*output_len]**2)/float(metric_weight)
+                          for idx, metric_weight in enumerate(metric_weights))
+
             combined_error = sum(metric_weights*array(error))
             errors.append(error)
             combined_errors.append(combined_error)
