@@ -760,11 +760,13 @@ class Fitter(metaclass=abc.ABCMeta):
         if self._best_raw_error is None:
             return None
         if self.use_units:
-            return tuple([Quantity(raw_error, dim=metric.get_dimensions(output_dim))
-                          for raw_error, metric, output_dim in
-                          zip(self._best_raw_error, self.metric, self.output_dim)])
+            return {output_var: Quantity(raw_error, dim=metric.get_dimensions(output_dim))
+                    for output_var, raw_error, metric, output_dim in
+                    zip(self.output_var, self._best_raw_error, self.metric, self.output_dim)}
         else:
-            return tuple(self._best_raw_error)
+            return {output_var: raw_error
+                    for output_var, raw_error
+                    in zip(self.output_var, self._best_raw_error)}
 
     def results(self, format='list', use_units=None):
         """
