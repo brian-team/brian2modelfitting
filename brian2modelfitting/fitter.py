@@ -712,14 +712,22 @@ class Fitter(metaclass=abc.ABCMeta):
                                 for p, v in zip(self.parameter_names,
                                                 one_param_set)}
                                for one_param_set in parameters]
+                best_raw_error = tuple([Quantity(raw_error,
+                                                 dim=metric.get_dimensions(output_dim))
+                                        for raw_error, metric, output_dim
+                                        in zip(self._best_raw_error,
+                                               self.metric,
+                                               self.output_dim)])
             else:
                 param_dicts = [{p: v for p, v in zip(self.parameter_names,
                                                      one_param_set)}
                                for one_param_set in parameters]
                 best_error = self.best_error
+                best_raw_error = self._best_raw_error
 
-            additional_info = {'metric_weights': metric_weights,
-                               'best_errors': self._best_raw_error,
+            m_weights = metric_weights if self.use_units else array(metric_weights)
+            additional_info = {'metric_weights': m_weights,
+                               'best_errors': best_raw_error,
                                'output_var': self.output_var}
 
             if callback(param_dicts,
@@ -1255,6 +1263,7 @@ class TraceFitter(Fitter):
             combined_error = sum(metric_weights*array(error))
             errors.append(error)
             combined_errors.append(combined_error)
+            best_idx = argmin(combined_errors)
 
             if self.use_units:
                 norm_dim = get_dimensions(normalization)**2
@@ -1267,16 +1276,22 @@ class TraceFitter(Fitter):
                 all_errors = Quantity(combined_errors, dim=error_dim)
                 params = {p: Quantity(val, dim=self.model[p].dim)
                           for p, val in params.items()}
+                best_raw_error = tuple([Quantity(raw_error,
+                                                 dim=metric.get_dimensions(output_dim))
+                                        for raw_error, metric, output_dim
+                                        in zip(errors[best_idx],
+                                               self.metric,
+                                               self.output_dim)])
             else:
                 all_errors = array(combined_errors)
                 params = {p: float(val) for p, val in params.items()}
+                best_raw_error = errors[best_idx]
             tested_parameters.append(params)
 
-            best_idx = argmin(combined_errors)
             best_error = all_errors[best_idx]
             best_params = tested_parameters[best_idx]
             additional_info = {'metric_weights': metric_weights,
-                               'best_errors': errors[best_idx],
+                               'best_errors': best_raw_error,
                                'output_var': self.output_var}
             return callback_func(params, errors,
                                  best_params, best_error, iter, additional_info)

@@ -26,10 +26,14 @@ def callback_text(params, errors, best_params, best_error, index, additional_inf
         for weight, error, varname in zip(additional_info['metric_weights'],
                                           additional_info['best_errors'],
                                           additional_info['output_var']):
-            if isinstance(error, Quantity):
-                errors.append(f'{weight!s}×{error.in_best_unit(precision=2)} ({varname})')
+            if isinstance(weight, Quantity):
+                weight_str = weight.in_best_unit(precision=2)
             else:
-                errors.append(f'{weight!s}×{error:.2g} ({varname})')
+                weight_str = f'{weight:.2g}'
+            if isinstance(error, Quantity):
+                errors.append(f'{weight_str}×{error.in_best_unit(precision=2)} ({varname})')
+            else:
+                errors.append(f'{weight_str}×{error:.2g} ({varname})')
         error_sum = ' + '.join(errors)
         print(f"{round}Best parameters {param_str}\n"
               f"{' '*len(round)}Best error: {best_error_str} = {error_sum}")
