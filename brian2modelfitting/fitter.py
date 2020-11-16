@@ -756,7 +756,8 @@ class Fitter(metaclass=abc.ABCMeta):
         if self._best_error is None:
             return None
         if self.use_units:
-            error_dim = self.metric[0].get_dimensions(self.output_dim[0])
+            error_dim = (get_dimensions(self.metric_weights[0]) *
+                         self.metric[0].get_dimensions(self.output_dim[0]))
             # We assume that the error units have already been checked to
             # be consistent at this point
             return Quantity(self._best_error, dim=error_dim)
