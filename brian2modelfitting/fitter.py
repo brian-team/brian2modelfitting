@@ -1279,10 +1279,9 @@ class TraceFitter(Fitter):
                 params = {p: Quantity(val, dim=self.model[p].dim)
                           for p, val in params.items()}
                 best_raw_error = tuple([Quantity(raw_error,
-                                                 dim=metric.get_dimensions(output_dim))
-                                        for raw_error, metric, output_dim
+                                                 dim=output_dim**2)
+                                        for raw_error, output_dim
                                         in zip(errors[best_idx],
-                                               self.metric,
                                                self.output_dim)])
             else:
                 all_errors = array(combined_errors)
