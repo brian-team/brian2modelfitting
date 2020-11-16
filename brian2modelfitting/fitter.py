@@ -797,10 +797,18 @@ class Fitter(metaclass=abc.ABCMeta):
         params = array(self.optimizer.tested_parameters)
         params = params.reshape(-1, params.shape[-1])
 
-        if use_units and len(self.metric) == 1:  # TODO
-            error_dim = self.metric[0].get_dimensions(self.output_dim[0])
+        if use_units:
+            error_dim = get_dimensions(self.metric_weights[0])*self.metric[0].get_dimensions(self.output_dim[0])
             errors = Quantity(array(self.optimizer.errors).flatten(),
                               dim=error_dim)
+            if len(self.output_var) > 1:
+                # Add additional information for the raw errors
+                raw_error_quantities = {output_var: Quantity([raw_error[idx]
+                                                              for raw_error in self.raw_errors],
+                                                             dim=metric.get_dimensions(output_dim))
+                                        for idx, (output_var, metric, output_dim)
+                                        in enumerate(zip(self.output_var, self.metric, self.output_dim))
+                                        }
         else:
             errors = array(array(self.optimizer.errors).flatten())
 
@@ -818,6 +826,13 @@ class Fitter(metaclass=abc.ABCMeta):
                     else:
                         res_dict[n] = float(temp_data[i])
                 res_dict['error'] = errors[j]
+                if len(self.output_var) > 1:
+                    if use_units:
+                        res_dict['raw_errors'] = {output_var: raw_error_quantities[output_var][j]
+                                                  for output_var in self.output_var}
+                    else:
+                        res_dict['raw_errors'] = {output_var: self.raw_errors[j][idx]
+                                                  for idx, output_var in enumerate(self.output_var)}
                 res_list.append(res_dict)
 
             return res_list
@@ -831,6 +846,14 @@ class Fitter(metaclass=abc.ABCMeta):
                     res_dict[n] = array(params[:, i])
 
             res_dict['error'] = errors
+            if len(self.output_var) > 1:
+                if use_units:
+                    res_dict['raw_errors'] = {output_var: raw_error_quantities[output_var]
+                                              for output_var in self.output_var}
+                else:
+                    res_dict['raw_errors'] = {output_var: array([raw_error[idx]
+                                                                 for raw_error in self.raw_errors])
+                                              for idx, output_var in enumerate(self.output_var)}
             return res_dict
 
         elif format == 'dataframe':
@@ -840,7 +863,12 @@ class Fitter(metaclass=abc.ABCMeta):
                             'Specify "use_units=False" to avoid this warning.',
                             name_suffix='dataframe_units')
             data = concatenate((params, array(errors)[None, :].transpose()), axis=1)
-            return DataFrame(data=data, columns=names + ['error'])
+            columns = names + ['error']
+            if len(self.output_var) > 1:
+                data = concatenate((data, self.raw_errors), axis=1)
+                columns += [f'error_{output_var}'
+                            for output_var in self.output_var]
+            return DataFrame(data=data, columns=columns)
 
     def generate(self, output_var=None, params=None, param_init=None,
                  iteration=1e9, level=0):
