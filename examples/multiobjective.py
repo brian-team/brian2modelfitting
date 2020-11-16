@@ -54,7 +54,7 @@ fitter = TraceFitter(model=eqs, input_var='I', output_var=['v', 'm'],
 
 res, error = fitter.fit(n_rounds=20,
                         optimizer=n_opt, metric=metric,
-                        metric_weights=[1/(float(100*mV)**2),
+                        metric_weights=[1/((100*mV)**2),
                                         1],
                         callback='text',
                         gl=[1e-09 *siemens, 1e-07 *siemens],

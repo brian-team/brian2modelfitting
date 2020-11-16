@@ -539,12 +539,19 @@ class Fitter(metaclass=abc.ABCMeta):
                            iteration=self.iteration)
 
         raw_errors = array(self.calc_errors(metric))
-        errors = sum(raw_errors.T * metric_weights, axis=1)
+        errors = sum(raw_errors.T * array(metric_weights), axis=1)
 
         if penalty is not None:
             error_penalty = getattr(self.simulator.neurons, penalty + '_')
-            if self.use_units and len(metric) == 1:
-                error_dim = metric[0].get_dimensions(self.output_dim[0])
+            if self.use_units:
+                error_dim = get_dimensions(metric_weights[0]) * metric[0].get_dimensions(self.output_dim[0])
+                for one_metric, metric_weight, one_dim in zip(metric[1:],
+                                                              metric_weights[1:],
+                                                              self.output_dim[1:]):
+                    other_dim = get_dimensions(metric_weight) * one_metric.get_dimensions(one_dim)
+                    fail_for_dimension_mismatch(error_dim, other_dim,
+                                                error_message='The error terms have mismatching '
+                                                              'units.')
                 penalty_dim = self.simulator.neurons.variables[penalty].dim
                 fail_for_dimension_mismatch(error_dim, penalty_dim,
                                             error_message='The term used as penalty has to have '
@@ -678,8 +685,8 @@ class Fitter(metaclass=abc.ABCMeta):
         # Run Optimization Loop
         for index in range(n_rounds):
             best_params, parameters, errors = self.optimization_iter(optimizer,
-                                                                     metric,
-                                                                     metric_weights,
+                                                                     self.metric,
+                                                                     self.metric_weights,
                                                                      penalty)
             self.iteration += 1
             best_idx = nanargmin(self.optimizer.errors)
@@ -687,13 +694,18 @@ class Fitter(metaclass=abc.ABCMeta):
             self._best_raw_error = self.raw_errors[best_idx]
             # create output variables
             self._best_params = make_dic(self.parameter_names, best_params)
-            if self.use_units and len(self.metric) == 1:
-                if self.output_var == 'spikes':
-                    output_dim = DIMENSIONLESS
-                else:
-                    output_dim = self.output_dim
-                # Correct the units for the normalization factor
-                error_dim = self.metric[0].get_normalized_dimensions(output_dim[0])
+            if self.use_units:
+                error_dim = (get_dimensions(self.metric_weights[0]) *
+                             self.metric[0].get_normalized_dimensions(self.output_dim[0]))
+                for metric, metric_weight, output_dim in zip(self.metric[1:],
+                                                             self.metric_weights[1:],
+                                                             self.output_dim[1:]):
+                    # Correct the units for the normalization factor
+                    other_dim = (get_dimensions(metric_weight) *
+                                 metric.get_normalized_dimensions(output_dim))
+                    fail_for_dimension_mismatch(error_dim, other_dim,
+                                                error_message='The error terms have mismatching '
+                                                              'units.')
                 best_error = Quantity(float(self.best_error), dim=error_dim)
                 errors = Quantity(errors, dim=error_dim)
                 param_dicts = [{p: Quantity(v, dim=self.model[p].dim)
@@ -735,11 +747,24 @@ class Fitter(metaclass=abc.ABCMeta):
     def best_error(self):
         if self._best_error is None:
             return None
-        if self.use_units and len(self.metric) == 1:
+        if self.use_units:
             error_dim = self.metric[0].get_dimensions(self.output_dim[0])
+            # We assume that the error units have already been checked to
+            # be consistent at this point
             return Quantity(self._best_error, dim=error_dim)
         else:
             return self._best_error
+
+    @property
+    def best_raw_error(self):
+        if self._best_raw_error is None:
+            return None
+        if self.use_units:
+            return tuple([Quantity(raw_error, dim=metric.get_dimensions(output_dim))
+                          for raw_error, metric, output_dim in
+                          zip(self._best_raw_error, self.metric, self.output_dim)])
+        else:
+            return tuple(self._best_raw_error)
 
     def results(self, format='list', use_units=None):
         """
@@ -770,7 +795,7 @@ class Fitter(metaclass=abc.ABCMeta):
         params = array(self.optimizer.tested_parameters)
         params = params.reshape(-1, params.shape[-1])
 
-        if use_units and len(self.metric) == 1:
+        if use_units and len(self.metric) == 1:  # TODO
             error_dim = self.metric[0].get_dimensions(self.output_dim[0])
             errors = Quantity(array(self.optimizer.errors).flatten(),
                               dim=error_dim)
@@ -1202,11 +1227,14 @@ class TraceFitter(Fitter):
             combined_errors.append(combined_error)
 
             if self.use_units:
-                if len(self.output_var) == 1:
-                    error_dim = self.output_dim[0]**2 * get_dimensions(normalization)**2
-                    all_errors = Quantity(combined_errors, dim=error_dim)
-                else:
-                    all_errors = array(combined_errors)
+                norm_dim = get_dimensions(normalization)**2
+                error_dim = get_dimensions(metric_weights[0])*self.output_dim[0]**2*norm_dim
+                for metric_weight, output_dim in zip(metric_weights[1:], self.output_dim[1:]):
+                    other_dim = get_dimensions(metric_weight)*output_dim**2*norm_dim
+                    fail_for_dimension_mismatch(error_dim, other_dim,
+                                                error_message='The error terms have mismatching '
+                                                              'units.')
+                all_errors = Quantity(combined_errors, dim=error_dim)
                 params = {p: Quantity(val, dim=self.model[p].dim)
                           for p, val in params.items()}
             else:
