@@ -244,7 +244,6 @@ class Metric(metaclass=abc.ABCMeta):
         """
         pass
 
-    @abc.abstractmethod
     def revert_normalization(self, error):
         """
         Revert the normalization to recover the error before normalization.
@@ -259,7 +258,8 @@ class Metric(metaclass=abc.ABCMeta):
         raw_error : Quantity or float
             The error before normalization
         """
-        pass
+        return error / self.normalization
+
 
 class TraceMetric(Metric):
     """
@@ -480,9 +480,6 @@ class MSEMetric(TraceMetric):
 class FeatureMetric(TraceMetric):
     def __init__(self, stim_times, feat_list, weights=None, combine=None,
                  t_start=0*second, normalization=1.):
-        if normalization != 1:
-            raise ValueError('Do not set the normalization factor when using '
-                             'the FeatureMetric, use weights instead.')
         super(FeatureMetric, self).__init__(t_start=t_start,
                                             normalization=normalization)
         self.stim_times = stim_times

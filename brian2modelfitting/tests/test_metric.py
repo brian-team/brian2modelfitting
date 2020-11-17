@@ -246,10 +246,6 @@ def test_get_features_feature_metric():
     inp_times = [[99 * ms, 150 * ms], [49 * ms, 150 * ms]]
 
     # Default comparison: absolute difference
-    # Check that FeatureMetric rejects the normalization argument
-    with pytest.raises(ValueError):
-        feature_metric = FeatureMetric(inp_times, ['voltage_base'],
-                                       normalization=2)
     feature_metric = FeatureMetric(inp_times, ['voltage_base'])
     results = feature_metric.get_features(voltage_model, voltage_target, dt=dt)
     assert len(results) == 3
