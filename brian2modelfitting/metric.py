@@ -244,6 +244,22 @@ class Metric(metaclass=abc.ABCMeta):
         """
         pass
 
+    @abc.abstractmethod
+    def revert_normalization(self, error):
+        """
+        Revert the normalization to recover the error before normalization.
+
+        Parameters
+        ----------
+        error : Quantity or float
+            The normalized error.
+
+        Returns
+        -------
+        raw_error : Quantity or float
+            The error before normalization
+        """
+        pass
 
 class TraceMetric(Metric):
     """
@@ -456,6 +472,9 @@ class MSEMetric(TraceMetric):
 
     def get_normalized_dimensions(self, output_dim):
         return output_dim**2 * get_dimensions(self.normalization)**2
+
+    def revert_normalization(self, error):
+        return error / self.normalization**2
 
 
 class FeatureMetric(TraceMetric):

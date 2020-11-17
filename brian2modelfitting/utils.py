@@ -1,5 +1,6 @@
 from types import FunctionType
 
+from brian2 import have_same_dimensions
 from brian2.units.fundamentalunits import Quantity
 from tqdm.autonotebook import tqdm
 
@@ -19,14 +20,25 @@ def callback_text(params, errors, best_params, best_error, index, additional_inf
     else:
         best_error_str = f'{best_error:.4g}'
     round = f'Round {index}: '
-    if len(additional_info.get('best_errors', [])) > 1:
+    if len(additional_info.get('objective_errors', [])) > 1:
         errors = []
-        for error, varname in zip(additional_info['best_errors'],
-                                  additional_info['output_var']):
-            if isinstance(error, Quantity):
-                errors.append(f'{error.in_best_unit(precision=3)} ({varname})')
+        for error, normed_error, varname in zip(additional_info['objective_errors'],
+                                                additional_info['objective_errors_normalized'],
+                                                additional_info['output_var']):
+
+            if not have_same_dimensions(error, normed_error) or error != normed_error:
+                if isinstance(error, Quantity):
+                    raw_error_str = f', unnormalized error: {error.in_best_unit(precision=3)}'
+                else:
+                    raw_error_str = f', unnormalized error: {error:.3g}'
             else:
-                errors.append(f'{error:.3g} ({varname})')
+                raw_error_str = ''
+
+            if isinstance(normed_error, Quantity):
+                errors.append(f'{normed_error.in_best_unit(precision=3)} ({varname}{raw_error_str})')
+            else:
+                errors.append(f'{normed_error:.3g} ({varname}{raw_error_str})')
+
         error_sum = ' + '.join(errors)
         print(f"{round}Best parameters {param_str}\n"
               f"{' '*len(round)}Best error: {best_error_str} = {error_sum}")
