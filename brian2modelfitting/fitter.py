@@ -348,10 +348,10 @@ class Fitter(metaclass=abc.ABCMeta):
         # initialization of attributes used later
         self._best_params = None
         self._best_error = None
-        self._best_raw_error = None
-        self._best_raw_error_normed = None
-        self.raw_errors = []
-        self.raw_errors_normed = []
+        self._best_objective_errors = None
+        self._best_objective_errors_normed = None
+        self._objective_errors = []
+        self._objective_errors_normed = []
         self.optimizer = None
         self.metric = None
 
@@ -558,10 +558,10 @@ class Fitter(metaclass=abc.ABCMeta):
                                                           'the same units as the error.')
 
             errors += error_penalty
-        self.raw_errors_normed.extend(raw_errors.T.tolist())
+        self._objective_errors_normed.extend(raw_errors.T.tolist())
         unnormalized_raw_errors = array([metric.revert_normalization(err)
                                          for metric, err in zip(metric, raw_errors)]).T.tolist()
-        self.raw_errors.extend(unnormalized_raw_errors)
+        self._objective_errors.extend(unnormalized_raw_errors)
         optimizer.tell(parameters, errors)
 
         results = optimizer.recommend()
@@ -684,8 +684,8 @@ class Fitter(metaclass=abc.ABCMeta):
             self.iteration += 1
             best_idx = nanargmin(self.optimizer.errors)
             self._best_error = self.optimizer.errors[best_idx]
-            self._best_raw_error_normed = tuple(self.raw_errors_normed[best_idx])
-            self._best_raw_error = tuple(self.raw_errors[best_idx])
+            self._best_objective_errors_normed = tuple(self._objective_errors_normed[best_idx])
+            self._best_objective_errors = tuple(self._objective_errors[best_idx])
             # create output variables
             self._best_params = make_dic(self.parameter_names, best_params)
             if self.use_units:
@@ -705,13 +705,13 @@ class Fitter(metaclass=abc.ABCMeta):
                 best_raw_error_normed = tuple([Quantity(raw_error_normed,
                                                         dim=metric.get_normalized_dimensions(output_dim))
                                                for raw_error_normed, metric, output_dim
-                                               in zip(self._best_raw_error_normed,
+                                               in zip(self._best_objective_errors_normed,
                                                       self.metric,
                                                       self.output_dim)])
                 best_raw_error = tuple([Quantity(raw_error,
                                                  dim=metric.get_dimensions(output_dim))
                                         for raw_error, metric, output_dim
-                                        in zip(self._best_raw_error,
+                                        in zip(self._best_objective_errors,
                                                self.metric,
                                                self.output_dim)])
             else:
@@ -719,8 +719,8 @@ class Fitter(metaclass=abc.ABCMeta):
                                                      one_param_set)}
                                for one_param_set in parameters]
                 best_error = self.best_error
-                best_raw_error = self._best_raw_error
-                best_raw_error_normed = self._best_raw_error_normed
+                best_raw_error = self._best_objective_errors
+                best_raw_error_normed = self._best_objective_errors_normed
 
             additional_info = {'objective_errors': best_raw_error,
                                'objective_errors_normalized': best_raw_error_normed,
@@ -760,31 +760,31 @@ class Fitter(metaclass=abc.ABCMeta):
             return self._best_error
 
     @property
-    def best_raw_error(self):
-        if self._best_raw_error is None:
+    def best_objective_errors(self):
+        if self._best_objective_errors is None:
             return None
         if self.use_units:
             return {output_var: Quantity(raw_error, dim=metric.get_dimensions(output_dim))
                     for output_var, raw_error, metric, output_dim in
-                    zip(self.output_var, self._best_raw_error, self.metric, self.output_dim)}
+                    zip(self.output_var, self._best_objective_errors, self.metric, self.output_dim)}
         else:
             return {output_var: raw_error
                     for output_var, raw_error
-                    in zip(self.output_var, self._best_raw_error)}
+                    in zip(self.output_var, self._best_objective_errors)}
 
     @property
-    def best_raw_error_normed(self):
-        if self._best_raw_error is None:
+    def best_objective_errors_normalized(self):
+        if self._best_objective_errors_normed is None:
             return None
         if self.use_units:
             return {output_var: Quantity(raw_error_normed,
                                          dim=metric.get_normalized_dimensions(output_dim))
                     for output_var, raw_error_normed, metric, output_dim in
-                    zip(self.output_var, self._best_raw_error_normed, self.metric, self.output_dim)}
+                    zip(self.output_var, self._best_objective_errors_normed, self.metric, self.output_dim)}
         else:
             return {output_var: raw_error
                     for output_var, raw_error
-                    in zip(self.output_var, self._best_raw_error_normed)}
+                    in zip(self.output_var, self._best_objective_errors_normed)}
 
     def results(self, format='list', use_units=None):
         """
@@ -822,13 +822,13 @@ class Fitter(metaclass=abc.ABCMeta):
             if len(self.output_var) > 1:
                 # Add additional information for the raw errors
                 raw_errors_normed = {output_var: Quantity([raw_error_normed[idx]
-                                                           for raw_error_normed in self.raw_errors_normed],
+                                                           for raw_error_normed in self._objective_errors_normed],
                                                           dim=metric.get_normalized_dimensions(output_dim))
                                      for idx, (output_var, metric, output_dim)
                                      in enumerate(zip(self.output_var, self.metric, self.output_dim))
                                      }
                 raw_errors = {output_var: Quantity([raw_error[idx]
-                                                    for raw_error in self.raw_errors],
+                                                    for raw_error in self._objective_errors],
                                                    dim=metric.get_dimensions(output_dim))
                               for idx, (output_var, metric, output_dim)
                               in enumerate(zip(self.output_var, self.metric, self.output_dim))
@@ -857,9 +857,9 @@ class Fitter(metaclass=abc.ABCMeta):
                         res_dict['objective_errors'] = {output_var: raw_errors[output_var][j]
                                                         for output_var in self.output_var}
                     else:
-                        res_dict['objective_errors_normed'] = {output_var: self.raw_errors_normed[j][idx]
+                        res_dict['objective_errors_normed'] = {output_var: self._objective_errors_normed[j][idx]
                                                                for idx, output_var in enumerate(self.output_var)}
-                        res_dict['objective_errors'] = {output_var: self.raw_errors[j][idx]
+                        res_dict['objective_errors'] = {output_var: self._objective_errors[j][idx]
                                                         for idx, output_var in enumerate(self.output_var)}
                 res_list.append(res_dict)
 
@@ -882,10 +882,10 @@ class Fitter(metaclass=abc.ABCMeta):
                                                     for output_var in self.output_var}
                 else:
                     res_dict['objective_errors_normalized'] = {output_var: array([raw_error_normed[idx]
-                                                                                  for raw_error_normed in self.raw_errors_normed])
+                                                                                  for raw_error_normed in self._objective_errors_normed])
                                                                for idx, output_var in enumerate(self.output_var)}
                     res_dict['objective_errors'] = {output_var: array([raw_error[idx]
-                                                                       for raw_error in self.raw_errors])
+                                                                       for raw_error in self._objective_errors])
                                                     for idx, output_var in enumerate(self.output_var)}
             return res_dict
 
@@ -898,10 +898,10 @@ class Fitter(metaclass=abc.ABCMeta):
             data = concatenate((params, array(errors)[None, :].transpose()), axis=1)
             columns = names + ['error']
             if len(self.output_var) > 1:
-                data = concatenate((data, self.raw_errors_normed), axis=1)
+                data = concatenate((data, self._objective_errors_normed), axis=1)
                 columns += [f'normalized_error_{output_var}'
                             for output_var in self.output_var]
-                data = concatenate((data, self.raw_errors), axis=1)
+                data = concatenate((data, self._objective_errors), axis=1)
                 columns += [f'error_{output_var}'
                             for output_var in self.output_var]
             return DataFrame(data=data, columns=columns)
