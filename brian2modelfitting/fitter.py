@@ -352,7 +352,7 @@ class Fitter(metaclass=abc.ABCMeta):
         self.raw_errors = []
         self.optimizer = None
         self.metric = None
-        self.metric_weights = None
+
         if not param_init:
             param_init = {}
         for param, val in param_init.items():
@@ -506,7 +506,7 @@ class Fitter(metaclass=abc.ABCMeta):
         """
         pass
 
-    def optimization_iter(self, optimizer, metric, metric_weights, penalty):
+    def optimization_iter(self, optimizer, metric, penalty):
         """
         Function performs all operations required for one iteration of
         optimization. Drawing parameters, setting them to simulator and
@@ -539,16 +539,14 @@ class Fitter(metaclass=abc.ABCMeta):
                            iteration=self.iteration)
 
         raw_errors = array(self.calc_errors(metric))
-        errors = sum(raw_errors.T * array(metric_weights), axis=1)
+        errors = sum(raw_errors, axis=0)
 
         if penalty is not None:
             error_penalty = getattr(self.simulator.neurons, penalty + '_')
             if self.use_units:
-                error_dim = get_dimensions(metric_weights[0]) * metric[0].get_normalized_dimensions(self.output_dim[0])
-                for one_metric, metric_weight, one_dim in zip(metric[1:],
-                                                              metric_weights[1:],
-                                                              self.output_dim[1:]):
-                    other_dim = get_dimensions(metric_weight) * one_metric.get_normalized_dimensions(one_dim)
+                error_dim = metric[0].get_normalized_dimensions(self.output_dim[0])
+                for one_metric, one_dim in zip(metric[1:], self.output_dim[1:]):
+                    other_dim = one_metric.get_normalized_dimensions(one_dim)
                     fail_for_dimension_mismatch(error_dim, other_dim,
                                                 error_message='The error terms have mismatching '
                                                               'units.')
@@ -565,8 +563,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
         return results, parameters, errors
 
-    def fit(self, optimizer, metric=None, metric_weights=None,
-            n_rounds=1, callback='text',
+    def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
             restart=False, online_error=False, start_iteration=None,
             penalty=None, level=0, **params):
         """
@@ -583,8 +580,6 @@ class Fitter(metaclass=abc.ABCMeta):
             of multiple fitted output variables, can either be a single
             `~.Metric` that is applied to all variables, or a list with a
             `~.Metric` for each variable.
-        metric_weights: sequence, optional
-            Weights to sum up the metrics for the different outputs (if used).
         n_rounds: int
             Number of rounds to optimize over (feedback provided over each
             round).
@@ -633,11 +628,6 @@ class Fitter(metaclass=abc.ABCMeta):
                     raise TypeError("metric has to be a child of class Metric or None "
                                     "for OnlineTraceFitter")
 
-        if metric_weights is None:
-            if len(metric) != 1:
-                raise TypeError('Need to provide weights for the metrics.')
-            metric_weights = array([1.])
-
         if not (isinstance(optimizer, Optimizer)) or optimizer is None:
             raise TypeError("metric has to be a child of class Optimizer")
 
@@ -666,7 +656,6 @@ class Fitter(metaclass=abc.ABCMeta):
 
         self.optimizer = optimizer
         self.metric = metric
-        self.metric_weights = metric_weights
 
         callback = callback_setup(callback, n_rounds)
 
@@ -686,7 +675,6 @@ class Fitter(metaclass=abc.ABCMeta):
         for index in range(n_rounds):
             best_params, parameters, errors = self.optimization_iter(optimizer,
                                                                      self.metric,
-                                                                     self.metric_weights,
                                                                      penalty)
             self.iteration += 1
             best_idx = nanargmin(self.optimizer.errors)
@@ -695,14 +683,10 @@ class Fitter(metaclass=abc.ABCMeta):
             # create output variables
             self._best_params = make_dic(self.parameter_names, best_params)
             if self.use_units:
-                error_dim = (get_dimensions(self.metric_weights[0]) *
-                             self.metric[0].get_normalized_dimensions(self.output_dim[0]))
-                for metric, metric_weight, output_dim in zip(self.metric[1:],
-                                                             self.metric_weights[1:],
-                                                             self.output_dim[1:]):
+                error_dim = self.metric[0].get_normalized_dimensions(self.output_dim[0])
+                for metric, output_dim in zip(self.metric[1:], self.output_dim[1:]):
                     # Correct the units for the normalization factor
-                    other_dim = (get_dimensions(metric_weight) *
-                                 metric.get_normalized_dimensions(output_dim))
+                    other_dim = metric.get_normalized_dimensions(output_dim)
                     fail_for_dimension_mismatch(error_dim, other_dim,
                                                 error_message='The error terms have mismatching '
                                                               'units.')
@@ -725,9 +709,7 @@ class Fitter(metaclass=abc.ABCMeta):
                 best_error = self.best_error
                 best_raw_error = self._best_raw_error
 
-            m_weights = metric_weights if self.use_units else array(metric_weights)
-            additional_info = {'metric_weights': m_weights,
-                               'best_errors': best_raw_error,
+            additional_info = {'best_errors': best_raw_error,
                                'output_var': self.output_var}
 
             if callback(param_dicts,
@@ -756,8 +738,7 @@ class Fitter(metaclass=abc.ABCMeta):
         if self._best_error is None:
             return None
         if self.use_units:
-            error_dim = (get_dimensions(self.metric_weights[0]) *
-                         self.metric[0].get_normalized_dimensions(self.output_dim[0]))
+            error_dim = self.metric[0].get_normalized_dimensions(self.output_dim[0])
             # We assume that the error units have already been checked to
             # be consistent at this point
             return Quantity(self._best_error, dim=error_dim)
@@ -807,7 +788,7 @@ class Fitter(metaclass=abc.ABCMeta):
         params = params.reshape(-1, params.shape[-1])
 
         if use_units:
-            error_dim = get_dimensions(self.metric_weights[0])*self.metric[0].get_dimensions(self.output_dim[0])
+            error_dim = self.metric[0].get_dimensions(self.output_dim[0])
             errors = Quantity(array(self.optimizer.errors).flatten(),
                               dim=error_dim)
             if len(self.output_var) > 1:
@@ -1208,11 +1189,6 @@ class TraceFitter(Fitter):
         else:
             t_start_steps = 0
 
-        if self.metric_weights is not None:
-            metric_weights = self.metric_weights
-        else:
-            metric_weights = ones(len(self.output_var))
-
         def _calc_error(params):
             param_dic = get_param_dic([params[p] for p in self.parameter_names],
                                       self.parameter_names, self.n_traces, 1)
@@ -1220,36 +1196,30 @@ class TraceFitter(Fitter):
                                self.parameter_names, iteration=iteration,
                                name='refine')
             one_residual = []
-            if self.metric_weights is not None:
-                metric_weights = self.metric_weights
-            else:
-                metric_weights = ones(len(self.output_var))
-            for out_var, out, metric_weight, norm in zip(self.output_var,
-                                                         self.output_,
-                                                         metric_weights,
-                                                         normalization):
+
+            for out_var, out, norm in zip(self.output_var,
+                                          self.output_,
+                                          normalization):
                 trace = getattr(self.simulator.statemonitor, out_var+'_')
                 if t_weights is None:
                     residual = trace[:, t_start_steps:] - out[:, t_start_steps:]
                 else:
                     residual = (trace - out) * sqrt(t_weights)
-                one_residual.append(sqrt(metric_weight)*residual*norm)
+                one_residual.append(residual*norm)
             return array(one_residual).flatten()
 
         def _calc_gradient(params):
             residuals = []
             for name in self.parameter_names:
                 one_residual = []
-                for out_var, metric_weight, norm in zip(self.output_var,
-                                                        metric_weights,
-                                                        normalization):
+                for out_var, norm in zip(self.output_var, normalization):
                     trace = getattr(self.simulator.statemonitor,
                                     f'S_{out_var}_{name}_')
                     if t_weights is None:
                         residual = trace[:, t_start_steps:]
                     else:
                         residual = trace * sqrt(t_weights)
-                    one_residual.append(sqrt(metric_weight)*residual*norm)
+                    one_residual.append(residual*norm)
                 residuals.append(array(one_residual).flatten())
             gradient = array(residuals)
             return gradient.T
@@ -1260,26 +1230,20 @@ class TraceFitter(Fitter):
         def _callback_wrapper(params, iter, resid, *args, **kwds):
             # TODO: Assumes all the outputs have the same size
             output_len = self.output[0].size - t_start_steps
-            if self.metric_weights is None:
-                metric_weights = ones(len(self.output_var))
-            else:
-                metric_weights = self.metric_weights
-            error = tuple(mean(resid[idx*output_len:(idx + 1)*output_len]**2)/float(metric_weight)
-                          for idx, metric_weight in enumerate(metric_weights))
+            error = tuple([mean(resid[idx*output_len:(idx + 1)*output_len]**2)
+                           for idx in range(len(self.output_var))])
 
-            combined_error = sum(metric_weights*array(error))
+            combined_error = sum(array(error))
             errors.append(error)
             combined_errors.append(combined_error)
             best_idx = argmin(combined_errors)
 
             if self.use_units:
                 norm_dim = get_dimensions(normalization[0])**2
-                error_dim = get_dimensions(metric_weights[0])*self.output_dim[0]**2*norm_dim
-                for metric_weight, output_dim, norm in zip(metric_weights[1:],
-                                                           self.output_dim[1:],
-                                                           normalization[1:]):
-                    norm_dim = get_dimensions(norm)
-                    other_dim = get_dimensions(metric_weight)*output_dim**2*norm_dim
+                error_dim = self.output_dim[0]**2*norm_dim
+                for output_dim, norm in zip(self.output_dim[1:], normalization[1:]):
+                    norm_dim = get_dimensions(norm)**2
+                    other_dim = output_dim**2*norm_dim
                     fail_for_dimension_mismatch(error_dim, other_dim,
                                                 error_message='The error terms have mismatching '
                                                               'units.')
@@ -1300,8 +1264,7 @@ class TraceFitter(Fitter):
 
             best_error = all_errors[best_idx]
             best_params = tested_parameters[best_idx]
-            additional_info = {'metric_weights': metric_weights,
-                               'best_errors': best_raw_error,
+            additional_info = {'best_errors': best_raw_error,
                                'output_var': self.output_var}
             return callback_func(params, errors,
                                  best_params, best_error, iter, additional_info)

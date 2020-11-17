@@ -2,6 +2,10 @@ import pandas as pd
 import numpy as np
 from brian2 import *
 from brian2modelfitting import *
+
+# For nicer unit display
+mV**-2, uvolt**-2, nvolt**-2
+
 # set_device('cpp_standalone')  # recommend for speed
 dt = 0.01*ms
 defaultclock.dt = dt
@@ -43,7 +47,12 @@ ground_truth_v = mon.v[:]
 ground_truth_m = mon.m[:]
 ## Optimization and Metric Choice
 n_opt = NevergradOptimizer()
-metric = MSEMetric(t_start=5*ms)
+
+# The metrics' normalization can be used to weigh the errors produced by the
+# two metrics. It is also necessary for making the units of the two errors
+# compatible.
+metric_v = MSEMetric(t_start=5*ms, normalization=10*mV)
+metric_m = MSEMetric(t_start=5*ms, normalization=0.1)
 
 ## Fitting
 fitter = TraceFitter(model=eqs, input_var='I', output_var=['v', 'm'],
@@ -53,9 +62,7 @@ fitter = TraceFitter(model=eqs, input_var='I', output_var=['v', 'm'],
                      method='exponential_euler')
 
 res, error = fitter.fit(n_rounds=20,
-                        optimizer=n_opt, metric=metric,
-                        metric_weights=[1/((100*mV)**2),
-                                        1],
+                        optimizer=n_opt, metric=[metric_v, metric_m],
                         callback='text',
                         gl=[1e-09 *siemens, 1e-07 *siemens],
                         g_na=[2e-06*siemens, 2e-04*siemens],

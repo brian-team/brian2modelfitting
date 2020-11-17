@@ -19,21 +19,14 @@ def callback_text(params, errors, best_params, best_error, index, additional_inf
     else:
         best_error_str = f'{best_error:.4g}'
     round = f'Round {index}: '
-    if (additional_info and
-            'metric_weights' in additional_info and
-            len(additional_info['metric_weights'])>1):
+    if len(additional_info.get('best_errors', [])) > 1:
         errors = []
-        for weight, error, varname in zip(additional_info['metric_weights'],
-                                          additional_info['best_errors'],
-                                          additional_info['output_var']):
-            if isinstance(weight, Quantity):
-                weight_str = weight.in_best_unit(precision=3)
-            else:
-                weight_str = f'{weight:.3g}'
+        for error, varname in zip(additional_info['best_errors'],
+                                  additional_info['output_var']):
             if isinstance(error, Quantity):
-                errors.append(f'{weight_str}×{error.in_best_unit(precision=3)} ({varname})')
+                errors.append(f'{error.in_best_unit(precision=3)} ({varname})')
             else:
-                errors.append(f'{weight_str}×{error:.3g} ({varname})')
+                errors.append(f'{error:.3g} ({varname})')
         error_sum = ' + '.join(errors)
         print(f"{round}Best parameters {param_str}\n"
               f"{' '*len(round)}Best error: {best_error_str} = {error_sum}")
