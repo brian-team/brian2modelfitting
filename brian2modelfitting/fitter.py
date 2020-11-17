@@ -544,11 +544,11 @@ class Fitter(metaclass=abc.ABCMeta):
         if penalty is not None:
             error_penalty = getattr(self.simulator.neurons, penalty + '_')
             if self.use_units:
-                error_dim = get_dimensions(metric_weights[0]) * metric[0].get_dimensions(self.output_dim[0])
+                error_dim = get_dimensions(metric_weights[0]) * metric[0].get_normalized_dimensions(self.output_dim[0])
                 for one_metric, metric_weight, one_dim in zip(metric[1:],
                                                               metric_weights[1:],
                                                               self.output_dim[1:]):
-                    other_dim = get_dimensions(metric_weight) * one_metric.get_dimensions(one_dim)
+                    other_dim = get_dimensions(metric_weight) * one_metric.get_normalized_dimensions(one_dim)
                     fail_for_dimension_mismatch(error_dim, other_dim,
                                                 error_message='The error terms have mismatching '
                                                               'units.')
@@ -713,7 +713,7 @@ class Fitter(metaclass=abc.ABCMeta):
                                                 one_param_set)}
                                for one_param_set in parameters]
                 best_raw_error = tuple([Quantity(raw_error,
-                                                 dim=metric.get_dimensions(output_dim))
+                                                 dim=metric.get_normalized_dimensions(output_dim))
                                         for raw_error, metric, output_dim
                                         in zip(self._best_raw_error,
                                                self.metric,
@@ -757,7 +757,7 @@ class Fitter(metaclass=abc.ABCMeta):
             return None
         if self.use_units:
             error_dim = (get_dimensions(self.metric_weights[0]) *
-                         self.metric[0].get_dimensions(self.output_dim[0]))
+                         self.metric[0].get_normalized_dimensions(self.output_dim[0]))
             # We assume that the error units have already been checked to
             # be consistent at this point
             return Quantity(self._best_error, dim=error_dim)
@@ -769,7 +769,7 @@ class Fitter(metaclass=abc.ABCMeta):
         if self._best_raw_error is None:
             return None
         if self.use_units:
-            return {output_var: Quantity(raw_error, dim=metric.get_dimensions(output_dim))
+            return {output_var: Quantity(raw_error, dim=metric.get_normalized_dimensions(output_dim))
                     for output_var, raw_error, metric, output_dim in
                     zip(self.output_var, self._best_raw_error, self.metric, self.output_dim)}
         else:
@@ -814,7 +814,7 @@ class Fitter(metaclass=abc.ABCMeta):
                 # Add additional information for the raw errors
                 raw_error_quantities = {output_var: Quantity([raw_error[idx]
                                                               for raw_error in self.raw_errors],
-                                                             dim=metric.get_dimensions(output_dim))
+                                                             dim=metric.get_normalized_dimensions(output_dim))
                                         for idx, (output_var, metric, output_dim)
                                         in enumerate(zip(self.output_var, self.metric, self.output_dim))
                                         }
@@ -1287,10 +1287,11 @@ class TraceFitter(Fitter):
                 params = {p: Quantity(val, dim=self.model[p].dim)
                           for p, val in params.items()}
                 best_raw_error = tuple([Quantity(raw_error,
-                                                 dim=output_dim**2)
-                                        for raw_error, output_dim
+                                                 dim=output_dim**2*get_dimensions(norm)**2)
+                                        for raw_error, output_dim, norm
                                         in zip(errors[best_idx],
-                                               self.output_dim)])
+                                               self.output_dim,
+                                               normalization)])
             else:
                 all_errors = array(combined_errors)
                 params = {p: float(val) for p, val in params.items()}
