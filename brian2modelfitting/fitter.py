@@ -1081,7 +1081,7 @@ class TraceFitter(Fitter):
             as the regions with 1s. Using instead values of 0.5 and 1 would have
             the same effect. Cannot be combined with ``t_start``. If not set, will
             reuse the `t_weights` value from the previously used metric.
-        normalization : float, optional
+        normalization : float or array-like of float, optional
             A normalization term that will be used rescale results before
             handing them to the optimization algorithm. Can be useful if the
             algorithm makes assumptions about the scale of errors, e.g. if the
@@ -1172,11 +1172,14 @@ class TraceFitter(Fitter):
 
         if normalization is None:
             if self.metric is not None:
-                normalization = getattr(self.metric[0], 'normalization', 1.)
+                normalization = [getattr(metric, 'normalization', 1.)
+                                 for metric in self.metric]
             else:
-                normalization = 1.
+                normalization = [1.] * len(self.output_var)
         else:
-            normalization = 1/normalization
+            if not isinstance(normalization, Sequence):
+                normalization = [normalization] * len(self.output_var)
+            normalization = [1.0/n for n in normalization]
 
         callback_func = callback_setup(callback, None)
 
@@ -1221,31 +1224,33 @@ class TraceFitter(Fitter):
                 metric_weights = self.metric_weights
             else:
                 metric_weights = ones(len(self.output_var))
-            for out_var, out, metric_weight in zip(self.output_var,
-                                                   self.output_,
-                                                   metric_weights):
+            for out_var, out, metric_weight, norm in zip(self.output_var,
+                                                         self.output_,
+                                                         metric_weights,
+                                                         normalization):
                 trace = getattr(self.simulator.statemonitor, out_var+'_')
                 if t_weights is None:
                     residual = trace[:, t_start_steps:] - out[:, t_start_steps:]
                 else:
                     residual = (trace - out) * sqrt(t_weights)
-                one_residual.append(sqrt(metric_weight)*residual)
-            return array(one_residual).flatten() * normalization
+                one_residual.append(sqrt(metric_weight)*residual*norm)
+            return array(one_residual).flatten()
 
         def _calc_gradient(params):
             residuals = []
             for name in self.parameter_names:
                 one_residual = []
-                for out_var, metric_weight in zip(self.output_var,
-                                                  metric_weights):
+                for out_var, metric_weight, norm in zip(self.output_var,
+                                                        metric_weights,
+                                                        normalization):
                     trace = getattr(self.simulator.statemonitor,
                                     f'S_{out_var}_{name}_')
                     if t_weights is None:
                         residual = trace[:, t_start_steps:]
                     else:
                         residual = trace * sqrt(t_weights)
-                    one_residual.append(sqrt(metric_weight)*residual)
-                residuals.append(array(one_residual).flatten() * normalization)
+                    one_residual.append(sqrt(metric_weight)*residual*norm)
+                residuals.append(array(one_residual).flatten())
             gradient = array(residuals)
             return gradient.T
 
@@ -1268,9 +1273,12 @@ class TraceFitter(Fitter):
             best_idx = argmin(combined_errors)
 
             if self.use_units:
-                norm_dim = get_dimensions(normalization)**2
+                norm_dim = get_dimensions(normalization[0])**2
                 error_dim = get_dimensions(metric_weights[0])*self.output_dim[0]**2*norm_dim
-                for metric_weight, output_dim in zip(metric_weights[1:], self.output_dim[1:]):
+                for metric_weight, output_dim, norm in zip(metric_weights[1:],
+                                                           self.output_dim[1:],
+                                                           normalization[1:]):
+                    norm_dim = get_dimensions(norm)
                     other_dim = get_dimensions(metric_weight)*output_dim**2*norm_dim
                     fail_for_dimension_mismatch(error_dim, other_dim,
                                                 error_message='The error terms have mismatching '
