@@ -141,12 +141,7 @@ def get_sensitivity_equations(group, parameters, namespace=None, level=1,
     new_eqs = []
     for names, sensitivity_eqs, param in zip(sensitivity_names, sensitivity, parameters):
         for name, eq, orig_var in zip(names, sensitivity_eqs, diff_eq_names):
-            if param in namespace:
-                unit = eqs[orig_var].dim / namespace[param].dim
-            elif param in group.variables:
-                unit = eqs[orig_var].dim / group.variables[param].dim
-            else:
-                raise AssertionError(f'Parameter {param} neither in namespace nor variables')
+            unit = eqs[orig_var].dim / group.variables[param].dim
             unit = repr(unit) if not unit.is_dimensionless else '1'
             if optimize:
                 # Check if the equation stays at zero if initialized at zero
@@ -483,6 +478,8 @@ class Fitter(metaclass=abc.ABCMeta):
                                                             expr=Expression(sympy_to_str(diffed)))])
                         sensititivity_subexpressions += new_eqs
             new_model = model + sensitivity_eqs + sensititivity_subexpressions
+            print('Full model: ')
+            print(new_model)
             neurons = NeuronGroup(n_neurons, new_model,
                                   threshold=self.threshold, reset=self.reset,
                                   refractory=self.refractory, name=name,
