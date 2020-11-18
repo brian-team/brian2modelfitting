@@ -478,8 +478,6 @@ class Fitter(metaclass=abc.ABCMeta):
                                                             expr=Expression(sympy_to_str(diffed)))])
                         sensititivity_subexpressions += new_eqs
             new_model = model + sensitivity_eqs + sensititivity_subexpressions
-            print('Full model: ')
-            print(new_model)
             neurons = NeuronGroup(n_neurons, new_model,
                                   threshold=self.threshold, reset=self.reset,
                                   refractory=self.refractory, name=name,
