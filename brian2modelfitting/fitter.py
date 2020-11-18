@@ -852,7 +852,7 @@ class Fitter(metaclass=abc.ABCMeta):
                         res_dict['objective_errors'] = {output_var: raw_errors[output_var][j]
                                                         for output_var in self.output_var}
                     else:
-                        res_dict['objective_errors_normed'] = {output_var: self._objective_errors_normed[j][idx]
+                        res_dict['objective_errors_normalized'] = {output_var: self._objective_errors_normed[j][idx]
                                                                for idx, output_var in enumerate(self.output_var)}
                         res_dict['objective_errors'] = {output_var: self._objective_errors[j][idx]
                                                         for idx, output_var in enumerate(self.output_var)}

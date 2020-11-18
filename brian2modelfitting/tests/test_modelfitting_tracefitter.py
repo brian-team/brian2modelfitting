@@ -2,7 +2,6 @@
 Test the modelfitting module
 '''
 import pytest
-import numpy as np
 import pandas as pd
 
 try:
@@ -14,6 +13,7 @@ from brian2 import (zeros, Equations, NeuronGroup, StateMonitor, TimedArray,
                     nS, mV, volt, ms, pA, pF, Quantity, set_device, get_device,
                     Network, have_same_dimensions, DimensionMismatchError)
 from brian2.equations.equations import DIFFERENTIAL_EQUATION, SUBEXPRESSION
+import brian2.numpy_ as np  # for unit-awareness
 from brian2modelfitting import (NevergradOptimizer, TraceFitter, MSEMetric,
                                 OnlineTraceFitter, Simulator, Metric,
                                 Optimizer, GammaFactor)
@@ -47,6 +47,12 @@ all_constant_model = Equations('''
     c : volt (constant)
     penalty_fixed = 10*mV**2: volt**2
     penalty_wrong_unit = 10*mV : volt''')
+
+multiobjective_model = '''
+dvar1/dt = (target1 - var1 + x)/(5*ms) : 1
+dvar2/dt = (target2 - var2)/(5*ms) : volt
+target1 : 1 (constant)
+target2 : volt (constant)'''
 
 n_opt = NevergradOptimizer()
 metric = MSEMetric()
@@ -186,6 +192,49 @@ def setup_standalone(request):
     request.addfinalizer(fin)
 
     return dt, tf
+
+@pytest.fixture
+def setup_multiobjective(request):
+    dt = 0.1 * ms
+    out_trace1 = np.ones(1000)*5
+    out_trace2 = np.ones(1000)*-7*mV
+    tf = TraceFitter(dt=dt,
+                     model=multiobjective_model,
+                     input_var='x',
+                     output_var=['var1', 'var2'],
+                     input=np.zeros_like(out_trace1)[None, :],
+                     output=[out_trace1[None, :],
+                             out_trace2[None, :]],
+                     n_samples=70)
+
+    def fin():
+        reinit_devices()
+    request.addfinalizer(fin)
+
+    return dt, tf
+
+
+@pytest.fixture
+def setup_multiobjective_no_units(request):
+    dt = 0.1 * ms
+
+    out_trace1 = np.ones(1000)*5
+    out_trace2 = np.ones(1000)*-7*mV
+    tf = TraceFitter(dt=dt,
+                     model=multiobjective_model,
+                     input_var='x',
+                     output_var=['var1', 'var2'],
+                     input=np.zeros_like(out_trace1)[None, :],
+                     output=[out_trace1[None, :],
+                             out_trace2[None, :]],
+                     n_samples=70, use_units=False)
+
+    def fin():
+        reinit_devices()
+    request.addfinalizer(fin)
+
+    return dt, tf
+
 
 def test_get_param_dic():
     d = get_param_dic([1, 2], ['a', 'b'], 2, 2)
@@ -1016,3 +1065,167 @@ def test_onlinetracefitter_fit_tstart():
                              c=[0 * mV, 30 * mV])
     # Fit should be close to 20mV
     assert np.abs(params['c'] - 20*mV) < 1*mV
+
+
+def test_multiobjective_basic(setup_multiobjective):
+    dt, tf = setup_multiobjective
+    result, error = tf.fit(n_rounds=20,
+                       metric=[MSEMetric(t_start=50*ms),
+                               MSEMetric(t_start=50*ms, normalization=1*mV)],
+                       optimizer=n_opt,
+                       target1=(-10, 10),
+                       target2=(-10*mV, 10*mV),
+                       callback=None)
+    # Since the problem is simple, we should be reasonably close to the correct solution
+    assert abs(result['target1'] - 5) < 0.1
+    assert abs(result['target2'] + 7*mV) < 0.1*mV
+
+    # The variables relax exponentially to the target values
+    t_values = np.arange(1000)*0.1*ms
+    simulated_var1 = result['target1'] * (1 - np.exp(-t_values/(5*ms)))
+    simulated_var2 = result['target2'] * (1 - np.exp(-t_values/(5*ms)))
+    error_var1 = np.mean((simulated_var1[t_values>=50*ms] - 5)**2)
+    normed_error_var1 = error_var1
+    error_var2 = np.mean((simulated_var2[t_values>=50*ms] + 7*mV) ** 2)
+    normed_error_var2 = np.mean(((simulated_var2[t_values>=50 * ms] + 7 * mV)/(1*mV)) ** 2)
+    # Check that the errors returned by the fitter are correct
+    assert_almost_equal(error, tf.best_error)
+    assert_almost_equal(error, normed_error_var1 + normed_error_var2)
+    assert set(tf.best_objective_errors.keys()) == {'var1', 'var2'}
+    assert have_same_dimensions(tf.best_objective_errors['var1'], error_var1)
+    assert_almost_equal(float(tf.best_objective_errors['var1']), float(error_var1))
+    assert have_same_dimensions(tf.best_objective_errors['var2'], error_var2)
+    assert_almost_equal(float(tf.best_objective_errors['var2']), float(error_var2))
+    assert set(tf.best_objective_errors_normalized.keys()) == {'var1', 'var2'}
+
+    assert have_same_dimensions(tf.best_objective_errors_normalized['var1'], normed_error_var1)
+    assert_almost_equal(float(tf.best_objective_errors_normalized['var1']), float(normed_error_var1))
+    assert have_same_dimensions(tf.best_objective_errors_normalized['var2'], normed_error_var2)
+    assert_almost_equal(float(tf.best_objective_errors_normalized['var2']), float(normed_error_var2))
+
+    # Check that the objective errors are included in the results
+    list_results = tf.results(format='list')
+    assert all('objective_errors' for r in list_results)
+    assert all('objective_errors_normalized' for r in list_results)
+    assert all('var1' in r['objective_errors'] and 'var2' in r['objective_errors']
+               for r in list_results)
+    assert all('var1' in r['objective_errors_normalized'] and
+               'var2' in r['objective_errors_normalized']
+               for r in list_results)
+    assert all((have_same_dimensions(r['objective_errors']['var1'], 1) and
+                have_same_dimensions(r['objective_errors']['var2'], mV**2))
+               for r in list_results)
+    assert all((have_same_dimensions(r['objective_errors_normalized']['var1'], 1) and
+                have_same_dimensions(r['objective_errors_normalized']['var2'], 1))
+               for r in list_results)
+
+    dict_results = tf.results(format='dict')
+    assert ('objective_errors' in dict_results and
+            isinstance(dict_results['objective_errors'], dict))
+    assert ('objective_errors_normalized' in dict_results and
+            isinstance(dict_results['objective_errors_normalized'], dict))
+    assert ('var1' in dict_results['objective_errors'] and
+            have_same_dimensions(dict_results['objective_errors']['var1'], 1))
+    assert ('var2' in dict_results['objective_errors'] and
+            have_same_dimensions(dict_results['objective_errors']['var2'], mV**2))
+    assert ('var1' in dict_results['objective_errors_normalized'] and
+            have_same_dimensions(dict_results['objective_errors_normalized']['var1'], 1))
+    assert ('var2' in dict_results['objective_errors'] and
+            have_same_dimensions(dict_results['objective_errors_normalized']['var2'], 1))
+
+    try:
+        import pandas
+        pandas_results = tf.results(format='dataframe')
+        assert 'error_var1' in pandas_results.columns
+        assert 'error_var2' in pandas_results.columns
+        assert 'normalized_error_var1' in pandas_results.columns
+        assert 'normalized_error_var2' in pandas_results.columns
+    except ImportError:
+        pass
+
+    # Fits should still be could after refinement
+    refined, _ = tf.refine(calc_gradient=True, callback=None)
+    assert abs(refined['target1'] - 5) < 0.1
+    assert abs(refined['target2'] + 7*mV) < 0.1*mV
+
+
+def test_multiobjective_no_units(setup_multiobjective_no_units):
+    dt, tf = setup_multiobjective_no_units
+    result, error = tf.fit(n_rounds=20,
+                       metric=[MSEMetric(t_start=50*ms),
+                               MSEMetric(t_start=50*ms, normalization=0.001)],
+                       optimizer=n_opt,
+                       target1=(-10, 10),
+                       target2=(-10*mV, 10*mV),
+                       callback=None)
+    # Since the problem is simple, we should be reasonably close to the correct solution
+    assert abs(result['target1'] - 5) < 0.1
+    assert abs(result['target2'] + float(7*mV)) < float(0.1*mV)
+
+    # The variables relax exponentially to the target values
+    t_values = np.arange(1000)*0.1*ms
+    simulated_var1 = result['target1'] * (1 - np.exp(-t_values/(5*ms)))
+    simulated_var2 = result['target2'] * (1 - np.exp(-t_values/(5*ms)))
+    error_var1 = np.mean((simulated_var1[t_values>=50*ms] - 5)**2)
+    normed_error_var1 = error_var1
+    error_var2 = np.mean((simulated_var2[t_values>=50*ms] + float(7*mV)) ** 2)
+    normed_error_var2 = np.mean(((simulated_var2[t_values>=50 * ms] + float(7*mV))/float(1*mV)) ** 2)
+    # Check that the errors returned by the fitter are correct
+    assert_almost_equal(error, tf.best_error)
+    assert_almost_equal(error, normed_error_var1 + normed_error_var2)
+    assert set(tf.best_objective_errors.keys()) == {'var1', 'var2'}
+    assert have_same_dimensions(tf.best_objective_errors['var1'], error_var1)
+    assert_almost_equal(float(tf.best_objective_errors['var1']), float(error_var1))
+    assert have_same_dimensions(tf.best_objective_errors['var2'], error_var2)
+    assert_almost_equal(float(tf.best_objective_errors['var2']), float(error_var2))
+    assert set(tf.best_objective_errors_normalized.keys()) == {'var1', 'var2'}
+
+    assert have_same_dimensions(tf.best_objective_errors_normalized['var1'], normed_error_var1)
+    assert_almost_equal(float(tf.best_objective_errors_normalized['var1']), float(normed_error_var1))
+    assert have_same_dimensions(tf.best_objective_errors_normalized['var2'], normed_error_var2)
+    assert_almost_equal(float(tf.best_objective_errors_normalized['var2']), float(normed_error_var2))
+
+    # Check that the objective errors are included in the results
+    list_results = tf.results(format='list')
+    assert all('objective_errors' for r in list_results)
+    assert all('objective_errors_normalized' for r in list_results)
+    assert all('var1' in r['objective_errors'] and 'var2' in r['objective_errors']
+               for r in list_results)
+    assert all('var1' in r['objective_errors_normalized'] and
+               'var2' in r['objective_errors_normalized']
+               for r in list_results)
+    assert all((have_same_dimensions(r['objective_errors']['var1'], 1) and
+                have_same_dimensions(r['objective_errors']['var2'], 1))
+               for r in list_results)
+    assert all((have_same_dimensions(r['objective_errors_normalized']['var1'], 1) and
+                have_same_dimensions(r['objective_errors_normalized']['var2'], 1))
+               for r in list_results)
+
+    dict_results = tf.results(format='dict')
+    assert ('objective_errors' in dict_results and
+            isinstance(dict_results['objective_errors'], dict))
+    assert ('objective_errors_normalized' in dict_results and
+            isinstance(dict_results['objective_errors_normalized'], dict))
+    assert ('var1' in dict_results['objective_errors'] and
+            have_same_dimensions(dict_results['objective_errors']['var1'], 1))
+    assert ('var2' in dict_results['objective_errors'] and
+            have_same_dimensions(dict_results['objective_errors']['var2'], 1))
+    assert ('var1' in dict_results['objective_errors_normalized'] and
+            have_same_dimensions(dict_results['objective_errors_normalized']['var1'], 1))
+    assert ('var2' in dict_results['objective_errors'] and
+            have_same_dimensions(dict_results['objective_errors_normalized']['var2'], 1))
+
+    try:
+        import pandas
+        pandas_results = tf.results(format='dataframe')
+        assert 'error_var1' in pandas_results.columns
+        assert 'error_var2' in pandas_results.columns
+        assert 'normalized_error_var1' in pandas_results.columns
+        assert 'normalized_error_var2' in pandas_results.columns
+    except ImportError:
+        pass
+
+    # Fits should still be could after refinement
+    refined, _ = tf.refine(calc_gradient=True, callback=None)
+    assert abs(refined['target1'] - 5) < 0.1
+    assert abs(refined['target2'] + float(7*mV)) < float(0.1*mV)
