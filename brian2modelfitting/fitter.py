@@ -1176,6 +1176,9 @@ class TraceFitter(Fitter):
                                 'the fit function first.')
             params = self.best_params
 
+        scalar_method = ('method' in kwds and
+                         kwds['method'].lower() not in {'leastsq', 'least_squares'})
+
         if t_weights is not None:
             t_weights = normalize_weights(t_weights)
         elif t_start is None:
@@ -1233,9 +1236,13 @@ class TraceFitter(Fitter):
         def _calc_error(params):
             param_dic = get_param_dic([params[p] for p in self.parameter_names],
                                       self.parameter_names, self.n_traces, 1)
-            self.simulator.run(self.duration, param_dic,
-                               self.parameter_names, iteration=iteration,
-                               name='refine')
+            # Check whether we already ran this exact sim
+            if (self.simulator.current_net != 'refine' or
+                    any((self.simulator.last_run_parameters[p] != param_dic[p]).any()
+                        for p in param_dic)):
+                self.simulator.run(self.duration, param_dic,
+                                   self.parameter_names, iteration=iteration,
+                                   name='refine')
             one_residual = []
 
             for out_var, out, norm in zip(self.output_var,
@@ -1250,20 +1257,52 @@ class TraceFitter(Fitter):
             return array(one_residual).flatten()
 
         def _calc_gradient(params):
+            param_dic = get_param_dic([params[p] for p in self.parameter_names],
+                                      self.parameter_names, self.n_traces, 1)
+            # Check whether we already ran this exact sim
+            if (self.simulator.current_net != 'refine' or
+                    any((self.simulator.last_run_parameters[p] != param_dic[p]).any()
+                        for p in param_dic)):
+                self.simulator.run(self.duration, param_dic,
+                                   self.parameter_names, iteration=iteration,
+                                   name='refine')
+
             residuals = []
             for name in self.parameter_names:
                 one_residual = []
-                for out_var, norm in zip(self.output_var, normalization):
-                    trace = getattr(self.simulator.statemonitor,
-                                    f'S_{out_var}_{name}_')
+                # Scalar methods (i.e. all except for the default least square
+                # method), require a gradient with a scalar value for each
+                # variable, i.e. the gradient of the error
+                # Since our error is a squared error, this means returning
+                # 2*r*dr/dp (r=residual, p=parameter), where dr/dp is given
+                # by the S_... sensitivity variables
+                for out_var, out, norm in zip(self.output_var,
+                                              self.output_,
+                                              normalization):
+                    trace_sensitivity = getattr(self.simulator.statemonitor,
+                                                f'S_{out_var}_{name}_')
+                    trace = getattr(self.simulator.statemonitor, f'{out_var}_')
                     if t_weights is None:
-                        residual = trace[:, t_start_steps:]
+                        residual = trace[:, t_start_steps:] - out[:, t_start_steps:]
+                        sensitivity = trace_sensitivity[:, t_start_steps:]
                     else:
-                        residual = trace * sqrt(t_weights)
-                    one_residual.append(residual*norm)
+                        residual = (trace - out) * sqrt(t_weights)
+                        sensitivity = trace_sensitivity * sqrt(t_weights)
+                    if scalar_method:
+                        one_residual.append(2*residual*sensitivity*(norm**2))
+                    else:
+                        one_residual.append(sensitivity*norm)
                 residuals.append(array(one_residual).flatten())
+
             gradient = array(residuals)
-            return gradient.T
+            if scalar_method:
+                # Note that lmfit uses the *sum* of squared errors (and not the mean)
+                # of the array returned by _calc_error, so for consistency we do the
+                # same here
+                grad_sum = gradient.sum(axis=1)
+                return grad_sum
+            else:
+                return gradient.T
 
         tested_parameters = []
         errors = []
@@ -1320,8 +1359,13 @@ class TraceFitter(Fitter):
                                  best_params, best_error, iter, additional_info)
 
         assert 'Dfun' not in kwds
+        assert 'jac' not in kwds
         if calc_gradient:
-            kwds.update({'Dfun': _calc_gradient})
+            if scalar_method:
+                kwds['jac'] = _calc_gradient
+            else:
+                kwds['Dfun'] = _calc_gradient
+
         if 'iter_cb' in kwds:
             # Use the given callback but raise a warning if callback is not
             # set to None
@@ -1348,6 +1392,8 @@ class TraceFitter(Fitter):
             if max_nfev:
                 kwds['max_nfev'] = max_nfev
 
+        # Do a dummy run before starting the minimizer, because some methods
+        # might call the gradient bef
         result = lmfit.minimize(_calc_error, parameters,
                                 iter_cb=iter_cb,
                                 **kwds)

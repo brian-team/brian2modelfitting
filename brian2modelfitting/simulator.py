@@ -54,6 +54,7 @@ class Simulator(metaclass=abc.ABCMeta):
     def __init__(self):
         self.networks = {}
         self.current_net = None
+        self.last_run_parameters = None
         self.var_init = None
 
     neurons = property(lambda self: self.networks[self.current_net]['neurons'])
@@ -84,6 +85,7 @@ class Simulator(metaclass=abc.ABCMeta):
                            '"statemonitor" in the network.')
         self.networks[name] = network
         self.current_net = None  # will be set in run
+        self.last_run_parameters = None
         self.var_init = var_init
 
     @abc.abstractmethod
@@ -112,6 +114,7 @@ class RuntimeSimulator(Simulator):
 
     def run(self, duration, params, params_names, iteration, name='fit'):
         self.current_net = name
+        self.last_run_parameters = params
         network = self.networks[name]
         network.restore()
         self.neurons.set_states(params, units=False)
@@ -136,6 +139,7 @@ class CPPStandaloneSimulator(Simulator):
         code generation
         """
         self.current_net = name
+        self.last_run_parameters = params
         network = self.networks[name]
         # Include the iteration index in the parameters
         params_names = sorted(params_names) + ['iteration']
