@@ -1,7 +1,7 @@
 import abc
 import numbers
 from distutils.version import LooseVersion
-from typing import Sequence
+from typing import Sequence, Mapping
 
 import sympy
 from numpy import ones, array, arange, concatenate, mean, argmin, nanargmin, reshape, zeros, sqrt, ndarray, broadcast_to, sum
@@ -229,21 +229,31 @@ class Fitter(metaclass=abc.ABCMeta):
         The size of the time step.
     model : `~brian2.equations.equations.Equations` or str
         The equations describing the model.
-    input : `~numpy.ndarray` or `~brian2.units.fundamentalunits.Quantity`
-        A 2D array of shape ``(n_traces, time steps)`` given the input that will
-        be fed into the model.
-    output : `~brian2.units.fundamentalunits.Quantity` or list
-        Recorded output of the model that the model should reproduce. Should
-        be a 2D array of the same shape as the input when fitting traces with
-        `TraceFitter`, a list of spike times when fitting spike trains with
-        `SpikeFitter`. Can also be a list of several output 2D arrays.
+    input : dic, `~numpy.ndarray` or `~brian2.units.fundamentalunits.Quantity`
+        A dictionary given the input variable as the key and a 2D array of
+        shape ``(n_traces, time steps)`` as the value, defining the input that
+        will be fed into the model. Note that this variable should be *used*
+        in the model (e.g. a variable ``I`` that is added as a current in the
+        membrane potential equation), but not *defined*.
+    output : dict, `~brian2.units.fundamentalunits.Quantity` or list
+        Recorded output of the model that the model should reproduce. Should be
+        given as a dictionary with the name of the variable as the key and the
+        desired output as the value. The desired output has to be a 2D array of
+        the same shape as the input when fitting traces with
+        `TraceFitter`, or a list of spike times when fitting spike trains with
+        `SpikeFitter`. Can also be a list of several output 2D arrays or a
+        single output array if combined with ``output_var`` (deprecated use).
     input_var : str
         The name of the input variable in the model. Note that this variable
         should be *used* in the model (e.g. a variable ``I`` that is added as
         a current in the membrane potential equation), but not *defined*.
+        .. deprecated:: 0.5
+            Use a dictionary for ``input`` instead.
     output_var : str or list of str
         The name of the output variable in the model or a list of output
         variables. Only needed when fitting traces with `.TraceFitter`.
+        .. deprecated:: 0.5
+            Use a dictionary for ``output`` instead.
     n_samples: int
         Number of parameter samples to be optimized over in a single iteration.
     threshold: `str`, optional
@@ -267,18 +277,69 @@ class Fitter(metaclass=abc.ABCMeta):
     param_init: `dict`, optional
         Dictionary of variables to be initialized with respective values
     """
-    def __init__(self, dt, model, input, output, input_var, output_var,
-                 n_samples, threshold, reset, refractory, method, param_init,
-                 penalty, use_units=True):
+    def __init__(self, dt, model, input, output, n_samples, input_var=None,
+                 output_var=None, threshold=None, reset=None, refractory=None,
+                 method=None, param_init=None, penalty=None, use_units=True):
         """Initialize the fitter."""
-
-        if dt is None:
-            raise ValueError("dt-sampling frequency of the input must be set")
 
         if isinstance(model, str):
             model = Equations(model)
-        if input_var not in model.identifiers:
-            raise NameError("%s is not an identifier in the model" % input_var)
+
+        # Support deprecated legacy syntax of input_var + input or the new
+        # syntax with a dictionary as input
+        if input_var is not None:
+            logger.warn('Use the \'input\' argument with a dictionary instead '
+                        'of giving the name as \'input_var\'',
+                        name_suffix='deprecated_input_var')
+            if isinstance(input, Mapping) and input_var not in input:
+                raise ValueError('Name given as \'input_var\' and key in '
+                                 '\'input\' dictionary do not match.')
+        else:
+            if not isinstance(input, Mapping):
+                raise TypeError('\'input\' argument has to be a dictionary '
+                                'mapping the name of the input variable to the '
+                                'input.')
+            if len(input) > 1:
+                raise NotImplementedError('Only a single input is currently '
+                                          'supported.')
+            input_var = next(input.keys())
+
+        if isinstance(input, Mapping):
+            input = input[input_var]
+
+        if input_var != 'spikes' and input_var not in model.identifiers:
+            raise NameError(f"{input_var} is not an identifier in the model")
+
+        # Support deprecated legacy syntax of output_var + input or the new
+        # syntax with a dictionary as output
+        if output_var is not None:
+            logger.warn('Use the \'output\' argument with a dictionary instead '
+                        'of giving the name as \'output_var\'',
+                        name_suffix='deprecated_output_var')
+            if isinstance(output_var, str):
+                output_var = [output_var]
+
+            if isinstance(output, Mapping):
+                if set(output_var) != set(output.keys()):
+                    raise ValueError('Names given as \'output_var\' and keys '
+                                     'in \'output\' dictionary do not match.')
+            elif not isinstance(output, list):
+                output = [output]
+        else:
+            if not isinstance(output, Mapping):
+                raise TypeError('\'output\' argument has to be a dictionary '
+                                'mapping the name of the input variable to the '
+                                'input.')
+            output_var = list(output.keys())
+            output = list(output.values())
+
+        for o_var in output_var:
+            if o_var != 'spikes' and o_var not in model.names:
+                raise NameError(f"{o_var} is not a model variable")
+
+        self.output_var = output_var
+        self.output = output
+        self.output_ = [array(o, copy=False) for o in output]
 
         self.dt = dt
 
@@ -298,10 +359,7 @@ class Fitter(metaclass=abc.ABCMeta):
         self.penalty = penalty
 
         self.input = input
-        if isinstance(output_var, str):
-            output_var = [output_var]
-            output = [output]
-        self.output_var = output_var
+
         self.output_dim = []
         for o_var, out in zip(self.output_var, output):
             if o_var == 'spikes':
@@ -996,28 +1054,22 @@ class TraceFitter(Fitter):
         arguments or in the returned parameter dictionary and errors. Defaults
         to ``True``.
     """
-    def __init__(self, model, input_var, input, output_var, output, dt,
-                 n_samples=30, method=None, reset=None, refractory=False,
+    def __init__(self, model, input, output, dt,
+                 n_samples=60, input_var=None, output_var=None,
+                 method=None, reset=None, refractory=False,
                  threshold=None, param_init=None, penalty=None, use_units=True):
-        super().__init__(dt, model, input, output, input_var, output_var,
-                         n_samples, threshold, reset, refractory, method,
-                         param_init, penalty=penalty, use_units=use_units)
-        if isinstance(output_var, str):
-            output_var = [output_var]
-        if not isinstance(output, list):
-            output = [output]
-        self.output = [Quantity(o) for o in output]
-        self.output_ = [array(o) for o in output]
+        super().__init__(dt=dt, model=model, input=input, output=output,
+                         input_var=input_var, output_var=output_var,
+                         n_samples=n_samples, threshold=threshold, reset=reset,
+                         refractory=refractory, method=method,
+                         param_init=param_init, penalty=penalty,
+                         use_units=use_units)
+        for o in self.output:
+            if o.shape != self.input.shape:
+                raise ValueError("Input and output must have the same size")
         # We store the bounds set in TraceFitter.fit, so that Tracefitter.refine
         # can reuse them
         self.bounds = None
-
-        for o_var in output_var:
-            if o_var not in self.model.names:
-                raise NameError("%s is not a model variable" % o_var)
-        for o in self.output:
-            if o.shape != input.shape:
-                raise ValueError("Input and output must have the same size")
 
     def calc_errors(self, metric):
         """
@@ -1370,10 +1422,12 @@ class SpikeFitter(Fitter):
         """Initialize the fitter."""
         if method is None:
             method = 'exponential_euler'
-        super().__init__(dt, model, input, output, input_var, 'spikes',
-                         n_samples, threshold, reset, refractory, method,
-                         param_init, penalty=penalty,
-                         use_units=use_units)
+        super().__init__(dt, model, input=input, output=output,
+                         input_var=input_var, output_var='spikes',
+                         n_samples=n_samples, threshold=threshold,
+                         reset=reset, refractory=refractory,
+                         method=method, param_init=param_init,
+                         penalty=penalty, use_units=use_units)
         self.output = [Quantity(o) for o in output]
         self.output_ = [array(o) for o in output]
 
@@ -1431,9 +1485,11 @@ class OnlineTraceFitter(Fitter):
                  threshold=None, param_init=None,
                  t_start=0*second, penalty=None):
         """Initialize the fitter."""
-        super().__init__(dt, model, input, output, input_var, output_var,
-                         n_samples, threshold, reset, refractory, method,
-                         param_init, penalty=penalty)
+        super().__init__(dt, model, input=input, output=output,
+                         input_var=input_var, output_var=output_var,
+                         n_samples=n_samples, threshold=threshold,
+                         reset=reset, refractory=refractory, method=method,
+                         param_init=param_init, penalty=penalty)
 
         self.output = [Quantity(output)]
         self.output_ = [array(output)]

@@ -5,7 +5,6 @@ from brian2.units.fundamentalunits import Quantity
 from tqdm.autonotebook import tqdm
 
 
-
 def callback_text(params, errors, best_params, best_error, index, additional_info):
     """Default callback print-out for Fitters"""
     params = []
