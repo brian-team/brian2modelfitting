@@ -18,6 +18,8 @@ from brian2.equations.equations import Equations, SUBEXPRESSION, SingleEquation
 from brian2.devices import set_device, reset_device, device
 from brian2.devices.cpp_standalone.device import CPPStandaloneDevice
 from brian2.core.functions import Function
+from scipy.optimize import OptimizeResult
+
 from .simulator import RuntimeSimulator, CPPStandaloneSimulator
 from .metric import Metric, SpikeMetric, TraceMetric, MSEMetric, normalize_weights
 from .optimizer import Optimizer
@@ -1400,6 +1402,30 @@ class TraceFitter(Fitter):
             if max_nfev:
                 kwds['max_nfev'] = max_nfev
 
+        def lmfit_wrapper(fun, x0, args, **kwargs):
+            # let's ignore "fun", which is already the wrapped error function
+            print(f'Optimizing {x0} with lmfit')
+            kwds = {}
+            if 'jac' in kwargs:
+                kwds['Dfun'] = kwargs.pop('jac')
+            import copy
+            lmfit_params = copy.deepcopy(parameters)
+            for param_name, x in zip(self.parameter_names, x0):
+                lmfit_params[param_name].set(value=x)
+            result = lmfit.minimize(_calc_error, lmfit_params, args=args, **kwds)
+            scipy_result = OptimizeResult()
+            # Copy over information
+            scipy_result.success = result.success
+            scipy_result.x = array(result.params)
+            scipy_result.message = result.message
+            scipy_result.fun = (result.residual*result.residual).sum()
+            scipy_result.nfev = result.nfev
+            return scipy_result
+
+        if kwds.get('method', None) == 'basinhopping':
+            kwds['minimizer_kwargs'] = {'method': lmfit_wrapper}
+            if 'Dfun' in kwds:
+                kwds['minimizer_kwargs']['jac'] = kwds.pop('Dfun')
         result = lmfit.minimize(_calc_error, parameters,
                                 iter_cb=iter_cb,
                                 **kwds)

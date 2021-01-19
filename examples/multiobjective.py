@@ -61,7 +61,7 @@ fitter = TraceFitter(model=eqs, input_var='I', output_var=['v', 'm'],
                      dt=dt, n_samples=60, param_init={'v': 'El'},
                      method='exponential_euler')
 
-res, error = fitter.fit(n_rounds=20,
+res, error = fitter.fit(n_rounds=2,
                         optimizer=n_opt, metric=[metric_v, metric_m],
                         callback='text',
                         gl=[1e-09 *siemens, 1e-07 *siemens],
@@ -69,7 +69,7 @@ res, error = fitter.fit(n_rounds=20,
                         g_kd=[6e-07*siemens, 6e-05*siemens],
                         Cm=[0.1*ufarad*cm**-2 * area, 2*ufarad*cm**-2 * area])
 
-refined_params, _ = fitter.refine(calc_gradient=True)
+refined_params, _ = fitter.refine(method='basinhopping', calc_gradient=True)
 
 ## Visualization of the results
 fits = fitter.generate_traces(params=None, param_init={'v': -65*mV})
