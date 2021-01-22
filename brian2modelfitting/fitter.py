@@ -1404,28 +1404,35 @@ class TraceFitter(Fitter):
 
         def lmfit_wrapper(fun, x0, args, **kwargs):
             # let's ignore "fun", which is already the wrapped error function
-            print(f'Optimizing {x0} with lmfit')
             kwds = {}
             if 'jac' in kwargs:
                 kwds['Dfun'] = kwargs.pop('jac')
             import copy
             lmfit_params = copy.deepcopy(parameters)
             for param_name, x in zip(self.parameter_names, x0):
-                lmfit_params[param_name].set(value=x)
+                lmfit_params[param_name].set(value=lmfit_params[param_name].from_internal(x))
             result = lmfit.minimize(_calc_error, lmfit_params, args=args, **kwds)
             scipy_result = OptimizeResult()
             # Copy over information
             scipy_result.success = result.success
-            scipy_result.x = array(result.params)
+            scipy_result.x = array([result.params[param_name].setup_bounds()
+                                    for param_name in self.parameter_names])
             scipy_result.message = result.message
             scipy_result.fun = (result.residual*result.residual).sum()
             scipy_result.nfev = result.nfev
             return scipy_result
 
         if kwds.get('method', None) == 'basinhopping':
+            def bh_callback(x, error, accept):
+                params = {name: parameters[name].from_internal(one_x)
+                          for name, one_x in zip(self.parameter_names, x)}
+                print(f'New values: {params} with error {error} (accepted: {accept})')
+
             kwds['minimizer_kwargs'] = {'method': lmfit_wrapper}
             if 'Dfun' in kwds:
                 kwds['minimizer_kwargs']['jac'] = kwds.pop('Dfun')
+            kwds['disp'] = True
+            kwds['callback'] = bh_callback
         result = lmfit.minimize(_calc_error, parameters,
                                 iter_cb=iter_cb,
                                 **kwds)
