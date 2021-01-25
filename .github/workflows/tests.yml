@@ -41,5 +41,5 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       if: ${{ matrix.python-version == '3.6' }}
-      run: coveralls
+      run: coveralls --service=github
 
