@@ -7,6 +7,38 @@ from tqdm.autonotebook import tqdm
 
 def callback_text(params, errors, best_params, best_error, index, additional_info):
     """Default callback print-out for Fitters"""
+    param_str = format_parameters(best_params)
+    round = f'Round {index}: '
+    errors = []
+    for error, normed_error, varname in zip(additional_info['objective_errors'],
+                                            additional_info['objective_errors_normalized'],
+                                            additional_info['output_var']):
+
+        if not have_same_dimensions(error, normed_error) or error != normed_error:
+            raw_error_str = f', unnormalized error: {format_error(error)}'
+        else:
+            raw_error_str = ''
+
+        errors.append(f'{format_error(normed_error)} ({varname}{raw_error_str})')
+
+    error_sum = ' + '.join(errors)
+    if len(additional_info['objective_errors']) > 1:
+        best_error_str = f'{format_error(best_error)} = '
+    else:
+        best_error_str = ''  # redundant with "error_sum"
+    print(f"{round}Best parameters {param_str}\n"
+          f"{' '*len(round)}Best error: {best_error_str} {error_sum}")
+
+
+def format_error(best_error):
+    if isinstance(best_error, Quantity):
+        best_error_str = best_error.in_best_unit(precision=4)
+    else:
+        best_error_str = f'{best_error:.4g}'
+    return best_error_str
+
+
+def format_parameters(best_params):
     params = []
     for p, v in sorted(best_params.items()):
         if isinstance(v, Quantity):
@@ -14,36 +46,7 @@ def callback_text(params, errors, best_params, best_error, index, additional_inf
         else:
             params.append(f'{p}={v:.3g}')
     param_str = ', '.join(params)
-    if isinstance(best_error, Quantity):
-        best_error_str = best_error.in_best_unit(precision=4)
-    else:
-        best_error_str = f'{best_error:.4g}'
-    round = f'Round {index}: '
-    if len(additional_info.get('objective_errors', [])) > 1:
-        errors = []
-        for error, normed_error, varname in zip(additional_info['objective_errors'],
-                                                additional_info['objective_errors_normalized'],
-                                                additional_info['output_var']):
-
-            if not have_same_dimensions(error, normed_error) or error != normed_error:
-                if isinstance(error, Quantity):
-                    raw_error_str = f', unnormalized error: {error.in_best_unit(precision=3)}'
-                else:
-                    raw_error_str = f', unnormalized error: {error:.3g}'
-            else:
-                raw_error_str = ''
-
-            if isinstance(normed_error, Quantity):
-                errors.append(f'{normed_error.in_best_unit(precision=3)} ({varname}{raw_error_str})')
-            else:
-                errors.append(f'{normed_error:.3g} ({varname}{raw_error_str})')
-
-        error_sum = ' + '.join(errors)
-        print(f"{round}Best parameters {param_str}\n"
-              f"{' '*len(round)}Best error: {best_error_str} = {error_sum}")
-    else:
-        print(f"{round}Best parameters {param_str}\n"
-              f"{' '*len(round)}Best error: {best_error_str} ({additional_info['output_var'][0]})")
+    return param_str
 
 
 def callback_none(params, errors, best_params, best_error, index, additional_info):

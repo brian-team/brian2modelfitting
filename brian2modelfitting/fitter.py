@@ -12,7 +12,7 @@ from brian2.utils.stringtools import get_identifiers
 
 from brian2 import (NeuronGroup, defaultclock, get_device, Network,
                     StateMonitor, SpikeMonitor, second, get_local_namespace,
-                    Quantity, get_logger, Expression)
+                    Quantity, get_logger, Expression, have_same_dimensions)
 from brian2.input import TimedArray
 from brian2.equations.equations import Equations, SUBEXPRESSION, SingleEquation
 from brian2.devices import set_device, reset_device, device
@@ -23,7 +23,7 @@ from scipy.optimize import OptimizeResult
 from .simulator import RuntimeSimulator, CPPStandaloneSimulator
 from .metric import Metric, SpikeMetric, TraceMetric, MSEMetric, normalize_weights
 from .optimizer import Optimizer
-from .utils import callback_setup, make_dic
+from .utils import callback_setup, make_dic, format_parameters, format_error
 
 
 logger = get_logger(__name__)
@@ -1424,14 +1424,33 @@ class TraceFitter(Fitter):
 
         if kwds.get('method', None) == 'basinhopping':
             def bh_callback(x, error, accept):
-                params = {name: parameters[name].from_internal(one_x)
-                          for name, one_x in zip(self.parameter_names, x)}
-                print(f'New values: {params} with error {error} (accepted: {accept})')
+                if self.use_units:
+                    params = {name: Quantity(parameters[name].from_internal(one_x),
+                                             dim=self.model[name].dim)
+                              for name, one_x in zip(self.parameter_names, x)}
+                    # TODO: Multiobjective
+                    norm_dim = get_dimensions(normalization[0]) ** 2
+                    error_dim = self.output_dim[0] ** 2 * norm_dim
+                    normed_error = Quantity(error, dim=error_dim)
+
+                else:
+                    params = {name: parameters[name].from_internal(one_x)
+                              for name, one_x in zip(self.parameter_names, x)}
+                    normed_error = error
+                raw_error = normed_error / normalization[0]**2
+                if not have_same_dimensions(raw_error,
+                                            normed_error) or error != normed_error:
+                    raw_error_str = f', unnormalized error: {format_error(raw_error)}'
+                else:
+                    raw_error_str = ''
+
+                errors = f'{format_error(normed_error)} ({self.output_var[0]}{raw_error_str})'
+                accept_str = 'accepted' if accept else 'discarded'
+                print(f'Basinhopping step: {format_parameters(params)} with error {errors} ({accept_str})')
 
             kwds['minimizer_kwargs'] = {'method': lmfit_wrapper}
             if 'Dfun' in kwds:
                 kwds['minimizer_kwargs']['jac'] = kwds.pop('Dfun')
-            kwds['disp'] = True
             kwds['callback'] = bh_callback
         result = lmfit.minimize(_calc_error, parameters,
                                 iter_cb=iter_cb,
