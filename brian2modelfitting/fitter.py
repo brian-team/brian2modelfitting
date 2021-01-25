@@ -302,7 +302,7 @@ class Fitter(metaclass=abc.ABCMeta):
             if len(input) > 1:
                 raise NotImplementedError('Only a single input is currently '
                                           'supported.')
-            input_var = next(input.keys())
+            input_var = list(input.keys())[0]
 
         if isinstance(input, Mapping):
             input = input[input_var]
