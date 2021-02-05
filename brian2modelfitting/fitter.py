@@ -1322,10 +1322,9 @@ class TraceFitter(Fitter):
         combined_errors = []
         def _callback_wrapper(params, iter, resid, *args, **kwds):
             # TODO: Assumes all the outputs have the same size
-            output_len = self.output[0].size - t_start_steps
+            output_len = self.output[0][:, t_start_steps:].size
             error = tuple([mean(resid[idx*output_len:(idx + 1)*output_len]**2)
                            for idx in range(len(self.output_var))])
-
             combined_error = sum(array(error))
             errors.append(error)
             combined_errors.append(combined_error)
