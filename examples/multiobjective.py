@@ -55,9 +55,9 @@ metric_v = MSEMetric(t_start=5*ms, normalization=10*mV)
 metric_m = MSEMetric(t_start=5*ms, normalization=0.1)
 
 ## Fitting
-fitter = TraceFitter(model=eqs, input_var='I', output_var=['v', 'm'],
-                     input=inp_ar.T, output=[ground_truth_v,
-                                             ground_truth_m],
+fitter = TraceFitter(model=eqs, input={'I': inp_ar.T},
+                     output={'v': ground_truth_v,
+                             'm': ground_truth_m},
                      dt=dt, n_samples=60, param_init={'v': 'El'},
                      method='exponential_euler')
 
