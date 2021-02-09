@@ -236,10 +236,8 @@ with each simulation.
 .. code:: python
 
   fitter = OnlineTraceFitter(model=model,
-                             input=inp_traces,
-                             output=out_traces,
-                             input_var='I',
-                             output_var='v',
+                             input={'I': inp_traces},
+                             output={'v': out_traces},
                              dt=0.1*ms,
                              n_samples=5)
 

@@ -36,10 +36,8 @@ parameters that will be optimized specified as constants in the following way:
 
 Initialization of Fitter requires:
   - ``dt`` - time step
-  - ``input`` - set of input traces (list or array)
-  - ``output`` - set of goal output (traces/spike trains) (list or array)
-  - ``input_var`` - name of the input trace variable (string)
-  - ``output_var`` - name of the output trace variable (string)
+  - ``input`` - a dictionary with the name of the input variable and a set of input traces (list or array)
+  - ``output`` - a dictionary with the name of the output variable(s) and a set of goal output (traces/spike trains) (list or array)
   - ``n_samples`` - number of samples to draw in each round (limited by method)
   - ``reset``, and ``threshold`` in case of spiking neurons (can take refractory as well)
 
@@ -79,10 +77,8 @@ Example of `~brian2modelfitting.fitter.TraceFitter` with all of the necessary ar
 .. code:: python
 
   fitter = TraceFitter(model=model,
-                       input=inp_traces,
-                       output=out_traces,
-                       input_var='I',
-                       output_var='v',
+                       input={'I': inp_traces},
+                       output={'v': out_traces},
                        dt=0.1*ms,
                        n_samples=5)
 
