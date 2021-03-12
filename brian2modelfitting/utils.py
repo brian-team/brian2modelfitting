@@ -5,45 +5,53 @@ from brian2.units.fundamentalunits import Quantity
 from tqdm.autonotebook import tqdm
 
 
+def _format_quantity(v, precision=3):
+    if isinstance(v, Quantity):
+        return f'{v.in_best_unit(precision=precision)}'
+    else:
+        return f'{v:.{precision}g}'
+
+
 def callback_text(params, errors, best_params, best_error, index, additional_info):
     """Default callback print-out for Fitters"""
     params = []
     for p, v in sorted(best_params.items()):
-        if isinstance(v, Quantity):
-            params.append(f'{p}={v.in_best_unit(precision=3)}')
-        else:
-            params.append(f'{p}={v:.3g}')
+        params.append(f'{p}={_format_quantity(v)}')
     param_str = ', '.join(params)
-    if isinstance(best_error, Quantity):
-        best_error_str = best_error.in_best_unit(precision=4)
-    else:
-        best_error_str = f'{best_error:.4g}'
     round = f'Round {index}: '
     if len(additional_info.get('objective_errors', [])) > 1:
+        best_error_str = _format_quantity(best_error, precision=4)
         errors = []
         for error, normed_error, varname in zip(additional_info['objective_errors'],
                                                 additional_info['objective_errors_normalized'],
                                                 additional_info['output_var']):
 
             if not have_same_dimensions(error, normed_error) or error != normed_error:
-                if isinstance(error, Quantity):
-                    raw_error_str = f', unnormalized error: {error.in_best_unit(precision=3)}'
-                else:
-                    raw_error_str = f', unnormalized error: {error:.3g}'
+                raw_error_str = f', unnormalized error: {_format_quantity(error)}'
             else:
                 raw_error_str = ''
 
-            if isinstance(normed_error, Quantity):
-                errors.append(f'{normed_error.in_best_unit(precision=3)} ({varname}{raw_error_str})')
-            else:
-                errors.append(f'{normed_error:.3g} ({varname}{raw_error_str})')
+            errors.append(f'{_format_quantity(normed_error)} ({varname}{raw_error_str})')
 
         error_sum = ' + '.join(errors)
         print(f"{round}Best parameters {param_str}\n"
               f"{' '*len(round)}Best error: {best_error_str} = {error_sum}")
     else:
-        print(f"{round}Best parameters {param_str}\n"
-              f"{' '*len(round)}Best error: {best_error_str} ({additional_info['output_var'][0]})")
+        print(f"{round}Best parameters {param_str}")
+        if 'objective_errors_normalized' in additional_info:
+            best_error_normed = _format_quantity(additional_info['objective_errors_normalized'][0])
+            best_error_raw = _format_quantity(additional_info['objective_errors'][0])
+            if (not have_same_dimensions(additional_info['objective_errors_normalized'][0],
+                                         additional_info['objective_errors'][0]) or
+                    best_error_normed != best_error_raw):
+                print(f"{' ' * len(round)}Best error: {best_error_normed} ({additional_info['output_var'][0]}, "
+                      f"unnormalized error: {best_error_raw})")
+            else:
+                print(f"{' ' * len(round)}Best error: {best_error_normed} ({additional_info['output_var'][0]})")
+        else:
+            best_error_str = _format_quantity(best_error, precision=4)
+            print(f"{' ' * len(round)}Best error: {best_error_str} ({additional_info['output_var'][0]})")
+
 
 
 def callback_none(params, errors, best_params, best_error, index, additional_info):
