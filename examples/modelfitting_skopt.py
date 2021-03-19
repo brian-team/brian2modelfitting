@@ -21,13 +21,13 @@ metric = MSEMetric()
 
 # pass parameters to the NeuronGroup
 fitter = TraceFitter(model=model, dt=0.1*ms,
-                     input_var='v', output_var='I',
-                     input=input_traces, output=output_traces,
-                     n_samples=10,)
+                     input={'v': input_traces},
+                     output={'I': output_traces},
+                     n_samples=10)
 
 res, error = fitter.fit(n_rounds=2,
                         optimizer=s_opt, metric=metric,
                         g=[1*nS, 30*nS], E=[-20*mV, 100*mV],
-                        callback='progressbar',)
+                        callback='progressbar')
 
 print(res, error)

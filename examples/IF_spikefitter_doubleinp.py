@@ -68,11 +68,9 @@ metric = GammaFactor(delta=1*ms, time=60*ms)
 
 
 # pass parameters to the NeuronGroup
-fitter = SpikeFitter(model=eqs_fit, input_var='I', dt=dt,
-                     input=input_current2, output=out_spikes,
-                     n_samples=30,
-                     threshold='v > -50*mV',
-                     reset='v = -70*mV',
+fitter = SpikeFitter(model=eqs_fit, input={'I': input_current2}, dt=dt,
+                     output=out_spikes,
+                     n_samples=30, threshold='v > -50*mV', reset='v = -70*mV',
                      param_init={'v': -70*mV},
                      method='exponential_euler',)
 result_dict, error = fitter.fit(n_rounds=2,

@@ -131,7 +131,7 @@ def test_spikefitter_fit(setup):
     for attr in attr_fit:
         assert hasattr(sf, attr)
 
-    assert isinstance(sf.metric, Metric)
+    assert len(sf.metric) == 1 and isinstance(sf.metric[0], Metric)
     assert isinstance(sf.optimizer, Optimizer)
 
     assert isinstance(results, dict)

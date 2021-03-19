@@ -9,18 +9,18 @@ from numpy.testing.utils import assert_equal
 
 
 def test_callback_text(capsys):
-    callback_text([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2)
+    callback_text([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2, {'output_var': 'v'})
 
 
 def test_callback_none():
-    c = callback_none([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2)
+    c = callback_none([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2, {'output_var': 'v'})
     assert isinstance(c, type(None))
 
 
 def test_ProgressBar():
     pb = ProgressBar(total=10)
     assert isinstance(pb.t, tqdm.tqdm)
-    pb([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2)
+    pb([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2, {'output_var': 'v'})
 
 
 def test_callback_setup():
@@ -32,15 +32,16 @@ def test_callback_setup():
 
     c = callback_setup(None, 10)
     assert callable(c)
-    x = c([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2)
+    x = c([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2, {'output_var': 'v'})
     assert x is None
 
-    def callback(params, errors, best_params, best_error, index):
+    def callback(params, errors, best_params, best_error, index,
+                 additional_index):
         return params
 
     c = callback_setup(callback, 10)
     assert callable(c)
-    x = c([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2)
+    x = c([1, 2, 3], [1.2, 2.3, 0.1], {'a':3}, 0.1, 2, {'output_var': 'v'})
     assert_equal(x, [1, 2, 3])
 
 

@@ -106,13 +106,9 @@ time step ``dt``, number of samples we want to draw in each optimization round.
 .. code:: python
 
   fitter = TraceFitter(model=model,
-                       input_var='I',
-                       output_var='v',
-                       input=inp_trace * amp,
-                       output=out_trace*mV,
-                       dt=0.01*ms,
-                       n_samples=100,
-                       method='exponential_euler',
+                       input={'I': inp_trace*amp},
+                       output={'v': out_trace*mV},
+                       dt=0.01*ms, n_samples=100, method='exponential_euler',
                        param_init={'v': -65*mV})
 
 Additionally, in this example, we pick the integration method to be

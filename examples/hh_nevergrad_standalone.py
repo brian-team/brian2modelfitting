@@ -72,10 +72,9 @@ set_device('cpp_standalone', directory='parallel', clean=False)
 n_opt = NevergradOptimizer()
 metric = MSEMetric()
 
-fitter = TraceFitter(model=eqs, input_var='I', output_var='v',
-                     input=inp_trace * amp, output=[out_trace]*mV, dt=dt,
-                     n_samples=5,
-                     param_init={'v': 'VT'},
+fitter = TraceFitter(model=eqs, input={'I': inp_trace * amp},
+                     output={'v': [out_trace]*mV},
+                     dt=dt, n_samples=5, param_init={'v': 'VT'},
                      method='exponential_euler',)
 
 res, error = fitter.fit(n_rounds=2,
