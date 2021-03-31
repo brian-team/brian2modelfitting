@@ -561,7 +561,7 @@ class Fitter(metaclass=abc.ABCMeta):
                             "for OnlineTraceFitter")
 
         if not (isinstance(optimizer, Optimizer)) or optimizer is None:
-            raise TypeError("metric has to be a child of class Optimizer")
+            raise TypeError("optimizer has to be a child of class Optimizer")
 
         if self.metric is not None and restart is False:
             if metric is not self.metric:
