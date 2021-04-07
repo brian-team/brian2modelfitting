@@ -1156,7 +1156,7 @@ class SpikeFitter(Fitter):
             restart=False, start_iteration=None, penalty=None,
             level=0, **params):
         if metric is None:
-            metric = GammaFactor(delta=1*ms, time=60*ms)
+            metric = GammaFactor(delta=2*ms, time=self.duration) 
 
         if not isinstance(metric, SpikeMetric):
             raise TypeError("You can only use SpikeMetric child metric with "
