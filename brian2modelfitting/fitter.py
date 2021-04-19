@@ -10,15 +10,15 @@ from brian2.utils.stringtools import get_identifiers
 
 from brian2 import (NeuronGroup, defaultclock, get_device, Network,
                     StateMonitor, SpikeMonitor, second, get_local_namespace,
-                    Quantity, get_logger)
+                    Quantity, get_logger, ms)
 from brian2.input import TimedArray
 from brian2.equations.equations import Equations, SUBEXPRESSION
 from brian2.devices import set_device, reset_device, device
 from brian2.devices.cpp_standalone.device import CPPStandaloneDevice
 from brian2.core.functions import Function
 from .simulator import RuntimeSimulator, CPPStandaloneSimulator
-from .metric import Metric, SpikeMetric, TraceMetric, MSEMetric, normalize_weights
-from .optimizer import Optimizer
+from .metric import Metric, SpikeMetric, TraceMetric, MSEMetric, GammaFactor, normalize_weights
+from .optimizer import Optimizer, NevergradOptimizer
 from .utils import callback_setup, make_dic
 
 
@@ -560,8 +560,8 @@ class Fitter(metaclass=abc.ABCMeta):
             raise TypeError("metric has to be a child of class Metric or None "
                             "for OnlineTraceFitter")
 
-        if not (isinstance(optimizer, Optimizer)) or optimizer is None:
-            raise TypeError("metric has to be a child of class Optimizer")
+        if not (isinstance(optimizer, Optimizer) or optimizer is None):
+            raise TypeError("optimizer has to be a child of class Optimizer or None")
 
         if self.metric is not None and restart is False:
             if metric is not self.metric:
@@ -576,6 +576,9 @@ class Fitter(metaclass=abc.ABCMeta):
 
         if penalty is None:
             penalty = self.penalty
+
+        if optimizer is None:
+            optimizer = NevergradOptimizer()
 
         if self.optimizer is None or restart:
             if start_iteration is None:
@@ -862,6 +865,9 @@ class TraceFitter(Fitter):
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
             restart=False, start_iteration=None, penalty=None,
             level=0, **params):
+        if metric is None:
+            metric = MSEMetric()
+
         if not isinstance(metric, TraceMetric):
             raise TypeError("You can only use TraceMetric child metric with "
                             "TraceFitter")
@@ -1149,6 +1155,9 @@ class SpikeFitter(Fitter):
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
             restart=False, start_iteration=None, penalty=None,
             level=0, **params):
+        if metric is None:
+            metric = GammaFactor(delta=2*ms, time=self.duration) 
+
         if not isinstance(metric, SpikeMetric):
             raise TypeError("You can only use SpikeMetric child metric with "
                             "SpikeFitter")
