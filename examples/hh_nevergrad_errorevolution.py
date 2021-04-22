@@ -1,7 +1,6 @@
 from brian2 import *
 from brian2modelfitting import *
 import pandas as pd
-from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.animation import FuncAnimation
 
 
@@ -65,8 +64,10 @@ fitter = TraceFitter(
 
 
 def callback(params, errors, best_params, best_error, index):
-    """Custom callback"""
-    print(f'[round {index + 1}]\t{np.min(errors)}')
+    """Custom callback.
+    
+    Print the best error for each optimization round."""
+    print(f'[round {index + 1}]\tbest error: {np.min(errors)}')
 
 
 # fitting procedure
@@ -81,7 +82,6 @@ res, error = fitter.fit(
     g_k=[6.e-07 * siemens, 6.e-05 * siemens])
 
 # visualization of best fitted traces
-start_scope()
 fit_traces = fitter.generate_traces(params=res, param_init=init_v)
 
 nrows = 2
@@ -106,35 +106,28 @@ handles, labels = [
 fig.legend(handles, labels, loc='upper right')
 plt.tight_layout()
 plt.show()
-# fig.savefig('traces.png', format='png', bbox_inches='tight', dpi=220)
 
 # visualization of errors and parameters evolving over time
-full_output = fitter.results(format='dataframe', use_units=False)
-g_k = full_output['g_k'].to_numpy()
-g_na = full_output['g_na'].to_numpy()
-g_l = full_output['g_l'].to_numpy()
-error = full_output['error'].to_numpy()
+full_output = fitter.results(format='dict', use_units=False)
+g_k = full_output['g_k']
+g_na = full_output['g_na']
+g_l = full_output['g_l']
+error = full_output['error']
 
 fig = plt.figure(figsize=(15, 5))
 ax1 = fig.add_subplot(1, 2, 1, projection='3d')
-ax2 = fig.add_subplot(1, 2, 2)
-ax1.set_xlabel('$g_K$ [S]')
-ax1.set_ylabel('$g_{Na}$ [S]')
-ax1.set_zlabel('$g_l$ [S]')
-ax2.set_xlabel('round')
-ax2.set_ylabel('error')
-ax1.w_xaxis.set_pane_color((0, 0, 0))
-ax1.w_yaxis.set_pane_color((0, 0, 0))
-ax1.w_zaxis.set_pane_color((0, 0, 0))
-ax1.set_xlim3d(0, g_k.max() * 1.01)
-ax1.set_ylim3d(0, g_na.max() * 1.01)
-ax1.set_zlim3d(0, g_l.max() * 1.01)
+ax1.set(xlabel='$g_K$ [S]', ylabel='$g_{Na}$ [S]', zlabel='$g_l$ [S]',
+        xlim=(0, g_k.max() * 1.01), ylim=(0, g_na.max() * 1.01),
+        zlim=(0, g_l.max() * 1.01))
 ax1.ticklabel_format(useOffset=True, style='scientific', scilimits=(0, 0))
-ax1.grid()
+ax2 = fig.add_subplot(1, 2, 2)
+ax2.set(xlabel='round', ylabel='error')
 ax2.grid()
 
 
 def init():
+    """Scatter plot of the initial population of parameters and the
+    best associated error."""
     ax1.plot3D(g_k[:n_samples], g_na[:n_samples], g_l[:n_samples],
                'b*', markersize=4, label='init population')
     ax2.plot([0], np.min(error[:n_samples]),
@@ -144,6 +137,11 @@ def init():
 
 
 def animate(frame):
+    """Scatter plot current population of parameters for each frame,
+    starting from the second round of optimization.
+    
+    Number of frames should correspond to the number of optimization
+    rounds."""
     istart = frame * n_samples
     iend = istart + n_samples
     if (res['g_k'] / siemens in g_k[istart:iend]
@@ -166,4 +164,3 @@ anim = FuncAnimation(
     fig, animate, init_func=init, frames=np.arange(1, n_rounds), repeat=False)
 plt.tight_layout()
 plt.show()
-# anim.save('evolution.gif', writer='pillow', fps=5)
