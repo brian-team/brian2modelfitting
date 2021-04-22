@@ -149,10 +149,10 @@ def animate(frame):
     if (res['g_k'] / siemens in g_k[istart:iend]
             and res['g_na'] / siemens in g_na[istart:iend]
             and res['g_l'] / siemens in g_l[istart:iend]):
-        ax1.plot3D(res['g_k'], res['g_na'], res['g_l'],
-                   'r*', markersize=8, label='best params')
+        ax1.plot3D([res['g_k']], [res['g_na']], [res['g_l']],
+                  'r*', markersize=8, label='best params')
         ax2.plot(frame, np.min(error[istart:iend]),
-                 'r*', markersize=8, label='best error')
+                'r*', markersize=8, label='best error')
         ax1.legend()
         ax2.legend()
     else:
@@ -163,7 +163,7 @@ def animate(frame):
 
 
 anim = FuncAnimation(
-    fig, animate, init_func=init, frames=np.arange(1, n_rounds), interval=1)
+    fig, animate, init_func=init, frames=np.arange(1, n_rounds), repeat=False)
 plt.tight_layout()
 plt.show()
 # anim.save('evolution.gif', writer='pillow', fps=5)
