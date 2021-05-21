@@ -62,7 +62,8 @@ fitter = TraceFitter(model=eqs, input={'I': inp_ar.T},
                      method='exponential_euler')
 
 res, error = fitter.fit(n_rounds=20,
-                        optimizer=n_opt, metric=[metric_v, metric_m],
+                        optimizer=n_opt, metric={'v': metric_v,
+                                                 'm': metric_m},
                         callback='text',
                         gl=[1e-09 *siemens, 1e-07 *siemens],
                         g_na=[2e-06*siemens, 2e-04*siemens],

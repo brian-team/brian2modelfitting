@@ -633,10 +633,10 @@ class Fitter(metaclass=abc.ABCMeta):
         ----------
         optimizer: `~.Optimizer` children
             Child of Optimizer class, specific for each library.
-        metric: `~.Metric`, or list of `~.Metric`
+        metric: `~.Metric`, or dict
             Child of Metric class, specifies optimization metric. In the case
             of multiple fitted output variables, can either be a single
-            `~.Metric` that is applied to all variables, or a list with a
+            `~.Metric` that is applied to all variables, or a dictionary with a
             `~.Metric` for each variable.
         n_rounds: int
             Number of rounds to optimize over (feedback provided over each
@@ -675,16 +675,20 @@ class Fitter(metaclass=abc.ABCMeta):
         error: float
             error value for best parameter set
         """
-        if isinstance(metric, Metric):
-            metric = [metric] * len(self.output_var)
-        if metric is not None:
-            if not len(metric) == len(self.output_var):
-                raise TypeError('List of metrics needs to have as many '
-                                'elements as output variables.')
-            for m in metric:
-                if not (isinstance(m, Metric) or metric is None):
-                    raise TypeError("metric has to be a child of class Metric or None "
-                                    "for OnlineTraceFitter")
+        metric = self._verify_metric_argument(metric)
+
+        # Convert metric dictionary to parallel list with output variables
+        metric = [metric[o] if metric is not None else None
+                  for o in self.output_var]
+        for single_metric, output in zip(metric, self.output):
+            if getattr(single_metric, 't_weights', None) is not None:
+                if not single_metric.t_weights.shape == (
+                        output.shape[1],):
+                    raise ValueError(
+                        "The 't_weights' argument of the metric has "
+                        "to be a one-dimensional array of length "
+                        f"{output.shape[1]} but has shape "
+                        f"{single_metric.t_weights.shape}")
 
         if not (isinstance(optimizer, Optimizer)) or optimizer is None:
             raise TypeError("metric has to be a child of class Optimizer")
@@ -788,6 +792,46 @@ class Fitter(metaclass=abc.ABCMeta):
                 break
 
         return self.best_params, self.best_error
+
+    def _verify_metric_argument(self, metric, metric_class=Metric):
+        if isinstance(metric, Metric):
+            metric = {varname: metric
+                      for varname in self.output_var}
+        elif isinstance(metric, Sequence):
+            logger.warn('Using a list of metrics is deprecated, use a '
+                        'dictionary instead.',
+                        name_suffix='deprecated_metric_list')
+            n_warnings += 1
+            if not len(metric) == len(self.output_var):
+                raise TypeError('List of metrics needs to have as many '
+                                'elements as output variables.')
+            metric = {o : m for m, o in zip(metric, self.output_var)}
+
+        if isinstance(metric, Mapping):
+            for o, m in metric.items():
+                if o not in self.output_var:
+                    raise ValueError(f"Metric key '{o}' does not correspond to "
+                                     f"an output variable name.")
+                    if not isinstance(m, Metric):
+                        raise TypeError("metric has to be a child of class "
+                                        "Metric.")
+                if not isinstance(m, metric_class):
+                    raise TypeError(f"metric has to be a child of class "
+                                    f"'{metric_class.__name__}' but is a "
+                                    f"'{type(m).__name__}'.")
+            for o in self.output_var:
+                if not o in metric:
+                    raise ValueError(f"Output variable '{o}' does not have a "
+                                     f"corresponding entry in the metric "
+                                     f"dictionary.")
+        elif metric is not None:
+            if not isinstance(metric, Mapping):
+                raise TypeError('Metric has to be a Metric instance, or a'
+                                'dictionary mapping output variable names to '
+                                'Metric instances. Use None for'
+                                'OnlineTraceFitter.')
+
+        return metric
 
     @property
     def best_params(self):
@@ -1091,20 +1135,8 @@ class TraceFitter(Fitter):
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
             restart=False, start_iteration=None, penalty=None,
             level=0, **params):
-        if not isinstance(metric, Sequence):
-            metric = [metric] * len(self.output_var)
-        for single_metric in metric:
-            if not isinstance(single_metric, TraceMetric):
-                raise TypeError("Metric has to be a 'TraceMetric', but is "
-                                f"type '{type(single_metric)}'.")
-        for single_metric, output in zip(metric, self.output):
-            if single_metric.t_weights is not None:
-                if not single_metric.t_weights.shape == (output.shape[1], ):
-                    raise ValueError("The 't_weights' argument of the metric has "
-                                     "to be a one-dimensional array of length "
-                                     f"{output.shape[1]} but has shape "
-                                     f"{single_metric.t_weights.shape}")
         self.bounds = dict(params)
+        metric = self._verify_metric_argument(metric, metric_class=TraceMetric)
         best_params, error = super().fit(optimizer=optimizer,
                                          metric=metric,
                                          n_rounds=n_rounds,
@@ -1422,7 +1454,7 @@ class SpikeFitter(Fitter):
         if method is None:
             method = 'exponential_euler'
         super().__init__(dt, model, input=input, output=output,
-                         input_var=input_var, output_var='spikes',
+                         input_var=input_var, output_var=['spikes'],
                          n_samples=n_samples, threshold=threshold,
                          reset=reset, refractory=refractory,
                          method=method, param_init=param_init,
@@ -1453,12 +1485,7 @@ class SpikeFitter(Fitter):
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
             restart=False, start_iteration=None, penalty=None,
             level=0, **params):
-        if not isinstance(metric, Sequence):
-            metric = [metric] * len(self.output_var)
-        for single_metric in metric:
-            if not isinstance(single_metric, SpikeMetric):
-                raise TypeError("Metric has to be a 'SpikeMetric', but is "
-                                f"type '{type(single_metric)}'.")
+        metric = self._verify_metric_argument(metric, metric_class=SpikeMetric)
         best_params, error = super().fit(optimizer=optimizer,
                                          metric=metric,
                                          n_rounds=n_rounds,
