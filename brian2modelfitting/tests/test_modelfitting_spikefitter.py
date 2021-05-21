@@ -144,19 +144,58 @@ def test_spikefitter_fit(setup):
 
 def test_spikefitter_fit_errors(setup):
     dt, sf = setup
+    class NaiveOptimizer:
+        def __init__(self):
+            self.best = []
+    naive_opt = NaiveOptimizer()
     with pytest.raises(TypeError):
         results, errors = sf.fit(n_rounds=2,
                                  optimizer=n_opt,
-                                 metric=MSEMetric(),
+                                 metric=MSEMetric(), #testing a wrong metric
                                  gL=[20*nS, 40*nS],
                                  C=[0.5*nF, 1.5*nF])
     with pytest.raises(TypeError):
         results, errors = sf.fit(n_rounds=2,
-                                 optimizer=None,
-                                 metric=MSEMetric(),
+                                 optimizer=naive_opt, #testing a Non-Optimizer child
+                                 metric=metric,
                                  gL=[20*nS, 40*nS],
                                  C=[0.5*nF, 1.5*nF])
 
+def test_fitter_fit_default_optimizer(setup):
+    dt, sf = setup
+    results, errors = sf.fit(n_rounds=2,
+                             optimizer=None,
+                             metric=metric,
+                             gL=[20*nS, 40*nS],
+                             C=[0.5*nF, 1.5*nF])
+    assert sf.simulator.neurons.iteration == 1
+    attr_fit = ['optimizer', 'metric', 'best_params']
+    for attr in attr_fit:
+        assert hasattr(sf, attr)
+
+    assert isinstance(sf.optimizer, NevergradOptimizer) #default optimizer
+    assert isinstance(sf.simulator, Simulator)
+
+    assert_equal(results, sf.best_params)
+    assert_equal(errors, sf.best_error)
+
+
+def test_spikefitter_fit_default_metric(setup):
+    dt, sf = setup
+    results, errors = sf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=None,
+                             gL=[20*nS, 40*nS],
+                             C=[0.5*nF, 1.5*nF])
+    assert sf.simulator.neurons.iteration == 1
+    attr_fit = ['optimizer', 'metric', 'best_params']
+    for attr in attr_fit:
+        assert hasattr(sf, attr)
+    assert isinstance(sf.metric, GammaFactor) #default spike metric
+    assert isinstance(sf.simulator, Simulator)
+
+    assert_equal(results, sf.best_params)
+    assert_equal(errors, sf.best_error)
 
 
 def test_spikefitter_param_init(setup):

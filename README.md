@@ -12,6 +12,7 @@ Brian2modelfitting is released under the terms of the CeCILL 2.1 license.
 
 Please report issues at the github issue tracker (https://github.com/brian-team/brian2/issues) or at the brian support mailing list (http://groups.google.com/group/briansupport/)
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4601961.svg)](https://doi.org/10.5281/zenodo.4601961)
 
 Installation
 ------------
@@ -23,5 +24,5 @@ pip install brian2modelfitting
 
 Testing status
 --------------
-[![Build Status](https://travis-ci.org/brian-team/brian2modelfitting.svg?branch=master)](https://travis-ci.org/brian-team/brian2modelfitting) 
+[![Build Status](https://github.com/brian-team/brian2modelfitting/workflows/Tests/badge.svg)](https://github.com/brian-team/brian2modelfitting/actions) 
 [![Coverage Status](https://coveralls.io/repos/github/brian-team/brian2modelfitting/badge.svg?branch=master)](https://coveralls.io/github/brian-team/brian2modelfitting?branch=master)

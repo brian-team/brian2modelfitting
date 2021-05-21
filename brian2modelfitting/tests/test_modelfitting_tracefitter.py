@@ -309,6 +309,25 @@ def test_tracefitter_init_errors(setup):
                          output=np.array(output_traces),  # no units
                          n_samples=2)
 
+
+def test_tracefitter_fit_default_metric(setup):
+    dt, tf = setup
+    results, errors = tf.fit(n_rounds=2,
+                             optimizer=n_opt,
+                             metric=None,
+                             g=[1*nS, 30*nS],
+                             callback=None)
+    assert tf.simulator.neurons.iteration == 1
+    attr_fit = ['optimizer', 'metric', 'best_params']
+    for attr in attr_fit:
+        assert hasattr(tf, attr)
+    assert isinstance(tf.metric, MSEMetric) #default trace metric
+    assert isinstance(tf.simulator, Simulator)
+
+    assert_equal(results, tf.best_params)
+    assert_equal(errors, tf.best_error)
+
+
 from nevergrad.optimization import registry as nevergrad_registry
 @pytest.mark.parametrize('method', sorted(nevergrad_registry.keys()))
 def test_fitter_fit_methods(method):
@@ -390,6 +409,25 @@ def test_fitter_fit_no_units(setup_no_units):
     assert_equal(errors, tf.best_error)
 
 
+def test_fitter_fit_default_optimizer(setup):
+    dt, tf = setup
+    results, errors = tf.fit(n_rounds=2,
+                             optimizer=None,
+                             metric=metric,
+                             g=[1*nS, 30*nS],
+                             callback=None)
+    assert tf.simulator.neurons.iteration == 1
+    attr_fit = ['optimizer', 'metric', 'best_params']
+    for attr in attr_fit:
+        assert hasattr(tf, attr)
+
+    assert isinstance(tf.optimizer, NevergradOptimizer) #default optimizer
+    assert isinstance(tf.simulator, Simulator)
+
+    assert_equal(results, tf.best_params)
+    assert_equal(errors, tf.best_error)
+
+
 def test_fitter_fit_callback(setup):
     dt, tf = setup
 
@@ -434,9 +472,13 @@ def test_fitter_fit_callback(setup):
 
 def test_fitter_fit_errors(setup):
     dt, tf = setup
+    class NaiiveOptimizer:
+        def __init__(self):
+            self.best = []
+    opt = NaiiveOptimizer()
     with pytest.raises(TypeError):
         tf.fit(n_rounds=2,
-               optimizer=None,
+               optimizer=opt, #testing a Non-Optimizer child
                metric=metric,
                g=[1*nS, 30*nS])
 
