@@ -200,11 +200,9 @@ def setup_multiobjective(request):
     out_trace2 = np.ones(1000)*-7*mV
     tf = TraceFitter(dt=dt,
                      model=multiobjective_model,
-                     input_var='x',
-                     output_var=['var1', 'var2'],
-                     input=np.zeros_like(out_trace1)[None, :],
-                     output=[out_trace1[None, :],
-                             out_trace2[None, :]],
+                     input={'x': np.zeros_like(out_trace1)[None, :]},
+                     output={'var1': out_trace1[None, :],
+                             'var2': out_trace2[None, :]},
                      n_samples=70)
 
     def fin():
@@ -222,11 +220,9 @@ def setup_multiobjective_no_units(request):
     out_trace2 = np.ones(1000)*-7*mV
     tf = TraceFitter(dt=dt,
                      model=multiobjective_model,
-                     input_var='x',
-                     output_var=['var1', 'var2'],
-                     input=np.zeros_like(out_trace1)[None, :],
-                     output=[out_trace1[None, :],
-                             out_trace2[None, :]],
+                     input={'x': np.zeros_like(out_trace1)[None, :]},
+                     output={'var1': out_trace1[None, :],
+                             'var2': out_trace2[None, :]},
                      n_samples=70, use_units=False)
 
     def fin():
@@ -1112,8 +1108,8 @@ def test_onlinetracefitter_fit_tstart():
 def test_multiobjective_basic(setup_multiobjective):
     dt, tf = setup_multiobjective
     result, error = tf.fit(n_rounds=20,
-                       metric=[MSEMetric(t_start=50*ms),
-                               MSEMetric(t_start=50*ms, normalization=1*mV)],
+                       metric={'var1': MSEMetric(t_start=50*ms),
+                               'var2': MSEMetric(t_start=50*ms, normalization=1*mV)},
                        optimizer=n_opt,
                        target1=(-10, 10),
                        target2=(-10*mV, 10*mV),
@@ -1194,8 +1190,8 @@ def test_multiobjective_basic(setup_multiobjective):
 def test_multiobjective_no_units(setup_multiobjective_no_units):
     dt, tf = setup_multiobjective_no_units
     result, error = tf.fit(n_rounds=20,
-                       metric=[MSEMetric(t_start=50*ms),
-                               MSEMetric(t_start=50*ms, normalization=0.001)],
+                       metric={'var1': MSEMetric(t_start=50*ms),
+                               'var2': MSEMetric(t_start=50*ms, normalization=0.001)},
                        optimizer=n_opt,
                        target1=(-10, 10),
                        target2=(-10*mV, 10*mV),
