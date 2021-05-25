@@ -804,7 +804,6 @@ class Fitter(metaclass=abc.ABCMeta):
             logger.warn('Using a list of metrics is deprecated, use a '
                         'dictionary instead.',
                         name_suffix='deprecated_metric_list')
-            n_warnings += 1
             if not len(metric) == len(self.output_var):
                 raise TypeError('List of metrics needs to have as many '
                                 'elements as output variables.')
