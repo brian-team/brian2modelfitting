@@ -317,7 +317,8 @@ def test_tracefitter_fit_default_metric(setup):
     attr_fit = ['optimizer', 'metric', 'best_params']
     for attr in attr_fit:
         assert hasattr(tf, attr)
-    assert isinstance(tf.metric, MSEMetric) #default trace metric
+    assert len(tf.metric) == 1 and isinstance(tf.metric[0],
+                                              MSEMetric) #default trace metric
     assert isinstance(tf.simulator, Simulator)
 
     assert_equal(results, tf.best_params)
