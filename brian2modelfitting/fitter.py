@@ -1076,6 +1076,23 @@ class Fitter(metaclass=abc.ABCMeta):
             fits = getattr(self.simulator.statemonitor, output_var)[:]
         return fits
 
+# Short name: (Long name, accepts jac, requires jac)
+SCALAR_METHODS_GRADIENT_SUPPORT = {
+    'nelder': ('Nelder-Mead', False, False),
+    'powell': ('Powell', False, False),
+    'cg': ('CG', True, False),
+    'bfgs': ('BFGS', True, False),
+    'newton': ('Newton-CG', True, True),
+    'lbfgsb': ('L-BFGS-B', True, False),
+    'l-bfgsb': ('L-BFGS-B', True, False),
+    'tnc': ('TNC', True, False),
+    'cobyla': ('COBYLA', False, False),
+    'slsqp': ('SLSQP', True, False),
+    'dogleg': ('dogleg', True, False),
+    'trust-ncg': ('trust-ncg', True, False),
+    'trust-exact': ('trust-exact', True, False),
+    'trust-krylov': ('trust-krylov', True, False)
+}
 
 class TraceFitter(Fitter):
     """
@@ -1318,9 +1335,12 @@ class TraceFitter(Fitter):
         else:
             t_start_steps = 0
 
-        def _calc_error(params):
-            param_dic = get_param_dic([params[p] for p in self.parameter_names],
-                                      self.parameter_names, self.n_traces, 1)
+        def _calc_residual(params):
+            try:
+                param_dic = get_param_dic([params[p] for p in self.parameter_names],
+                                          self.parameter_names, self.n_traces, 1)
+            except IndexError:
+                param_dic = get_param_dic(params, self.parameter_names, self.n_traces, 1)
             self.simulator.run(self.duration, param_dic,
                                self.parameter_names, iteration=iteration,
                                name='refine')
@@ -1337,6 +1357,11 @@ class TraceFitter(Fitter):
                 one_residual.append(residual*norm)
             return array(one_residual).flatten()
 
+        def _calc_error(params):
+            error = sum(_calc_residual(params)**2)
+            print(error.shape)
+            return error
+
         def _calc_gradient(params):
             residuals = []
             for name in self.parameter_names:
@@ -1352,6 +1377,23 @@ class TraceFitter(Fitter):
                 residuals.append(array(one_residual).flatten())
             gradient = array(residuals)
             return gradient.T
+
+        def _calc_gradient_scalar(params):
+            residuals = []
+            for name in self.parameter_names:
+                one_residual = []
+                for out_var, norm in zip(self.output_var, normalization):
+                    trace = getattr(self.simulator.statemonitor,
+                                    f'S_{out_var}_{name}_')
+                    if t_weights is None:
+                        residual = trace[:, t_start_steps:]
+                    else:
+                        residual = trace * sqrt(t_weights)
+                    one_residual.append(residual*norm)
+                residuals.append(array(one_residual).flatten())
+            gradient = array(residuals)
+            scalar_gradient = 2*sum(gradient*_calc_residual(params), axis=1)
+            return scalar_gradient
 
         tested_parameters = []
         errors = []
@@ -1407,8 +1449,31 @@ class TraceFitter(Fitter):
                                  best_params, best_error, iter, additional_info)
 
         assert 'Dfun' not in kwds
-        if calc_gradient:
-            kwds.update({'Dfun': _calc_gradient})
+        method = kwds.pop('method', 'leastsq').lower()
+        scalar_method = any(method == short_name or method == long_name.lower()
+                            for short_name, (long_name, _, _) in SCALAR_METHODS_GRADIENT_SUPPORT.items())
+        if scalar_method:
+            name, accepts_jac, needs_jac = SCALAR_METHODS_GRADIENT_SUPPORT[method]
+            if not accepts_jac and calc_gradient:
+                raise ValueError(f"The '{name}' method does not accept a "
+                                 f"gradient function, use calc_gradient=False.")
+            if needs_jac and not calc_gradient:
+                raise ValueError(f"The '{name}' method requires a "
+                                 f"gradient function, use calc_gradient=True.")
+            if calc_gradient:
+                kwds.update({'jac': _calc_gradient_scalar})
+        elif method in ['leastsq', 'least_squares']:
+            if calc_gradient:
+                kwds.update({'Dfun': _calc_gradient})
+        else:
+            methods = ["'leastsq'", "'least_squares'"]
+            for m, (long_name, _, _) in SCALAR_METHODS_GRADIENT_SUPPORT.items():
+                if long_name == m:
+                    methods += [f"'{m}'"]
+                else:
+                    methods += [f"'{m}' ('{long_name}')"]
+            raise ValueError(f"Unsupported method '{method}'. Supported "
+                             f"methods: {', '.join(methods)}.")
         if 'iter_cb' in kwds:
             # Use the given callback but raise a warning if callback is not
             # set to None
@@ -1435,8 +1500,8 @@ class TraceFitter(Fitter):
             if max_nfev:
                 kwds['max_nfev'] = max_nfev
 
-        result = lmfit.minimize(_calc_error, parameters,
-                                iter_cb=iter_cb,
+        result = lmfit.minimize(_calc_residual, parameters,
+                                iter_cb=iter_cb, method=method,
                                 **kwds)
 
         if self.use_units:
