@@ -10,7 +10,7 @@ Documentation for Brian2modelfitting can be found at http://brian2modelfitting.r
 
 Brian2modelfitting is released under the terms of the CeCILL 2.1 license.
 
-Please report issues at the github issue tracker (https://github.com/brian-team/brian2/issues) or at the brian support mailing list (http://groups.google.com/group/briansupport/)
+Please report issues at the github issue tracker (https://github.com/brian-team/brian2modelfitting/issues) or at the brian discussion forum (https://brian.discourse.group)
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4601961.svg)](https://doi.org/10.5281/zenodo.4601961)
 

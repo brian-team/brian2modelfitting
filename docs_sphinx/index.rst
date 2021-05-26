@@ -4,12 +4,9 @@ brian2modelfitting
 The package `.brian2modelfitting` is a tool for parameter fitting of neuron
 models in the `Brian 2 simulator <https://brian2.readthedocs.org>`_.
 
-Please contact us at
-``brian-development@googlegroups.com`` (https://groups.google.com/forum/#!forum/brian-development)
-if you are interested in contributing.
-
-Please report bugs at the `github issue tracker <https://github.com/brian-team/brian2modelfitting/issues>`_ or to
-``briansupport@googlegroups.com`` (https://groups.google.com/forum/#!forum/briansupport).
+Please report bugs at the `github issue tracker <https://github.com/brian-team/brian2modelfitting/issues>`_
+or at the `Brian discussion forum <https://groups.google.com/forum/#!forum/briansupport>`_. The latter is
+also a could place to discuss feature requests or potential contributions.
 
 
 Model fitting
