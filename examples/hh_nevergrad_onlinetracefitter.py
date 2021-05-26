@@ -43,11 +43,10 @@ Cm   : farad (constant)
 n_opt = NevergradOptimizer()
 
 ## FittingNone
-fitter = OnlineTraceFitter(model=eqs, input_var='I', output_var='v',
-                     input=inp_traces*amp, output=out_traces*mV, dt=dt,
-                     n_samples=40,
-                     param_init={'v': -65*mV},
-                     method='exponential_euler',)
+fitter = OnlineTraceFitter(model=eqs, input={'I': inp_traces*amp},
+                           output={'v': out_traces*mV},
+                           dt=dt, n_samples=40, param_init={'v': -65*mV},
+                           method='exponential_euler',)
 
 res, error = fitter.fit(n_rounds=10,
                         optimizer=n_opt,

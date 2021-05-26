@@ -38,6 +38,27 @@ start the optimization from scratch.
 Used by Fitter optimizer and metric can only be changed when the flat is `True`.
 
 
+Multiobjective normalization
+----------------------------
+It is possible to fit more than one output variable at the same time, by combining the errors for each variable. To do
+so, users can specify several output variables during the initialization::
+
+    fitter = TraceFitter(..., output={'x': target_x,
+                                      'y': target_y},
+                         ...)
+
+If the fit uses a single metric, it applies to both variables. Note that this requires that the resulting error has the
+same units for both variables – for example, it would not be possible to use the same `.MSEMetric` on variables with
+different units, since the errors cannot be simply added up. As a more general solution, users can specify a metric for
+each variable and use their normalization arguments to make the units compatible (most commonly by turning both errors
+into dimensionless quantities). This normalization also defines the relative weights of both errors. For example, if the
+variable ``x`` has dimensions of volt and the variable ``y`` is dimensionless, the following metrics can be used to make
+an error of 10mV in ``x`` to be weighed as much as an error of 0.1 in ``y``::
+
+    metrics = {'x': MSEMetric(normalization=10*mV)
+               'y': MSEMetric(normalization=0.1)}
+
+This dictionary then has to be provided as the ``metric`` argument of the `~.Fitter.fit` function.
 
 
 Callback function
@@ -236,10 +257,8 @@ with each simulation.
 .. code:: python
 
   fitter = OnlineTraceFitter(model=model,
-                             input=inp_traces,
-                             output=out_traces,
-                             input_var='I',
-                             output_var='v',
+                             input={'I': inp_traces},
+                             output={'v': out_traces},
                              dt=0.1*ms,
                              n_samples=5)
 

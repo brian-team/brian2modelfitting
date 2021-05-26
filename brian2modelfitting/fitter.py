@@ -1,8 +1,10 @@
 import abc
 import numbers
+from distutils.version import LooseVersion
+from typing import Sequence, Mapping
 
 import sympy
-from numpy import ones, array, arange, concatenate, mean, argmin, nanmin, reshape, zeros, sqrt, ndarray, broadcast_to
+from numpy import ones, array, arange, concatenate, mean, argmin, nanargmin, reshape, zeros, sqrt, ndarray, broadcast_to, sum
 
 from brian2.parsing.sympytools import sympy_to_str, str_to_sympy
 from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions, fail_for_dimension_mismatch
@@ -10,9 +12,9 @@ from brian2.utils.stringtools import get_identifiers
 
 from brian2 import (NeuronGroup, defaultclock, get_device, Network,
                     StateMonitor, SpikeMonitor, second, get_local_namespace,
-                    Quantity, get_logger, ms)
+                    Quantity, get_logger, Expression, ms)
 from brian2.input import TimedArray
-from brian2.equations.equations import Equations, SUBEXPRESSION
+from brian2.equations.equations import Equations, SUBEXPRESSION, SingleEquation
 from brian2.devices import set_device, reset_device, device
 from brian2.devices.cpp_standalone.device import CPPStandaloneDevice
 from brian2.core.functions import Function
@@ -139,12 +141,7 @@ def get_sensitivity_equations(group, parameters, namespace=None, level=1,
     new_eqs = []
     for names, sensitivity_eqs, param in zip(sensitivity_names, sensitivity, parameters):
         for name, eq, orig_var in zip(names, sensitivity_eqs, diff_eq_names):
-            if param in namespace:
-                unit = eqs[orig_var].dim / namespace[param].dim
-            elif param in group.variables:
-                unit = eqs[orig_var].dim / group.variables[param].dim
-            else:
-                raise AssertionError(f'Parameter {param} neither in namespace nor variables')
+            unit = eqs[orig_var].dim / group.variables[param].dim
             unit = repr(unit) if not unit.is_dimensionless else '1'
             if optimize:
                 # Check if the equation stays at zero if initialized at zero
@@ -232,21 +229,31 @@ class Fitter(metaclass=abc.ABCMeta):
         The size of the time step.
     model : `~brian2.equations.equations.Equations` or str
         The equations describing the model.
-    input : `~numpy.ndarray` or `~brian2.units.fundamentalunits.Quantity`
-        A 2D array of shape ``(n_traces, time steps)`` given the input that will
-        be fed into the model.
-    output : `~brian2.units.fundamentalunits.Quantity` or list
-        Recorded output of the model that the model should reproduce. Should
-        be a 2D array of the same shape as the input when fitting traces with
-        `TraceFitter`, a list of spike times when fitting spike trains with
-        `SpikeFitter`.
+    input : dic, `~numpy.ndarray` or `~brian2.units.fundamentalunits.Quantity`
+        A dictionary given the input variable as the key and a 2D array of
+        shape ``(n_traces, time steps)`` as the value, defining the input that
+        will be fed into the model. Note that this variable should be *used*
+        in the model (e.g. a variable ``I`` that is added as a current in the
+        membrane potential equation), but not *defined*.
+    output : dict, `~brian2.units.fundamentalunits.Quantity` or list
+        Recorded output of the model that the model should reproduce. Should be
+        given as a dictionary with the name of the variable as the key and the
+        desired output as the value. The desired output has to be a 2D array of
+        the same shape as the input when fitting traces with
+        `TraceFitter`, or a list of spike times when fitting spike trains with
+        `SpikeFitter`. Can also be a list of several output 2D arrays or a
+        single output array if combined with ``output_var`` (deprecated use).
     input_var : str
         The name of the input variable in the model. Note that this variable
         should be *used* in the model (e.g. a variable ``I`` that is added as
         a current in the membrane potential equation), but not *defined*.
-    output_var : str
-        The name of the output variable in the model. Only needed when fitting
-        traces with `.TraceFitter`.
+        .. deprecated:: 0.5
+            Use a dictionary for ``input`` instead.
+    output_var : str or list of str
+        The name of the output variable in the model or a list of output
+        variables. Only needed when fitting traces with `.TraceFitter`.
+        .. deprecated:: 0.5
+            Use a dictionary for ``output`` instead.
     n_samples: int
         Number of parameter samples to be optimized over in a single iteration.
     threshold: `str`, optional
@@ -270,18 +277,69 @@ class Fitter(metaclass=abc.ABCMeta):
     param_init: `dict`, optional
         Dictionary of variables to be initialized with respective values
     """
-    def __init__(self, dt, model, input, output, input_var, output_var,
-                 n_samples, threshold, reset, refractory, method, param_init,
-                 penalty, use_units=True):
+    def __init__(self, dt, model, input, output, n_samples, input_var=None,
+                 output_var=None, threshold=None, reset=None, refractory=None,
+                 method=None, param_init=None, penalty=None, use_units=True):
         """Initialize the fitter."""
-
-        if dt is None:
-            raise ValueError("dt-sampling frequency of the input must be set")
 
         if isinstance(model, str):
             model = Equations(model)
-        if input_var not in model.identifiers:
-            raise NameError("%s is not an identifier in the model" % input_var)
+
+        # Support deprecated legacy syntax of input_var + input or the new
+        # syntax with a dictionary as input
+        if input_var is not None:
+            logger.warn('Use the \'input\' argument with a dictionary instead '
+                        'of giving the name as \'input_var\'',
+                        name_suffix='deprecated_input_var')
+            if isinstance(input, Mapping) and input_var not in input:
+                raise ValueError('Name given as \'input_var\' and key in '
+                                 '\'input\' dictionary do not match.')
+        else:
+            if not isinstance(input, Mapping):
+                raise TypeError('\'input\' argument has to be a dictionary '
+                                'mapping the name of the input variable to the '
+                                'input.')
+            if len(input) > 1:
+                raise NotImplementedError('Only a single input is currently '
+                                          'supported.')
+            input_var = list(input.keys())[0]
+
+        if isinstance(input, Mapping):
+            input = input[input_var]
+
+        if input_var != 'spikes' and input_var not in model.identifiers:
+            raise NameError(f"{input_var} is not an identifier in the model")
+
+        # Support deprecated legacy syntax of output_var + input or the new
+        # syntax with a dictionary as output
+        if output_var is not None:
+            logger.warn('Use the \'output\' argument with a dictionary instead '
+                        'of giving the name as \'output_var\'',
+                        name_suffix='deprecated_output_var')
+            if isinstance(output_var, str):
+                output_var = [output_var]
+
+            if isinstance(output, Mapping):
+                if set(output_var) != set(output.keys()):
+                    raise ValueError('Names given as \'output_var\' and keys '
+                                     'in \'output\' dictionary do not match.')
+            elif not isinstance(output, list):
+                output = [output]
+        else:
+            if not isinstance(output, Mapping):
+                raise TypeError('\'output\' argument has to be a dictionary '
+                                'mapping the name of the input variable to the '
+                                'input.')
+            output_var = list(output.keys())
+            output = list(output.values())
+
+        for o_var in output_var:
+            if o_var != 'spikes' and o_var not in model.names:
+                raise NameError(f"{o_var} is not a model variable")
+
+        self.output_var = output_var
+        self.output = output
+        self.output_ = [array(o, copy=False) for o in output]
 
         self.dt = dt
 
@@ -301,16 +359,18 @@ class Fitter(metaclass=abc.ABCMeta):
         self.penalty = penalty
 
         self.input = input
-        self.output_var = output_var
-        if output_var == 'spikes':
-            self.output_dim = DIMENSIONLESS
-        else:
-            self.output_dim = model[output_var].dim
-            fail_for_dimension_mismatch(output, self.output_dim,
-                                        'The provided target values '
-                                        '("output") need to have the same '
-                                        'units as the variable '
-                                        '{}'.format(output_var))
+
+        self.output_dim = []
+        for o_var, out in zip(self.output_var, output):
+            if o_var == 'spikes':
+                self.output_dim.append(DIMENSIONLESS)
+            else:
+                self.output_dim.append(model[o_var].dim)
+                fail_for_dimension_mismatch(out, self.output_dim[-1],
+                                            'The provided target values '
+                                            '("output") need to have the same '
+                                            'units as the variable '
+                                            '{}'.format(o_var))
         self.model = model
 
         self.use_units = use_units
@@ -321,16 +381,19 @@ class Fitter(metaclass=abc.ABCMeta):
                                                                   input_dim)
         self.model += input_eqs
 
-        if output_var != 'spikes':
-            # For approaches that couple the system to the target values,
-            # provide a convenient variable
-            output_expr = 'output_var(t, i % n_traces)'
-            output_dim = ('1' if self.output_dim is DIMENSIONLESS
-                          else repr(self.output_dim))
-            output_eqs = "{}_target = {} : {}".format(output_var,
-                                                      output_expr,
-                                                      output_dim)
-            self.model += output_eqs
+        counter = 0
+        for o_var, o_dim in zip(self.output_var, self.output_dim):
+            if o_var != 'spikes':
+                counter += 1
+                # For approaches that couple the system to the target values,
+                # provide a convenient variable
+                output_expr = f'output_var_{counter}(t, i % n_traces)'
+                output_dim = ('1' if o_dim is DIMENSIONLESS
+                              else repr(o_dim))
+                output_eqs = "{}_target = {} : {}".format(o_var,
+                                                          output_expr,
+                                                          output_dim)
+                self.model += output_eqs
 
         input_traces = TimedArray(input.transpose(), dt=dt)
         self.input_traces = input_traces
@@ -338,8 +401,13 @@ class Fitter(metaclass=abc.ABCMeta):
         # initialization of attributes used later
         self._best_params = None
         self._best_error = None
+        self._best_objective_errors = None
+        self._best_objective_errors_normed = None
+        self._objective_errors = []
+        self._objective_errors_normed = []
         self.optimizer = None
         self.metric = None
+
         if not param_init:
             param_init = {}
         for param, val in param_init.items():
@@ -363,10 +431,12 @@ class Fitter(metaclass=abc.ABCMeta):
                                        level=level+1)
         if hasattr(self, 't_start'):  # OnlineTraceFitter
             namespace['t_start'] = self.t_start
-
-        if self.output_var != 'spikes':
-            namespace['output_var'] = TimedArray(self.output.transpose(),
-                                                 dt=self.dt)
+        counter = 0
+        for o_var, out in zip(self.output_var, self.output):
+            if self.output_var != 'spikes':
+                counter += 1
+                namespace[f'output_var_{counter}'] = TimedArray(out.transpose(),
+                                                                dt=self.dt)
         neurons = self.setup_neuron_group(n_neurons, namespace,
                                           calc_gradient=calc_gradient,
                                           optimize=optimize,
@@ -379,11 +449,9 @@ class Fitter(metaclass=abc.ABCMeta):
 
         record_vars = [v for v in output_var if v != 'spikes']
         if calc_gradient:
-            if not len(output_var) == 1:
-                raise AssertionError('Cannot calculate gradient with multiple '
-                                     'output variables.')
-            record_vars.extend([f'S_{output_var[0]}_{p}'
-                                for p in self.parameter_names])
+            record_vars.extend([f'S_{out_var}_{p}'
+                                for p in self.parameter_names
+                                for out_var in self.output_var])
         if len(record_vars):
             network.add(StateMonitor(neurons, record_vars, record=True,
                                      name='statemonitor', dt=self.dt))
@@ -429,14 +497,53 @@ class Fitter(metaclass=abc.ABCMeta):
                                                         parameters=self.parameter_names,
                                                         optimize=optimize,
                                                         namespace=namespace)
-            neurons = NeuronGroup(n_neurons, model + sensitivity_eqs,
+            # The sensitivity equations only add variables for variables
+            # defined by differential equations. For output variables that
+            # are given by subexpressions, we also add subexpressions to
+            # calculate their sensitivity.
+            sensititivity_subexpressions = Equations('')
+            for output_var in self.output_var:
+                if output_var in neurons.equations.subexpr_names:
+                    subexpr = neurons.equations[output_var]
+                    sympy_expr = str_to_sympy(subexpr.expr.code, variables=neurons.variables)
+                    for parameter in self.parameter_names:
+                        # FIXME: Deal with subexpressions that depend on other
+                        #        subexpressions
+                        parameter_symbol = sympy.Symbol(parameter, real=True)
+                        referred_vars = {var for var in subexpr.identifiers
+                                         if var in model.diff_eq_names}
+                        var_func_derivatives = {}
+                        # Express all referenced variables as functions of the parameters
+                        new_sympy_expr = sympy_expr
+                        for referred_var in referred_vars:
+                            var_symbol = sympy.Symbol(referred_var, real=True)
+                            var_func = sympy.Function(var_symbol)(parameter_symbol)
+                            var_derivative = sympy.Derivative(var_func, parameter_symbol)
+                            var_func_derivatives[var_symbol] = (var_func, var_derivative)
+                            new_sympy_expr = new_sympy_expr.subs(var_symbol, var_func)
+                        # Differentiate the function with respect to the parameter
+                        diffed = sympy.diff(new_sympy_expr, parameter_symbol)
+                        # Replace the functions/derivatives by the correct symbols
+                        for var, (func, derivative) in var_func_derivatives.items():
+                            diffed = diffed.subs({func: var,
+                                                  derivative: sympy.Symbol(f'S_{var}_{parameter}',
+                                                                           real=True)})
+
+                        new_eqs = Equations([SingleEquation(subexpr.type,
+                                                            varname=f'S_{output_var}_{parameter}',
+                                                            dimensions=subexpr.dim/neurons.equations[parameter].dim,
+                                                            var_type=subexpr.var_type,
+                                                            expr=Expression(sympy_to_str(diffed)))])
+                        sensititivity_subexpressions += new_eqs
+            new_model = model + sensitivity_eqs + sensititivity_subexpressions
+            neurons = NeuronGroup(n_neurons, new_model,
                                   threshold=self.threshold, reset=self.reset,
                                   refractory=self.refractory, name=name,
                                   namespace=namespace, dt=self.dt, **kwds)
         if online_error:
             neurons.run_regularly('total_error += ({} - {}_target)**2 * '
-                                  'int(t>=t_start)'.format(self.output_var,
-                                                           self.output_var),
+                                  'int(t>=t_start)'.format(self.output_var[0],
+                                                           self.output_var[0]),
                                   when='end')
 
         return neurons
@@ -486,19 +593,28 @@ class Fitter(metaclass=abc.ABCMeta):
         self.simulator.run(self.duration, d_param, self.parameter_names,
                            iteration=self.iteration)
 
-        errors = self.calc_errors(metric)
+        raw_errors = array(self.calc_errors(metric))
+        errors = sum(raw_errors, axis=0)
 
         if penalty is not None:
             error_penalty = getattr(self.simulator.neurons, penalty + '_')
             if self.use_units:
-                error_dim = metric.get_dimensions(self.output_dim)
+                error_dim = metric[0].get_normalized_dimensions(self.output_dim[0])
+                for one_metric, one_dim in zip(metric[1:], self.output_dim[1:]):
+                    other_dim = one_metric.get_normalized_dimensions(one_dim)
+                    fail_for_dimension_mismatch(error_dim, other_dim,
+                                                error_message='The error terms have mismatching '
+                                                              'units.')
                 penalty_dim = self.simulator.neurons.variables[penalty].dim
                 fail_for_dimension_mismatch(error_dim, penalty_dim,
                                             error_message='The term used as penalty has to have '
                                                           'the same units as the error.')
 
             errors += error_penalty
-
+        self._objective_errors_normed.extend(raw_errors.T.tolist())
+        unnormalized_raw_errors = array([metric.revert_normalization(err)
+                                         for metric, err in zip(metric, raw_errors)]).T.tolist()
+        self._objective_errors.extend(unnormalized_raw_errors)
         optimizer.tell(parameters, errors)
 
         results = optimizer.recommend()
@@ -517,15 +633,18 @@ class Fitter(metaclass=abc.ABCMeta):
         ----------
         optimizer: `~.Optimizer` children
             Child of Optimizer class, specific for each library.
-        metric: `~.Metric` children
-            Child of Metric class, specifies optimization metric
+        metric: `~.Metric`, or dict
+            Child of Metric class, specifies optimization metric. In the case
+            of multiple fitted output variables, can either be a single
+            `~.Metric` that is applied to all variables, or a dictionary with a
+            `~.Metric` for each variable.
         n_rounds: int
             Number of rounds to optimize over (feedback provided over each
             round).
         callback: `str` or `~typing.Callable`
             Either the name of a provided callback function (``text`` or
             ``progressbar``), or a custom feedback function
-            ``func(parameters, errors, best_parameters, best_error, index)``.
+            ``func(parameters, errors, best_parameters, best_error, index, additional_info)``.
             If this function returns ``True`` the fitting execution is
             interrupted.
         restart: bool
@@ -556,15 +675,27 @@ class Fitter(metaclass=abc.ABCMeta):
         error: float
             error value for best parameter set
         """
-        if not (isinstance(metric, Metric) or metric is None):
-            raise TypeError("metric has to be a child of class Metric or None "
-                            "for OnlineTraceFitter")
+        metric = self._verify_metric_argument(metric)
+
+        # Convert metric dictionary to parallel list with output variables
+        metric = [metric[o] if metric is not None else None
+                  for o in self.output_var]
+        for single_metric, output in zip(metric, self.output):
+            if getattr(single_metric, 't_weights', None) is not None:
+                if not single_metric.t_weights.shape == (
+                        output.shape[1],):
+                    raise ValueError(
+                        "The 't_weights' argument of the metric has "
+                        "to be a one-dimensional array of length "
+                        f"{output.shape[1]} but has shape "
+                        f"{single_metric.t_weights.shape}")
 
         if not (isinstance(optimizer, Optimizer) or optimizer is None):
             raise TypeError("optimizer has to be a child of class Optimizer or None")
 
         if self.metric is not None and restart is False:
-            if metric is not self.metric:
+            if (len(metric) != len(self.metric) or
+                    any(m1 is not m2 for m1, m2 in zip(metric, self.metric))):
                 raise Exception("You can not change the metric between fits")
 
         if self.optimizer is not None and restart is False:
@@ -608,39 +739,101 @@ class Fitter(metaclass=abc.ABCMeta):
         # Run Optimization Loop
         for index in range(n_rounds):
             best_params, parameters, errors = self.optimization_iter(optimizer,
-                                                                     metric,
+                                                                     self.metric,
                                                                      penalty)
             self.iteration += 1
-            self._best_error = nanmin(self.optimizer.errors)
+            best_idx = nanargmin(self.optimizer.errors)
+            self._best_error = self.optimizer.errors[best_idx]
+            self._best_objective_errors_normed = tuple(self._objective_errors_normed[best_idx])
+            self._best_objective_errors = tuple(self._objective_errors[best_idx])
             # create output variables
             self._best_params = make_dic(self.parameter_names, best_params)
             if self.use_units:
-                if self.output_var == 'spikes':
-                    output_dim = DIMENSIONLESS
-                else:
-                    output_dim = self.output_dim
-                # Correct the units for the normalization factor
-                error_dim = self.metric.get_normalized_dimensions(output_dim)
+                error_dim = self.metric[0].get_normalized_dimensions(self.output_dim[0])
+                for metric, output_dim in zip(self.metric[1:], self.output_dim[1:]):
+                    # Correct the units for the normalization factor
+                    other_dim = metric.get_normalized_dimensions(output_dim)
+                    fail_for_dimension_mismatch(error_dim, other_dim,
+                                                error_message='The error terms have mismatching '
+                                                              'units.')
                 best_error = Quantity(float(self.best_error), dim=error_dim)
                 errors = Quantity(errors, dim=error_dim)
                 param_dicts = [{p: Quantity(v, dim=self.model[p].dim)
                                 for p, v in zip(self.parameter_names,
                                                 one_param_set)}
                                for one_param_set in parameters]
+                best_raw_error_normed = tuple([Quantity(raw_error_normed,
+                                                        dim=metric.get_normalized_dimensions(output_dim))
+                                               for raw_error_normed, metric, output_dim
+                                               in zip(self._best_objective_errors_normed,
+                                                      self.metric,
+                                                      self.output_dim)])
+                best_raw_error = tuple([Quantity(raw_error,
+                                                 dim=metric.get_dimensions(output_dim))
+                                        for raw_error, metric, output_dim
+                                        in zip(self._best_objective_errors,
+                                               self.metric,
+                                               self.output_dim)])
             else:
                 param_dicts = [{p: v for p, v in zip(self.parameter_names,
                                                      one_param_set)}
                                for one_param_set in parameters]
                 best_error = self.best_error
+                best_raw_error = self._best_objective_errors
+                best_raw_error_normed = self._best_objective_errors_normed
+
+            additional_info = {'objective_errors': best_raw_error,
+                               'objective_errors_normalized': best_raw_error_normed,
+                               'output_var': self.output_var}
 
             if callback(param_dicts,
                         errors,
                         self.best_params,
                         best_error,
-                        index) is True:
+                        index,
+                        additional_info) is True:
                 break
 
         return self.best_params, self.best_error
+
+    def _verify_metric_argument(self, metric, metric_class=Metric):
+        if isinstance(metric, Metric):
+            metric = {varname: metric
+                      for varname in self.output_var}
+        elif isinstance(metric, Sequence):
+            logger.warn('Using a list of metrics is deprecated, use a '
+                        'dictionary instead.',
+                        name_suffix='deprecated_metric_list')
+            if not len(metric) == len(self.output_var):
+                raise TypeError('List of metrics needs to have as many '
+                                'elements as output variables.')
+            metric = {o : m for m, o in zip(metric, self.output_var)}
+
+        if isinstance(metric, Mapping):
+            for o, m in metric.items():
+                if o not in self.output_var:
+                    raise ValueError(f"Metric key '{o}' does not correspond to "
+                                     f"an output variable name.")
+                    if not isinstance(m, Metric):
+                        raise TypeError("metric has to be a child of class "
+                                        "Metric.")
+                if not isinstance(m, metric_class):
+                    raise TypeError(f"metric has to be a child of class "
+                                    f"'{metric_class.__name__}' but is a "
+                                    f"'{type(m).__name__}'.")
+            for o in self.output_var:
+                if not o in metric:
+                    raise ValueError(f"Output variable '{o}' does not have a "
+                                     f"corresponding entry in the metric "
+                                     f"dictionary.")
+        elif metric is not None:
+            if not isinstance(metric, Mapping):
+                raise TypeError('Metric has to be a Metric instance, or a'
+                                'dictionary mapping output variable names to '
+                                'Metric instances. Use None for'
+                                'OnlineTraceFitter.')
+
+        return metric
 
     @property
     def best_params(self):
@@ -658,10 +851,39 @@ class Fitter(metaclass=abc.ABCMeta):
         if self._best_error is None:
             return None
         if self.use_units:
-            error_dim = self.metric.get_dimensions(self.output_dim)
+            error_dim = self.metric[0].get_normalized_dimensions(self.output_dim[0])
+            # We assume that the error units have already been checked to
+            # be consistent at this point
             return Quantity(self._best_error, dim=error_dim)
         else:
             return self._best_error
+
+    @property
+    def best_objective_errors(self):
+        if self._best_objective_errors is None:
+            return None
+        if self.use_units:
+            return {output_var: Quantity(raw_error, dim=metric.get_dimensions(output_dim))
+                    for output_var, raw_error, metric, output_dim in
+                    zip(self.output_var, self._best_objective_errors, self.metric, self.output_dim)}
+        else:
+            return {output_var: raw_error
+                    for output_var, raw_error
+                    in zip(self.output_var, self._best_objective_errors)}
+
+    @property
+    def best_objective_errors_normalized(self):
+        if self._best_objective_errors_normed is None:
+            return None
+        if self.use_units:
+            return {output_var: Quantity(raw_error_normed,
+                                         dim=metric.get_normalized_dimensions(output_dim))
+                    for output_var, raw_error_normed, metric, output_dim in
+                    zip(self.output_var, self._best_objective_errors_normed, self.metric, self.output_dim)}
+        else:
+            return {output_var: raw_error
+                    for output_var, raw_error
+                    in zip(self.output_var, self._best_objective_errors_normed)}
 
     def results(self, format='list', use_units=None):
         """
@@ -693,9 +915,23 @@ class Fitter(metaclass=abc.ABCMeta):
         params = params.reshape(-1, params.shape[-1])
 
         if use_units:
-            error_dim = self.metric.get_dimensions(self.output_dim)
+            error_dim = self.metric[0].get_dimensions(self.output_dim[0])
             errors = Quantity(array(self.optimizer.errors).flatten(),
                               dim=error_dim)
+            if len(self.output_var) > 1:
+                # Add additional information for the raw errors
+                raw_errors_normed = {output_var: Quantity([raw_error_normed[idx]
+                                                           for raw_error_normed in self._objective_errors_normed],
+                                                          dim=metric.get_normalized_dimensions(output_dim))
+                                     for idx, (output_var, metric, output_dim)
+                                     in enumerate(zip(self.output_var, self.metric, self.output_dim))
+                                     }
+                raw_errors = {output_var: Quantity([raw_error[idx]
+                                                    for raw_error in self._objective_errors],
+                                                   dim=metric.get_dimensions(output_dim))
+                              for idx, (output_var, metric, output_dim)
+                              in enumerate(zip(self.output_var, self.metric, self.output_dim))
+                              }
         else:
             errors = array(array(self.optimizer.errors).flatten())
 
@@ -713,6 +949,17 @@ class Fitter(metaclass=abc.ABCMeta):
                     else:
                         res_dict[n] = float(temp_data[i])
                 res_dict['error'] = errors[j]
+                if len(self.output_var) > 1:
+                    if use_units:
+                        res_dict['objective_errors_normalized'] = {output_var: raw_errors_normed[output_var][j]
+                                                                   for output_var in self.output_var}
+                        res_dict['objective_errors'] = {output_var: raw_errors[output_var][j]
+                                                        for output_var in self.output_var}
+                    else:
+                        res_dict['objective_errors_normalized'] = {output_var: self._objective_errors_normed[j][idx]
+                                                               for idx, output_var in enumerate(self.output_var)}
+                        res_dict['objective_errors'] = {output_var: self._objective_errors[j][idx]
+                                                        for idx, output_var in enumerate(self.output_var)}
                 res_list.append(res_dict)
 
             return res_list
@@ -726,6 +973,19 @@ class Fitter(metaclass=abc.ABCMeta):
                     res_dict[n] = array(params[:, i])
 
             res_dict['error'] = errors
+            if len(self.output_var) > 1:
+                if use_units:
+                    res_dict['objective_errors_normalized'] = {output_var: raw_errors_normed[output_var]
+                                                               for output_var in self.output_var}
+                    res_dict['objective_errors'] = {output_var: raw_errors[output_var]
+                                                    for output_var in self.output_var}
+                else:
+                    res_dict['objective_errors_normalized'] = {output_var: array([raw_error_normed[idx]
+                                                                                  for raw_error_normed in self._objective_errors_normed])
+                                                               for idx, output_var in enumerate(self.output_var)}
+                    res_dict['objective_errors'] = {output_var: array([raw_error[idx]
+                                                                       for raw_error in self._objective_errors])
+                                                    for idx, output_var in enumerate(self.output_var)}
             return res_dict
 
         elif format == 'dataframe':
@@ -735,7 +995,15 @@ class Fitter(metaclass=abc.ABCMeta):
                             'Specify "use_units=False" to avoid this warning.',
                             name_suffix='dataframe_units')
             data = concatenate((params, array(errors)[None, :].transpose()), axis=1)
-            return DataFrame(data=data, columns=names + ['error'])
+            columns = names + ['error']
+            if len(self.output_var) > 1:
+                data = concatenate((data, self._objective_errors_normed), axis=1)
+                columns += [f'normalized_error_{output_var}'
+                            for output_var in self.output_var]
+                data = concatenate((data, self._objective_errors), axis=1)
+                columns += [f'error_{output_var}'
+                            for output_var in self.output_var]
+            return DataFrame(data=data, columns=columns)
 
     def generate(self, output_var=None, params=None, param_init=None,
                  iteration=1e9, level=0):
@@ -782,7 +1050,8 @@ class Fitter(metaclass=abc.ABCMeta):
             self.param_init.update(param_init)
         if output_var is None:
             output_var = self.output_var
-
+        elif isinstance(output_var, str):
+            output_var = [output_var]
         self.simulator = self.setup_simulator('generate', self.n_traces,
                                               output_var=output_var,
                                               param_init=param_init,
@@ -792,10 +1061,10 @@ class Fitter(metaclass=abc.ABCMeta):
         self.simulator.run(self.duration, param_dic, self.parameter_names,
                            iteration=iteration, name='generate')
 
-        if not isinstance(output_var, str):
+        if len(output_var) > 1:
             fits = {name: self._simulation_result(name) for name in output_var}
         else:
-            fits = self._simulation_result(output_var)
+            fits = self._simulation_result(output_var[0])
 
         return fits
 
@@ -831,55 +1100,52 @@ class TraceFitter(Fitter):
         arguments or in the returned parameter dictionary and errors. Defaults
         to ``True``.
     """
-    def __init__(self, model, input_var, input, output_var, output, dt,
-                 n_samples=30, method=None, reset=None, refractory=False,
+    def __init__(self, model, input, output, dt,
+                 n_samples=60, input_var=None, output_var=None,
+                 method=None, reset=None, refractory=False,
                  threshold=None, param_init=None, penalty=None, use_units=True):
-        super().__init__(dt, model, input, output, input_var, output_var,
-                         n_samples, threshold, reset, refractory, method,
-                         param_init, penalty=penalty, use_units=use_units)
-        self.output = Quantity(output)
-        self.output_ = array(output)
+        super().__init__(dt=dt, model=model, input=input, output=output,
+                         input_var=input_var, output_var=output_var,
+                         n_samples=n_samples, threshold=threshold, reset=reset,
+                         refractory=refractory, method=method,
+                         param_init=param_init, penalty=penalty,
+                         use_units=use_units)
+        for o in self.output:
+            if o.shape != self.input.shape:
+                raise ValueError("Input and output must have the same size")
         # We store the bounds set in TraceFitter.fit, so that Tracefitter.refine
         # can reuse them
         self.bounds = None
-
-        if output_var not in self.model.names:
-            raise NameError("%s is not a model variable" % output_var)
-        if output.shape != input.shape:
-            raise ValueError("Input and output must have the same size")
 
     def calc_errors(self, metric):
         """
         Returns errors after simulation with StateMonitor.
         To be used inside `optim_iter`.
         """
-        traces = getattr(self.simulator.networks['fit']['statemonitor'],
-                         self.output_var+'_')
-        # Reshape traces for easier calculation of error
-        traces = reshape(traces, (traces.shape[0]//self.n_traces,
-                                  self.n_traces,
-                                  -1))
-        errors = metric.calc(traces, self.output_, self.dt)
-        return errors
+        all_errors = []
+        for m, o_var, o in zip(metric, self.output_var, self.output_):
+            traces = getattr(self.simulator.networks['fit']['statemonitor'],
+                             o_var+'_')
+            # Reshape traces for easier calculation of error
+            traces = reshape(traces, (traces.shape[0]//self.n_traces,
+                                      self.n_traces,
+                                      -1))
+            errors = m.calc(traces, o, self.dt)
+            all_errors.append(errors)
+        return all_errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
             restart=False, start_iteration=None, penalty=None,
             level=0, **params):
+        self.bounds = dict(params)
         if metric is None:
             metric = MSEMetric()
-
-        if not isinstance(metric, TraceMetric):
-            raise TypeError("You can only use TraceMetric child metric with "
-                            "TraceFitter")
-        if metric.t_weights is not None:
-            if not metric.t_weights.shape == (self.output.shape[1], ):
-                raise ValueError("The 't_weights' argument of the metric has "
-                                 "to be a one-dimensional array of length "
-                                 f"{self.output.shape[1]} but has shape "
-                                 f"{metric.t_weights.shape}")
-        self.bounds = dict(params)
-        best_params, error = super().fit(optimizer, metric, n_rounds,
-                                         callback, restart,
+        metric = self._verify_metric_argument(metric, metric_class=TraceMetric)
+        best_params, error = super().fit(optimizer=optimizer,
+                                         metric=metric,
+                                         n_rounds=n_rounds,
+                                         callback=callback,
+                                         restart=restart,
                                          start_iteration=start_iteration,
                                          penalty=penalty,
                                          level=level+1,
@@ -925,7 +1191,7 @@ class TraceFitter(Fitter):
             as the regions with 1s. Using instead values of 0.5 and 1 would have
             the same effect. Cannot be combined with ``t_start``. If not set, will
             reuse the `t_weights` value from the previously used metric.
-        normalization : float, optional
+        normalization : float or array-like of float, optional
             A normalization term that will be used rescale results before
             handing them to the optimization algorithm. Can be useful if the
             algorithm makes assumptions about the scale of errors, e.g. if the
@@ -1001,9 +1267,13 @@ class TraceFitter(Fitter):
         if t_weights is not None:
             t_weights = normalize_weights(t_weights)
         elif t_start is None:
-            t_weights = getattr(self.metric, 't_weights', None)
+            if self.metric is not None:
+                t_weights = getattr(self.metric[0], 't_weights', None)
             if t_weights is None:
-                t_start = getattr(self.metric, 't_start', 0*second)
+                if self.metric is not None:
+                    t_start = getattr(self.metric[0], 't_start', 0*second)
+                else:
+                    t_start = 0*second
             else:
                 t_start = None
 
@@ -1011,9 +1281,15 @@ class TraceFitter(Fitter):
             raise ValueError("Cannot use both 't_weights' and 't_start'.")
 
         if normalization is None:
-            normalization = getattr(self.metric, 'normalization', 1.)
+            if self.metric is not None:
+                normalization = [getattr(metric, 'normalization', 1.)
+                                 for metric in self.metric]
+            else:
+                normalization = [1.] * len(self.output_var)
         else:
-            normalization = 1/normalization
+            if not isinstance(normalization, Sequence):
+                normalization = [normalization] * len(self.output_var)
+            normalization = [1.0/n for n in normalization]
 
         callback_func = callback_setup(callback, None)
 
@@ -1039,6 +1315,8 @@ class TraceFitter(Fitter):
 
         if t_weights is None:
             t_start_steps = int(round(t_start / self.dt))
+        else:
+            t_start_steps = 0
 
         def _calc_error(params):
             param_dic = get_param_dic([params[p] for p in self.parameter_names],
@@ -1046,47 +1324,87 @@ class TraceFitter(Fitter):
             self.simulator.run(self.duration, param_dic,
                                self.parameter_names, iteration=iteration,
                                name='refine')
-            trace = getattr(self.simulator.statemonitor, self.output_var+'_')
-            if t_weights is None:
-                residual = trace[:, t_start_steps:] - self.output_[:, t_start_steps:]
-            else:
-                residual = (trace - self.output_) * sqrt(t_weights)
-            return residual.flatten() * normalization
+            one_residual = []
+
+            for out_var, out, norm in zip(self.output_var,
+                                          self.output_,
+                                          normalization):
+                trace = getattr(self.simulator.statemonitor, out_var+'_')
+                if t_weights is None:
+                    residual = trace[:, t_start_steps:] - out[:, t_start_steps:]
+                else:
+                    residual = (trace - out) * sqrt(t_weights)
+                one_residual.append(residual*norm)
+            return array(one_residual).flatten()
 
         def _calc_gradient(params):
             residuals = []
             for name in self.parameter_names:
-                trace = getattr(self.simulator.statemonitor,
-                                f'S_{self.output_var}_{name}_')
-                if t_weights is None:
-                    residual = trace[:, t_start_steps:]
-                else:
-                    residual = trace * sqrt(t_weights)
-                residuals.append(residual.flatten() * normalization)
+                one_residual = []
+                for out_var, norm in zip(self.output_var, normalization):
+                    trace = getattr(self.simulator.statemonitor,
+                                    f'S_{out_var}_{name}_')
+                    if t_weights is None:
+                        residual = trace[:, t_start_steps:]
+                    else:
+                        residual = trace * sqrt(t_weights)
+                    one_residual.append(residual*norm)
+                residuals.append(array(one_residual).flatten())
             gradient = array(residuals)
             return gradient.T
 
         tested_parameters = []
         errors = []
+        combined_errors = []
         def _callback_wrapper(params, iter, resid, *args, **kwds):
-            error = mean(resid**2)
+            # TODO: Assumes all the outputs have the same size
+            output_len = self.output[0][:, t_start_steps:].size
+            error = tuple([mean(resid[idx*output_len:(idx + 1)*output_len]**2)
+                           for idx in range(len(self.output_var))])
+            combined_error = sum(array(error))
             errors.append(error)
+            combined_errors.append(combined_error)
+            best_idx = argmin(combined_errors)
+
             if self.use_units:
-                error_dim = self.output_dim**2 * get_dimensions(normalization)**2
-                all_errors = Quantity(errors, dim=error_dim)
+                norm_dim = get_dimensions(normalization[0])**2
+                error_dim = self.output_dim[0]**2*norm_dim
+                for output_dim, norm in zip(self.output_dim[1:], normalization[1:]):
+                    norm_dim = get_dimensions(norm)**2
+                    other_dim = output_dim**2*norm_dim
+                    fail_for_dimension_mismatch(error_dim, other_dim,
+                                                error_message='The error terms have mismatching '
+                                                              'units.')
+                all_errors = Quantity(combined_errors, dim=error_dim)
                 params = {p: Quantity(val, dim=self.model[p].dim)
                           for p, val in params.items()}
+                best_raw_error_normed = tuple([Quantity(raw_error,
+                                                        dim=output_dim**2*get_dimensions(norm)**2)
+                                               for raw_error, output_dim, norm
+                                               in zip(errors[best_idx],
+                                                      self.output_dim,
+                                                      normalization)])
+                best_raw_error = tuple([Quantity(raw_error / norm**2,
+                                                 dim=output_dim**2)
+                                        for raw_error, output_dim, norm
+                                        in zip(errors[best_idx],
+                                               self.output_dim,
+                                               normalization)])
             else:
-                all_errors = array(errors)
+                all_errors = array(combined_errors)
                 params = {p: float(val) for p, val in params.items()}
+                best_raw_error_normed = errors[best_idx]
+                best_raw_error = [err / norm**2
+                                  for norm, err in zip(errors[best_idx], normalization)]
             tested_parameters.append(params)
 
-            best_idx = argmin(errors)
             best_error = all_errors[best_idx]
             best_params = tested_parameters[best_idx]
-
-            return callback_func(params, all_errors,
-                                 best_params, best_error, iter)
+            additional_info = {'objective_errors': best_raw_error,
+                               'objective_errors_normalized': best_raw_error_normed,
+                               'output_var': self.output_var}
+            return callback_func(params, errors,
+                                 best_params, best_error, iter, additional_info)
 
         assert 'Dfun' not in kwds
         if calc_gradient:
@@ -1104,6 +1422,19 @@ class TraceFitter(Fitter):
             iter_cb = kwds.pop('iter_cb')
         else:
             iter_cb = _callback_wrapper
+
+        # Translate arguments for newer lmfit versions
+        if LooseVersion(lmfit.__version__) >= '1.0.1':
+            max_nfev = kwds.pop('max_nfev', None)
+            args = ['maxfev', 'maxiter']
+            for arg in args:
+                if arg in kwds:
+                    if max_nfev is not None:
+                        raise ValueError('Only specifiy a single \'max_nfev\' argument.')
+                    max_nfev = kwds.pop(arg)
+            if max_nfev:
+                kwds['max_nfev'] = max_nfev
+
         result = lmfit.minimize(_calc_error, parameters,
                                 iter_cb=iter_cb,
                                 **kwds)
@@ -1126,10 +1457,12 @@ class SpikeFitter(Fitter):
         """Initialize the fitter."""
         if method is None:
             method = 'exponential_euler'
-        super().__init__(dt, model, input, output, input_var, 'spikes',
-                         n_samples, threshold, reset, refractory, method,
-                         param_init, penalty=penalty,
-                         use_units=use_units)
+        super().__init__(dt, model, input=input, output=output,
+                         input_var=input_var, output_var=['spikes'],
+                         n_samples=n_samples, threshold=threshold,
+                         reset=reset, refractory=refractory,
+                         method=method, param_init=param_init,
+                         penalty=penalty, use_units=use_units)
         self.output = [Quantity(o) for o in output]
         self.output_ = [array(o) for o in output]
 
@@ -1149,20 +1482,21 @@ class SpikeFitter(Fitter):
         """
         spikes = get_spikes(self.simulator.networks['fit']['spikemonitor'],
                             self.n_samples, self.n_traces)
-        errors = metric.calc(spikes, self.output, self.dt)
+        assert len(metric) == 1
+        errors = [metric[0].calc(spikes, self.output, self.dt)]
         return errors
 
     def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
             restart=False, start_iteration=None, penalty=None,
             level=0, **params):
         if metric is None:
-            metric = GammaFactor(delta=2*ms, time=self.duration) 
-
-        if not isinstance(metric, SpikeMetric):
-            raise TypeError("You can only use SpikeMetric child metric with "
-                            "SpikeFitter")
-        best_params, error = super().fit(optimizer, metric, n_rounds,
-                                         callback, restart,
+            metric = GammaFactor(delta=2*ms, time=self.duration)
+        metric = self._verify_metric_argument(metric, metric_class=SpikeMetric)
+        best_params, error = super().fit(optimizer=optimizer,
+                                         metric=metric,
+                                         n_rounds=n_rounds,
+                                         callback=callback,
+                                         restart=restart,
                                          start_iteration=start_iteration,
                                          penalty=penalty,
                                          level=level+1,
@@ -1183,12 +1517,14 @@ class OnlineTraceFitter(Fitter):
                  threshold=None, param_init=None,
                  t_start=0*second, penalty=None):
         """Initialize the fitter."""
-        super().__init__(dt, model, input, output, input_var, output_var,
-                         n_samples, threshold, reset, refractory, method,
-                         param_init, penalty=penalty)
+        super().__init__(dt, model, input=input, output=output,
+                         input_var=input_var, output_var=output_var,
+                         n_samples=n_samples, threshold=threshold,
+                         reset=reset, refractory=refractory, method=method,
+                         param_init=param_init, penalty=penalty)
 
-        self.output = Quantity(output)
-        self.output_ = array(output)
+        self.output = [Quantity(output)]
+        self.output_ = [array(output)]
 
         if output_var not in self.model.names:
             raise NameError("%s is not a model variable" % output_var)
@@ -1196,8 +1532,8 @@ class OnlineTraceFitter(Fitter):
             raise ValueError("Input and output must have the same size")
 
         # Replace input variable by TimedArray
-        output_traces = TimedArray(output.transpose(), dt=dt)
-        output_dim = get_dimensions(output)
+        output_traces = TimedArray(self.output[0].transpose(), dt=dt)
+        output_dim = get_dimensions(self.output[0])
         squared_output_dim = ('1' if output_dim is DIMENSIONLESS
                               else repr(output_dim**2))
         error_eqs = Equations('total_error : {}'.format(squared_output_dim))
@@ -1232,7 +1568,7 @@ class OnlineTraceFitter(Fitter):
         """Calculates error in online fashion.To be used inside optim_iter."""
         errors = self.simulator.neurons.total_error/int((self.duration-self.t_start)/defaultclock.dt)
         errors = mean(errors.reshape((self.n_samples, self.n_traces)), axis=1)
-        return array(errors)
+        return [array(errors)]
 
     def generate_traces(self, params=None, param_init=None, level=0):
         """Generates traces for best fit of parameters and all inputs"""

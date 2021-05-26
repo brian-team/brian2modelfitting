@@ -131,7 +131,7 @@ def test_spikefitter_fit(setup):
     for attr in attr_fit:
         assert hasattr(sf, attr)
 
-    assert isinstance(sf.metric, Metric)
+    assert len(sf.metric) == 1 and isinstance(sf.metric[0], Metric)
     assert isinstance(sf.optimizer, Optimizer)
 
     assert isinstance(results, dict)
@@ -191,7 +191,8 @@ def test_spikefitter_fit_default_metric(setup):
     attr_fit = ['optimizer', 'metric', 'best_params']
     for attr in attr_fit:
         assert hasattr(sf, attr)
-    assert isinstance(sf.metric, GammaFactor) #default spike metric
+    assert len(sf.metric) == 1 and isinstance(sf.metric[0],
+                                              GammaFactor) #default spike metric
     assert isinstance(sf.simulator, Simulator)
 
     assert_equal(results, sf.best_params)
