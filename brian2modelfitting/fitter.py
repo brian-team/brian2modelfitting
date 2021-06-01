@@ -1087,11 +1087,7 @@ SCALAR_METHODS_GRADIENT_SUPPORT = {
     'l-bfgsb': ('L-BFGS-B', True, False),
     'tnc': ('TNC', True, False),
     'cobyla': ('COBYLA', False, False),
-    'slsqp': ('SLSQP', True, False),
-    'dogleg': ('dogleg', True, False),
-    'trust-ncg': ('trust-ncg', True, False),
-    'trust-exact': ('trust-exact', True, False),
-    'trust-krylov': ('trust-krylov', True, False)
+    'slsqp': ('SLSQP', True, False)
 }
 
 class TraceFitter(Fitter):
