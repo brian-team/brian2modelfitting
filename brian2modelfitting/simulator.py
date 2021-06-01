@@ -1,5 +1,7 @@
 import os
 import abc
+
+import numpy as np
 from numpy import atleast_1d
 from brian2 import device, Network
 
@@ -55,6 +57,7 @@ class Simulator(metaclass=abc.ABCMeta):
         self.networks = {}
         self.current_net = None
         self.var_init = None
+        self._last_parameters = None
 
     neurons = property(lambda self: self.networks[self.current_net]['neurons'])
     statemonitor = property(lambda self: self.networks[self.current_net]['statemonitor'])
@@ -101,8 +104,13 @@ class Simulator(metaclass=abc.ABCMeta):
         params_names: list[str]
             names of parameters to set the dictionary
         """
-        pass
+        self._last_parameters = dict(params)
 
+    def parameters_unchanged(self, params):
+        if self._last_parameters is None:
+            return False
+        return all(np.array_equal(params[p], self._last_parameters[p])
+                   for p in params)
 
 class RuntimeSimulator(Simulator):
     """Simulation class created for use with RuntimeDevice"""
@@ -111,6 +119,8 @@ class RuntimeSimulator(Simulator):
         network.store()
 
     def run(self, duration, params, params_names, iteration, name='fit'):
+        super(RuntimeSimulator, self).run(duration, params, params_names,
+                                          iteration, name)
         self.current_net = name
         network = self.networks[name]
         network.restore()
@@ -135,6 +145,8 @@ class CPPStandaloneSimulator(Simulator):
         Simulation has to be run in two stages in order to initialize the
         code generation
         """
+        super(CPPStandaloneSimulator, self).run(duration, params, params_names,
+                                                iteration, name)
         self.current_net = name
         network = self.networks[name]
         # Include the iteration index in the parameters

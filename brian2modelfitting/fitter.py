@@ -1337,9 +1337,10 @@ class TraceFitter(Fitter):
                                           self.parameter_names, self.n_traces, 1)
             except IndexError:
                 param_dic = get_param_dic(params, self.parameter_names, self.n_traces, 1)
-            self.simulator.run(self.duration, param_dic,
-                               self.parameter_names, iteration=iteration,
-                               name='refine')
+            if not self.simulator.parameters_unchanged(param_dic):
+                self.simulator.run(self.duration, param_dic,
+                                   self.parameter_names, iteration=iteration,
+                                   name='refine')
             one_residual = []
 
             for out_var, out, norm in zip(self.output_var,
@@ -1359,6 +1360,15 @@ class TraceFitter(Fitter):
             return error
 
         def _calc_gradient(params):
+            try:
+                param_dic = get_param_dic([params[p] for p in self.parameter_names],
+                                          self.parameter_names, self.n_traces, 1)
+            except IndexError:
+                param_dic = get_param_dic(params, self.parameter_names, self.n_traces, 1)
+            if not self.simulator.parameters_unchanged(param_dic):
+                self.simulator.run(self.duration, param_dic,
+                                   self.parameter_names, iteration=iteration,
+                                   name='refine')
             residuals = []
             for name in self.parameter_names:
                 one_residual = []
@@ -1375,6 +1385,15 @@ class TraceFitter(Fitter):
             return gradient.T
 
         def _calc_gradient_scalar(params):
+            try:
+                param_dic = get_param_dic([params[p] for p in self.parameter_names],
+                                          self.parameter_names, self.n_traces, 1)
+            except IndexError:
+                param_dic = get_param_dic(params, self.parameter_names, self.n_traces, 1)
+            if not self.simulator.parameters_unchanged(param_dic):
+                self.simulator.run(self.duration, param_dic,
+                                   self.parameter_names, iteration=iteration,
+                                   name='refine')
             residuals = []
             for name in self.parameter_names:
                 one_residual = []
@@ -1458,9 +1477,12 @@ class TraceFitter(Fitter):
                                  f"gradient function, use calc_gradient=True.")
             if calc_gradient:
                 kwds.update({'jac': _calc_gradient_scalar})
-        elif method in ['leastsq', 'least_squares']:
+        elif method == 'leastsq':
             if calc_gradient:
                 kwds.update({'Dfun': _calc_gradient})
+        elif method == 'least_squares':
+            if calc_gradient:
+                raise ValueError()
         else:
             methods = ["'leastsq'", "'least_squares'"]
             for m, (long_name, _, _) in SCALAR_METHODS_GRADIENT_SUPPORT.items():
