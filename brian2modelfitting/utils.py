@@ -1,5 +1,3 @@
-from types import FunctionType
-
 from brian2 import have_same_dimensions
 from brian2.units.fundamentalunits import Quantity
 from tqdm.autonotebook import tqdm
@@ -72,7 +70,7 @@ class ProgressBar(object):
 def callback_setup(set_type, n_rounds):
     """
     Helper function for callback setup in Fitter, loads option:
-    'text', 'progressbar' or custion FunctionType
+    'text', 'progressbar' or custom callable
     """
     if set_type == 'text':
         callback = callback_text
@@ -80,7 +78,7 @@ def callback_setup(set_type, n_rounds):
         callback = ProgressBar(n_rounds)
     elif set_type is None:
         callback = callback_none
-    elif type(set_type) is FunctionType:
+    elif callable(set_type):
         callback = set_type
     else:
         raise TypeError("callback has to be a str ('text' or 'progressbar'), "
