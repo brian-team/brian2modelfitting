@@ -6,7 +6,7 @@ from brian2modelfitting.fitter import SCALAR_METHODS_GRADIENT_SUPPORT as METHODS
 METHODS['least_squares'] = ('least_squares', True, False)
 METHODS['leastsq'] = ('leastsq', True, False)
 
-with open('results_normalization.pickle', 'rb') as f:
+with open('results.pickle', 'rb') as f:
     results = pickle.load(f)
 
 fig, axs1 = plt.subplots(3, 4, sharey=True, sharex=True)

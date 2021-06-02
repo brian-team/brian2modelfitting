@@ -70,28 +70,23 @@ for method, (_, supports_grad, needs_grad) in METHODS.items():
             continue
         store_results = StoreResults()
         for idx, (start_p1, start_p2) in enumerate(start_p):
-            ## Fitting
-            metric_x1 = MSEMetric(normalization=10)
-            metric_x2 = MSEMetric(normalization=1)
             fitter = TraceFitter(model=eqs, input={'I': inp_ar.T},
                                  output={'x1': ground_truth_x1,
                                          'x2': ground_truth_x2},
                                  dt=dt, n_samples=60,
                                  method='euler')
-            fitter.fit(n_rounds=0, optimizer=NevergradOptimizer(),
-                       metric={'x1': metric_x1, 'x2': metric_x2},
-                       p1=[0, 10], p2=[0, 10])
             try:
                 refined_params, _ = fitter.refine(params={'p1': start_p1, 'p2': start_p1},
                                                   calc_gradient=calc_gradient,
                                                   method=method,
                                                   max_nfev=100,
-                                                  callback=store_results)
+                                                  callback=store_results,
+                                                  p1=[0, 10], p2=[0, 10])
             except Exception as ex:
                 print(ex)
             finally:
                 full_results[method, calc_gradient].append(store_results.results())
 
 import pickle
-with open('results_normalization.pickle', 'wb') as f:
+with open('results.pickle', 'wb') as f:
     pickle.dump(full_results, f)
