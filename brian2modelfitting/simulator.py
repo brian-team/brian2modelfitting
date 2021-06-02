@@ -105,11 +105,12 @@ class Simulator(metaclass=abc.ABCMeta):
             names of parameters to set the dictionary
         """
         self._last_parameters = dict(params)
+        self.current_net = name
 
-    def parameters_unchanged(self, params):
-        if self._last_parameters is None:
-            return False
-        return all(np.array_equal(params[p], self._last_parameters[p])
+    def needs_run(self, params, name):
+        if self._last_parameters is None or self.current_net != name:
+            return True
+        return any(not np.array_equal(params[p], self._last_parameters[p])
                    for p in params)
 
 class RuntimeSimulator(Simulator):
@@ -119,9 +120,10 @@ class RuntimeSimulator(Simulator):
         network.store()
 
     def run(self, duration, params, params_names, iteration, name='fit'):
+        if not self.needs_run(params, name):
+            return
         super(RuntimeSimulator, self).run(duration, params, params_names,
                                           iteration, name)
-        self.current_net = name
         network = self.networks[name]
         network.restore()
         self.neurons.set_states(params, units=False)
@@ -145,9 +147,10 @@ class CPPStandaloneSimulator(Simulator):
         Simulation has to be run in two stages in order to initialize the
         code generation
         """
+        if not self.needs_run(params, name):
+            return
         super(CPPStandaloneSimulator, self).run(duration, params, params_names,
                                                 iteration, name)
-        self.current_net = name
         network = self.networks[name]
         # Include the iteration index in the parameters
         params_names = sorted(params_names) + ['iteration']

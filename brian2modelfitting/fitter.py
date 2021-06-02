@@ -1337,10 +1337,11 @@ class TraceFitter(Fitter):
                                           self.parameter_names, self.n_traces, 1)
             except IndexError:
                 param_dic = get_param_dic(params, self.parameter_names, self.n_traces, 1)
-            if not self.simulator.parameters_unchanged(param_dic):
-                self.simulator.run(self.duration, param_dic,
-                                   self.parameter_names, iteration=iteration,
-                                   name='refine')
+            # Note that this only actually runs the simulation if it hasn't
+            # already been run for _calc_gradient
+            self.simulator.run(self.duration, param_dic,
+                               self.parameter_names, iteration=iteration,
+                               name='refine')
             one_residual = []
 
             for out_var, out, norm in zip(self.output_var,
@@ -1365,10 +1366,11 @@ class TraceFitter(Fitter):
                                           self.parameter_names, self.n_traces, 1)
             except IndexError:
                 param_dic = get_param_dic(params, self.parameter_names, self.n_traces, 1)
-            if not self.simulator.parameters_unchanged(param_dic):
-                self.simulator.run(self.duration, param_dic,
-                                   self.parameter_names, iteration=iteration,
-                                   name='refine')
+            # Note that this only actually runs the simulation if it hasn't
+            # already been run for _calc_residual
+            self.simulator.run(self.duration, param_dic,
+                               self.parameter_names, iteration=iteration,
+                               name='refine')
             residuals = []
             for name in self.parameter_names:
                 one_residual = []
@@ -1385,29 +1387,8 @@ class TraceFitter(Fitter):
             return gradient.T
 
         def _calc_gradient_scalar(params):
-            try:
-                param_dic = get_param_dic([params[p] for p in self.parameter_names],
-                                          self.parameter_names, self.n_traces, 1)
-            except IndexError:
-                param_dic = get_param_dic(params, self.parameter_names, self.n_traces, 1)
-            if not self.simulator.parameters_unchanged(param_dic):
-                self.simulator.run(self.duration, param_dic,
-                                   self.parameter_names, iteration=iteration,
-                                   name='refine')
-            residuals = []
-            for name in self.parameter_names:
-                one_residual = []
-                for out_var, norm in zip(self.output_var, normalization):
-                    trace = getattr(self.simulator.statemonitor,
-                                    f'S_{out_var}_{name}_')
-                    if t_weights is None:
-                        residual = trace[:, t_start_steps:]
-                    else:
-                        residual = trace * sqrt(t_weights)
-                    one_residual.append(residual*norm)
-                residuals.append(array(one_residual).flatten())
-            gradient = array(residuals)
-            scalar_gradient = 2*sum(gradient*_calc_residual(params), axis=1)
+            gradient = _calc_gradient(params)
+            scalar_gradient = 2*sum(gradient.T*_calc_residual(params), axis=1)
             return scalar_gradient
 
         tested_parameters = []
