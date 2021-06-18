@@ -9,10 +9,11 @@ from brian2.devices.device import get_device, device
 from brian2.equations.equations import Equations
 from brian2.groups.neurongroup import NeuronGroup
 from brian2.input.timedarray import TimedArray
-from brian2.monitors.spikemonitor import SpikeMonitor
 from brian2.monitors.statemonitor import StateMonitor
 from brian2.units.allunits import *  # all physical units
-from brian2.units.fundamentalunits import (DIMENSIONLESS, get_dimensions,
+from brian2.units.fundamentalunits import (DIMENSIONLESS,
+                                           fail_for_dimension_mismatch,
+                                           get_dimensions,
                                            Quantity)
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,7 +26,7 @@ import torch
 from .simulator import RuntimeSimulator, CPPStandaloneSimulator
 
 
-def setup_simulator():
+def configure_simulator():
     """Return the configured simulator, which can be either
     `RuntimeSimulator`, object for use with `RuntimeDevice`, or
     `CPPStandaloneSimulator`, object for use with `CPPStandaloneDevice.
@@ -76,7 +77,7 @@ def get_full_namespace(additional_namespace, level=0):
     return namespace
 
 
-def get_param_dict(param_values, param_names, n_samples):
+def get_param_dict(param_values, param_names, n_values):
     """Return a dictionary compiled of parameter names and values.
 
     Parameters
@@ -86,7 +87,7 @@ def get_param_dict(param_values, param_names, n_samples):
         parameter values.
     param_names : iterable
         Iterable containing parameter names
-    n_samples : int
+    n_values : int
         Total number of given values for a single parameter.
 
     Returns
@@ -98,12 +99,12 @@ def get_param_dict(param_values, param_names, n_samples):
     param_values = np.array(param_values)
     param_dict = dict()
     for name, value in zip(param_names, param_values.T):
-        param_dict[name] = (np.ones((n_samples, )) * value)
+        param_dict[name] = (np.ones((n_values, )) * value)
     return param_dict
 
 
 def calc_prior(param_names, **params):
-    """Return prior distribution over given parameters. Note that the
+    """Return prior distributparion over given parameters. Note that the
     only available prior distribution currently supported is
     multidimensional uniform distribution defined on a box.
 
@@ -178,58 +179,160 @@ class Inferencer(object):
     """
     def __init__(self, dt, model, input, output, method=None, threshold=None,
                  reset=None, refractory=None, param_init=None):
+        # time scale
         self.dt = dt
+
+        # model equations
         if isinstance(model, str):
-            self.model = Equations(model)
+            model = Equations(model)
         else:
             raise TypeError('Equations must be appropriately formatted.')
+
+        # input data traces
         if not isinstance(input, Mapping):
             raise TypeError('`input` argument must be a dictionary mapping'
                             ' the name of the input variable and `input`.')
         if len(input) > 1:
             raise NotImplementedError('Only a single input is supported.')
-        self.input_var = list(input.keys())[0]
-        self.input = input[self.input_var]
+        input_var = list(input.keys())[0]
+        input = input[input_var]
+        if input_var not in model.identifiers:
+            raise NameError(f'{input_var} is not an identifier in the model.')
+
+        # output data traces
         if not isinstance(output, Mapping):
             raise TypeError('`output` argument must be a dictionary mapping'
                             ' the name of the output variable and `output`')
-        if len(output) > 1:
-            raise NotImplementedError('Only a single output is supported')
-        self.output_var = list(output.keys())[0]
-        self.output = output[self.output_var]
-        input_dim = get_dimensions(self.input)
+        output_var = list(output.keys())
+        output = list(output.values())
+        for o_var in output_var:
+            if o_var not in model.names:
+                raise NameError(f'{o_var} is not a model variable')
+        self.output_var = output_var
+        self.output = output
+
+        # create variable for parameter names
+        self.param_names = model.parameter_names
+
+        # set the simulation time for a given time scale
+        self.n_traces, n_steps = input.shape
+        self.sim_time = dt * n_steps
+
+        # handle multiple output variables
+        self.output_dim = []
+        for o_var, out in zip(self.output_var, self.output):
+            self.output_dim.append(model[o_var].dim)
+            fail_for_dimension_mismatch(out, self.output_dim[-1],
+                                        'The provided target values must have'
+                                        ' the same units as the variable'
+                                        f' {o_var}')
+
+        # add input to equations
+        self.model = model
+        input_dim = get_dimensions(input)
         input_dim = '1' if input_dim is DIMENSIONLESS else repr(input_dim)
-        input_eqs = f'{self.input_var} = input_var(t) : {input_dim}'
+        input_eqs = f'{input_var} = input_var(t, i % n_traces) : {input_dim}'
         self.model += input_eqs
-        self.input_traces = TimedArray(self.input.transpose(), dt=self.dt)
-        n_steps = self.input.size
-        self.sim_time = self.dt * n_steps
+
+        # add output to equations
+        counter = 0
+        for o_var, o_dim in zip(self.output_var, self.output_dim):
+            counter += 1
+            output_expr = f'output_var_{counter}(t, i % n_traces)'
+            output_dim = ('1' if o_dim is DIMENSIONLESS else repr(o_dim))
+            output_eqs = f'{o_var}_target = {output_expr} : {output_dim}'
+            self.model += output_eqs
+
+        # create the `TimedArray` object for input w.r.t. a given time scale
+        self.input_traces = TimedArray(input.transpose(), dt=self.dt)
+
+        # handle initial values for the ODE system
         if not param_init:
             param_init = {}
-        for param, val in param_init.items():
+        for param in param_init.keys():
             if not (param in self.model.diff_eq_names or
                     param in self.model.parameter_names):
                 raise ValueError(f'{param} is not a model variable or a'
                                  ' parameter in the model')
         self.param_init = param_init
-        self.param_names = self.model.parameter_names
+
+        # handle the rest of optional parameters for the `NeuronGroup` class
         self.method = method
         self.threshold = threshold
         self.reset = reset
         self.refractory = refractory
 
-    def setup_simulator(self, n_samples, output_var, param_init, level=1):
-        simulator = setup_simulator()
-        namespace = get_full_namespace({'input_var': self.input_traces},
+        # placeholder for the number of samples
+        self.n_samples = None
+
+    @property
+    def n_neurons(self):
+        """Return the number of neurons that are used in `NeuronGroup`
+        class while generating data for training the neural density
+        estimator.
+
+        Unlike the `Fitter` class, `Inferencer` does not take the total
+        number of samples in the constructor. Thus, this property
+        becomes available only after the simulation is performed.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        int
+            The total number of neurons.
+        """
+        if self.n_samples is None:
+            raise ValueError('Number of samples is not yet defined.'
+                             'Call `initialize_prior` method first.')
+        return self.n_traces * self.n_samples
+
+    def setup_simulator(self, network_name, n_neurons, output_var, param_init,
+                        level=1):
+        """Return configured simulator.
+
+        Parameters
+        ----------
+        network_name : str
+            Network name.
+        n_neurons : int
+            Number of neurons which equals to the number of samples
+            times the number of input/output traces.
+        output_var : str
+            Name of the output variable.
+        param_init : dict
+            Dictionary of state variables to be initialized with
+            respective values.
+        level : int, optional
+            How far to go back to get the locals/globals.
+
+        Returns
+        -------
+        brian2modelfitting.simulator.Simulator
+            Configured simulator w.r.t. to the available device.
+        """
+        # configure the simulator
+        simulator = configure_simulator()
+
+        # update the local namespace
+        namespace = get_full_namespace({'input_var': self.input_traces,
+                                        'n_traces': self.n_traces},
                                        level=level+1)
-        namespace['output_var'] = TimedArray(self.output.transpose(),
-                                             dt=self.dt)
-        kwargs = {}
+        counter = 0
+        for out in self.output:
+            counter += 1
+            namespace[f'output_var_{counter}'] = TimedArray(out.transpose(),
+                                                            dt=self.dt)
+
+        # setup neuron group
+        kwds = {}
         if self.method is not None:
-            kwargs['method'] = self.method
+            kwds['method'] = self.method
         model = (self.model
                  + Equations('iteration : integer (constant, shared)'))
-        neurons = NeuronGroup(N=n_samples,
+        neurons = NeuronGroup(N=n_neurons,
                               model=model,
                               threshold=self.threshold,
                               reset=self.reset,
@@ -237,16 +340,35 @@ class Inferencer(object):
                               dt=self.dt,
                               namespace=namespace,
                               name='neurons',
-                              **kwargs)
+                              **kwds)
         network = Network(neurons)
         network.add(StateMonitor(source=neurons, variables=output_var,
                                  record=True, dt=self.dt, name='statemonitor'))
-        simulator.initialize(network, param_init)
+        
+        # initialize the simulator
+        simulator.initialize(network, param_init, name=network_name)
         return simulator
 
-    def generate(self, n_samples, level=0, **params):
+    def initialize_prior(self, n_samples, **params):
+        """Return the dictionary in which the keys correspond to the
+        unknown parameter names and values to their respective
+        uniformly sampled values.
+
+        Parameters
+        ----------
+        n_samples : int
+            The number of samples.
+        params : dict
+            Bounds for each parameter.
+
+        Returns
+        -------
+        dict
+            Dictionary with the parameter names and uniformly
+            distributed prior distribution.
+        """
         try:
-            n_samples = int(n_samples)
+            self.n_samples = int(n_samples)
         except ValueError as e:
             print(e)
         for param in params:
@@ -256,17 +378,43 @@ class Inferencer(object):
         self.prior = calc_prior(self.param_names, **params)
         self.theta = self.prior.sample((n_samples, ))
         theta = np.atleast_2d(self.theta.numpy())
-        self.simulator = self.setup_simulator(n_samples=n_samples,
-                                              output_var=self.output_var,
-                                              param_init=self.param_init,
-                                              level=1)
-        d_param = get_param_dict(theta, self.param_names, n_samples)
-        self.simulator.run(self.sim_time, d_param, self.param_names, 0)
+        # theta = np.vstack(tuple([theta for _ in range(self.n_traces)]))
+        theta = np.repeat(theta, repeats=self.n_traces, axis=0)
+        return get_param_dict(theta, self.param_names, self.n_neurons)
+
+    def generate_training_data(self, n_samples, level=0, **params):
+        """Return executed simulator containing recorded variables to
+        be used for training the neural density estimator.
+
+        Parameter
+        ---------
+        n_samples : int
+            The number of samples.
+        level : int, optional
+            How far to go back to get the locals/globals.
+        params : dict
+            Bounds for each parameter.
+
+        Returns
+        -------
+        brian2modelfitting.simulator.Simulator
+            Executed simulator.
+        """
+        network_name = 'infere'
+        d_param = self.initialize_prior(n_samples, **params)
+        simulator = self.setup_simulator(network_name=network_name,
+                                         n_neurons=self.n_neurons,
+                                         output_var=self.output_var,
+                                         param_init=self.param_init,
+                                         level=level+1)
+        simulator.run(self.sim_time, d_param, self.param_names, iteration=0,
+                      name=network_name)
+        return simulator
 
     def _create_sum_stats(self, obs, obs_dim):
-        obs_mean = obs.mean(axis=0)
-        obs_std = obs.std(axis=0)
-        obs_ptp = obs.ptp(axis=0)
+        obs_mean = obs.mean(axis=1)
+        obs_std = obs.std(axis=1)
+        obs_ptp = obs.ptp(axis=1)
         obs_mean = obs_mean / Quantity(np.ones_like(obs_mean), obs_dim)
         obs_std = obs_std / Quantity(np.ones_like(obs_std), obs_dim)
         obs_ptp = obs_ptp / Quantity(np.ones_like(obs_ptp), obs_dim)
@@ -274,16 +422,47 @@ class Inferencer(object):
                           np.asarray(obs_std).reshape(-1, 1),
                           np.asarray(obs_ptp).reshape(-1, 1)))
 
-    def train(self):
-        obs_val = self.simulator.statemonitor.recorded_variables
+    def train(self, n_samples, n_rounds=1, **params):
+        """Return the trained neural density estimator.
+
+        Currently only sequential neural posterior estimator is
+        supported.
+
+        Parameter
+        ---------
+        n_samples : int
+            The number of samples.
+        n_round : int or str, optional
+            If `n_rounds`is set to 1, amortized inference will be
+            performed. Otherwise, if `n_rounds` is integer larger than
+            1, multi-round inference will be performed.
+        params : dict
+            Bounds for each parameter.
+
+        Returns
+        -------
+        sbi.inference.posteriors.direct_posterior.DirectPosterior
+            Trained posterior.
+        """
+        if not isinstance(n_rounds, int):
+            raise ValueError('Number of rounds must be a positive integer.')
+        if n_rounds != 1:
+            raise NotImplementedError('Only amortized inference is supported.')
+        simulator = self.generate_training_data(n_samples, **params)
+        obs_val = simulator.statemonitor.recorded_variables
         obs = obs_val[self.output_var].get_value_with_unit()
-        obs_dim = self.simulator.statemonitor.recorded_variables
+        obs_dim = simulator.statemonitor.recorded_variables
         dim = get_dimensions(obs_dim[self.output_var])
-        x = torch.tensor(self._create_sum_stats(obs, dim), dtype=torch.float32)
+        x = torch.tensor(self._create_sum_stats(obs, dim),
+                            dtype=torch.float32)
+        x = x.reshape(self.n_samples, self.n_traces)
         density_esimator = posterior_nn(model='maf')
-        self.inference = sbi.inference.SNPE(self.prior, density_esimator)
-        self.inference.append_simulations(self.theta, x).train()
-        self.posterior = self.inference.build_posterior()
+        inference = sbi.inference.SNPE(proposal, density_esimator)
+        inference.append_simulations(self.theta, x, proposal).train()
+        posterior = self.inference.build_posterior()
+        posteriors.append(posterior)
+        self.posterior = posterior
+        return posterior
 
     def sample(self, size, viz=False, **kwargs):
         dim = get_dimensions(self.output)
