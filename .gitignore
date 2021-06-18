@@ -82,4 +82,4 @@ target/
 brian2modelfitting.egg-info
 
 # sbi logs
-brian2modelfitting/examples/sbi-logs/
+examples/sbi-logs/
