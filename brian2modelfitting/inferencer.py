@@ -470,10 +470,13 @@ class Inferencer(object):
             theta, simulator = self.generate_training_data(n_samples, proposal)
             theta = torch.tensor(theta, dtype=torch.float32)
             obs = simulator.statemonitor.recorded_variables
-            x_val = obs[self.output_var[0]].get_value_with_unit()
-            x_dim = get_dimensions(obs[self.output_var[0]])
-            x = torch.tensor(self.extract_features(x_val, x_dim),
-                             dtype=torch.float32)
+            x = []
+            for ov in self.output_var:
+                x_val = obs[ov].get_value_with_unit()
+                x_dim = get_dimensions(obs[ov])
+                features = self.extract_features(x_val, x_dim)
+                x.append(features)
+            x = torch.tensor(x, dtype=torch.float32)
             x = x.reshape(self.n_samples, -1)
 
             # pass the simulated data to the inference object and train it
