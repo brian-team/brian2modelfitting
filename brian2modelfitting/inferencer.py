@@ -282,11 +282,11 @@ class Inferencer(object):
         Returns
         -------
         int
-            The total number of neurons.
+            Total number of neurons.
         """
         if self.n_samples is None:
             raise ValueError('Number of samples is not yet defined.'
-                             'Call `initialize_prior` method first.')
+                             'Call `generate_training_data` method first.')
         return self.n_traces * self.n_samples
 
     def setup_simulator(self, network_name, n_neurons, output_var, param_init,
@@ -344,64 +344,67 @@ class Inferencer(object):
         network = Network(neurons)
         network.add(StateMonitor(source=neurons, variables=output_var,
                                  record=True, dt=self.dt, name='statemonitor'))
-        
+
         # initialize the simulator
         simulator.initialize(network, param_init, name=network_name)
         return simulator
 
-    def initialize_prior(self, n_samples, **params):
-        """Return the dictionary in which the keys correspond to the
-        unknown parameter names and values to their respective
-        uniformly sampled values.
+    def initialize_prior(self, **params):
+        """Return the prior uniform distribution over parameters.
 
         Parameters
         ----------
-        n_samples : int
-            The number of samples.
         params : dict
             Bounds for each parameter.
 
         Returns
         -------
-        dict
-            Dictionary with the parameter names and uniformly
-            distributed prior distribution.
+        sbi.utils.BoxUniform
+            Uniformly distributed prior over given parameters.
         """
-        try:
-            self.n_samples = int(n_samples)
-        except ValueError as e:
-            print(e)
         for param in params:
             if param not in self.param_names:
                 raise ValueError(f'Parameter {param} must be defined as a'
                                  ' model\'s parameter')
-        self.prior = calc_prior(self.param_names, **params)
-        self.theta = self.prior.sample((n_samples, ))
-        theta = np.atleast_2d(self.theta.numpy())
-        # theta = np.vstack(tuple([theta for _ in range(self.n_traces)]))
-        theta = np.repeat(theta, repeats=self.n_traces, axis=0)
-        return get_param_dict(theta, self.param_names, self.n_neurons)
+        prior = calc_prior(self.param_names, **params)
+        return prior
 
-    def generate_training_data(self, n_samples, level=0, **params):
-        """Return executed simulator containing recorded variables to
-        be used for training the neural density estimator.
+    def generate_training_data(self, n_samples, prior, level=1):
+        """Return sampled prior and executed simulator containing
+        recorded variables to be used for training the neural density
+        estimator.
 
         Parameter
         ---------
         n_samples : int
             The number of samples.
+        prior : sbi.utils.BoxUniform
+            Uniformly distributed prior over given parameters.
         level : int, optional
             How far to go back to get the locals/globals.
-        params : dict
-            Bounds for each parameter.
 
         Returns
         -------
+        numpy.ndarray
+            Sampled prior of shape (`n_samples`, -1)
         brian2modelfitting.simulator.Simulator
             Executed simulator.
         """
+        # set n_samples to class variable to be able to call self.n_neurons
+        self.n_samples = n_samples
+
+        # sample from prior
+        theta = prior.sample((n_samples, ))
+        theta = np.atleast_2d(theta.numpy())
+
+        # repeat each row for how many input/output different trace are there
+        _theta = np.repeat(theta, repeats=self.n_traces, axis=0)
+
+        # create a dictionary with repeated sampled prior
+        d_param = get_param_dict(_theta, self.param_names, self.n_neurons)
+
+        # setup and run the simulator
         network_name = 'infere'
-        d_param = self.initialize_prior(n_samples, **params)
         simulator = self.setup_simulator(network_name=network_name,
                                          n_neurons=self.n_neurons,
                                          output_var=self.output_var,
@@ -409,20 +412,10 @@ class Inferencer(object):
                                          level=level+1)
         simulator.run(self.sim_time, d_param, self.param_names, iteration=0,
                       name=network_name)
-        return simulator
+        return (theta, simulator)
 
-    def _create_sum_stats(self, obs, obs_dim):
-        obs_mean = obs.mean(axis=1)
-        obs_std = obs.std(axis=1)
-        obs_ptp = obs.ptp(axis=1)
-        obs_mean = obs_mean / Quantity(np.ones_like(obs_mean), obs_dim)
-        obs_std = obs_std / Quantity(np.ones_like(obs_std), obs_dim)
-        obs_ptp = obs_ptp / Quantity(np.ones_like(obs_ptp), obs_dim)
-        return np.hstack((np.asarray(obs_mean).reshape(-1, 1),
-                          np.asarray(obs_std).reshape(-1, 1),
-                          np.asarray(obs_ptp).reshape(-1, 1)))
-
-    def train(self, n_samples, n_rounds=1, **params):
+    def train(self, n_samples, n_rounds=1, estimation_method='SNPE',
+              density_estimator_model='maf', **params):
         """Return the trained neural density estimator.
 
         Currently only sequential neural posterior estimator is
@@ -432,10 +425,16 @@ class Inferencer(object):
         ---------
         n_samples : int
             The number of samples.
-        n_round : int or str, optional
+        n_rounds : int or str, optional
             If `n_rounds`is set to 1, amortized inference will be
             performed. Otherwise, if `n_rounds` is integer larger than
             1, multi-round inference will be performed.
+        estimation_method : str
+            Inference method. Either of SNPE, SNLE or SNRE. Currently,
+            only SNPE is supported.
+        density_estimator_model : str
+            The type of density estimator to be created. Either `mdn`,
+            `made`, `maf` or `nsf`.
         params : dict
             Bounds for each parameter.
 
@@ -446,29 +445,64 @@ class Inferencer(object):
         """
         if not isinstance(n_rounds, int):
             raise ValueError('Number of rounds must be a positive integer.')
-        if n_rounds != 1:
-            raise NotImplementedError('Only amortized inference is supported.')
-        simulator = self.generate_training_data(n_samples, **params)
-        obs_val = simulator.statemonitor.recorded_variables
-        obs = obs_val[self.output_var].get_value_with_unit()
-        obs_dim = simulator.statemonitor.recorded_variables
-        dim = get_dimensions(obs_dim[self.output_var])
-        x = torch.tensor(self._create_sum_stats(obs, dim),
-                            dtype=torch.float32)
-        x = x.reshape(self.n_samples, self.n_traces)
-        density_esimator = posterior_nn(model='maf')
-        inference = sbi.inference.SNPE(proposal, density_esimator)
-        inference.append_simulations(self.theta, x, proposal).train()
-        posterior = self.inference.build_posterior()
-        posteriors.append(posterior)
+        if str.upper(estimation_method) != 'SNPE':
+            raise NotImplementedError('Only SNPE estimator is supported.')
+
+        # observation the focus is on
+        x_o = []
+        for o in self.output:
+            o_dim = get_dimensions(o)
+            o_obs = self.extract_features(o.transpose(), o_dim)
+            x_o.append(o_obs.flatten())
+        x_o = torch.tensor(x_o, dtype=torch.float32)
+        self.x_o = x_o
+
+        # initialize prior, density estimator and inference method
+        prior = self.initialize_prior(**params)
+        density_esimator = posterior_nn(density_estimator_model)
+        inference = sbi.inference.SNPE(prior, density_esimator)
+
+        # allocate empty list of posteriors, for multi-round inference only
+        posteriors = []
+        proposal = prior
+        for _ in range(n_rounds):
+            # extract the data and make adjustments for `sbi`
+            theta, simulator = self.generate_training_data(n_samples, proposal)
+            theta = torch.tensor(theta, dtype=torch.float32)
+            obs = simulator.statemonitor.recorded_variables
+            x_val = obs[self.output_var[0]].get_value_with_unit()
+            x_dim = get_dimensions(obs[self.output_var[0]])
+            x = torch.tensor(self.extract_features(x_val, x_dim),
+                             dtype=torch.float32)
+            x = x.reshape(self.n_samples, -1)
+
+            # pass the simulated data to the inference object and train it
+            de = inference.append_simulations(theta, x, proposal).train()
+
+            # use the density estimator to build the posterior
+            posterior = inference.build_posterior(de)
+
+            # append the current posterior to the list of posteriors
+            posteriors.append(posterior)
+
+            # update the proposal given the observation
+            proposal = posterior.set_default_x(x_o)
         self.posterior = posterior
         return posterior
 
+    def extract_features(self, obs, obs_dim):
+        obs_mean = obs.mean(axis=0)
+        obs_std = obs.std(axis=0)
+        obs_ptp = obs.ptp(axis=0)
+        obs_mean = obs_mean / Quantity(np.ones_like(obs_mean), obs_dim)
+        obs_std = obs_std / Quantity(np.ones_like(obs_std), obs_dim)
+        obs_ptp = obs_ptp / Quantity(np.ones_like(obs_ptp), obs_dim)
+        return np.hstack((np.array(obs_mean).reshape(-1, 1),
+                          np.array(obs_std).reshape(-1, 1),
+                          np.array(obs_ptp).reshape(-1, 1)))
+
     def sample(self, size, viz=False, **kwargs):
-        dim = get_dimensions(self.output)
-        x_o = torch.tensor(self._create_sum_stats(self.output.ravel(), dim),
-                           dtype=torch.float32)
-        samples = self.posterior.sample((size, ), x_o)
+        samples = self.posterior.sample((size, ))
         if viz:
             sbi.analysis.pairplot(samples, **kwargs)
             plt.tight_layout()
