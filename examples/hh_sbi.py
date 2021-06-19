@@ -43,13 +43,15 @@ inferencer = Inferencer(dt=dt, model=eqs,
 
 # Generate prior and train the neural density estimator
 inferencer.train(n_samples=100,
+                 n_rounds=2,
+                 density_estimator_model='made',
                  gl=[1e-09 * siemens, 1e-07 * siemens],
                  g_na=[2e-06 * siemens, 2e-04 * siemens],
                  g_kd=[6e-07 * siemens, 6e-05 * siemens],
                  Cm=[0.1 * uF * cm ** -2 * area, 2 * uF * cm ** -2 * area])
 
-# # Draw samples from posterior and visualize the results
-# labels_params = [r'$\overline{g}_{l}$', r'$\overline{g}_{Na}$',
-#                  r'$\overline{g}_{K}$', r'$\overline{C}_{m}$']
-# samples = inferencer.sample(1000, viz=True,
-#                             labels=labels_params, figsize=(10, 10))
+# Draw samples from posterior and visualize the results
+labels_params = [r'$\overline{g}_{l}$', r'$\overline{g}_{Na}$',
+                 r'$\overline{g}_{K}$', r'$\overline{C}_{m}$']
+samples = inferencer.sample(1000, viz=True,
+                            labels=labels_params, figsize=(10, 10))
