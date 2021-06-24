@@ -28,9 +28,9 @@ from .simulator import RuntimeSimulator, CPPStandaloneSimulator
 
 def configure_simulator():
     """Return the configured simulator, which can be either
-    ``RuntimeSimulator``, object for use with ``RuntimeDevice``, or
-    ``CPPStandaloneSimulator``, object for use with
-    ``CPPStandaloneDevice``.
+    `.RuntimeSimulator`, object for use with `.RuntimeDevice`, or
+    `.CPPStandaloneSimulator`, object for use with
+    `.CPPStandaloneDevice`.
 
     Parameters
     ----------
@@ -39,7 +39,7 @@ def configure_simulator():
     Returns
     -------
     brian2modelfitting.simulator.Simulator
-        Either ``RuntimeSimulator`` or ``CPPStandaloneSimulator``
+        Either `.RuntimeSimulator` or `.CPPStandaloneSimulator`
         depending on the currently active ``Device`` object describing
         the available computational engine.
     """
@@ -84,7 +84,7 @@ def get_param_dict(param_values, param_names, n_values):
     Parameters
     ----------
     param_values : iterable
-        Iterable of size (``n_samples``, ``len(param_names)``
+        Iterable of size (``n_samples``, ``len(param_names)``)
         containing parameter values.
     param_names : iterable
         Iterable containing parameter names
