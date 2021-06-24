@@ -42,8 +42,12 @@ inferencer = Inferencer(dt=dt, model=eqs,
                         param_init={'v': 'VT'})
 
 # Generate prior and train the neural density estimator
-inferencer.train(n_samples=100,
-                 n_rounds=2,
+inferencer.train(n_samples=15,
+                 features=[
+                    lambda x: x.mean(axis=0),
+                    lambda x: x.std(axis=0),
+                    lambda x: x.ptp(axis=0)],
+                 n_rounds=1,
                  density_estimator_model='made',
                  gl=[1e-09 * siemens, 1e-07 * siemens],
                  g_na=[2e-06 * siemens, 2e-04 * siemens],
@@ -53,5 +57,10 @@ inferencer.train(n_samples=100,
 # Draw samples from posterior and visualize the results
 labels_params = [r'$\overline{g}_{l}$', r'$\overline{g}_{Na}$',
                  r'$\overline{g}_{K}$', r'$\overline{C}_{m}$']
-samples = inferencer.sample(1000, viz=True,
-                            labels=labels_params, figsize=(10, 10))
+inferencer.sample((1000,))
+
+# Create pairplot from samples
+inferencer.pairplot()
+
+# Generate traces by using a single sample from the trained posterior
+fits = inferencer.generate_traces()
