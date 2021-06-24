@@ -2,7 +2,7 @@ from types import FunctionType
 
 from brian2 import have_same_dimensions
 from brian2.units.fundamentalunits import Quantity
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 
 def _format_quantity(v, precision=3):
