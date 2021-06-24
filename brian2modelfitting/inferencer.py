@@ -453,10 +453,11 @@ class Inferencer(object):
         # observation the focus is on
         x_o = []
         for o in self.output:
-            o_dim = get_dimensions(o)
-            o_obs = self.extract_features(o.transpose(), o_dim)
-            x_o.append(o_obs.flatten())
+            o = np.array(o)
+            obs = extract_features(o.transpose())
+            x_o.append(obs.flatten())
         x_o = torch.tensor(x_o, dtype=torch.float32)
+        print(x_o.shape)
         self.x_o = x_o
 
         # initialize prior, density estimator and inference method
@@ -468,18 +469,17 @@ class Inferencer(object):
         posteriors = []
         proposal = prior
         for _ in range(n_rounds):
-            # extract the data and make adjustments for `sbi`
+            # extract the data and make adjustments for ``sbi``
             theta, simulator = self.generate_training_data(n_samples, proposal)
             theta = torch.tensor(theta, dtype=torch.float32)
             obs = simulator.statemonitor.recorded_variables
             x = []
             for ov in self.output_var:
-                x_val = obs[ov].get_value_with_unit()
-                x_dim = get_dimensions(obs[ov])
-                features = self.extract_features(x_val, x_dim)
+                x_val = obs[ov].get_value()
+                features = extract_features(x_val)
                 x.append(features)
-            x = torch.tensor(x, dtype=torch.float32)
-            x = x.reshape(self.n_samples, -1)
+            x = torch.tensor(x, dtype=torch.float32).reshape(self.n_samples, -1)
+            print(x.shape)
 
             # pass the simulated data to the inference object and train it
             de = inference.append_simulations(theta, x, proposal).train()
@@ -495,17 +495,6 @@ class Inferencer(object):
         self.posterior = posterior
         return posterior
 
-    def extract_features(self, obs, obs_dim):
-        obs_mean = obs.mean(axis=0)
-        obs_std = obs.std(axis=0)
-        obs_ptp = obs.ptp(axis=0)
-        obs_mean = obs_mean / Quantity(np.ones_like(obs_mean), obs_dim)
-        obs_std = obs_std / Quantity(np.ones_like(obs_std), obs_dim)
-        obs_ptp = obs_ptp / Quantity(np.ones_like(obs_ptp), obs_dim)
-        return np.hstack((np.array(obs_mean).reshape(-1, 1),
-                          np.array(obs_std).reshape(-1, 1),
-                          np.array(obs_ptp).reshape(-1, 1)))
-
     def sample(self, size, viz=False, **kwargs):
         samples = self.posterior.sample((size, ))
         if viz:
@@ -513,3 +502,12 @@ class Inferencer(object):
             plt.tight_layout()
             plt.show()
         return samples
+
+
+def extract_features(obs):
+    obs_mean = obs.mean(axis=0)
+    obs_std = obs.std(axis=0)
+    obs_ptp = obs.ptp(axis=0)
+    return np.hstack((np.array(obs_mean).reshape(-1, 1),
+                      np.array(obs_std).reshape(-1, 1),
+                      np.array(obs_ptp).reshape(-1, 1)))
