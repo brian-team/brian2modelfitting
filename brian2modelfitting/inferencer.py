@@ -28,8 +28,9 @@ from .simulator import RuntimeSimulator, CPPStandaloneSimulator
 
 def configure_simulator():
     """Return the configured simulator, which can be either
-    `RuntimeSimulator`, object for use with `RuntimeDevice`, or
-    `CPPStandaloneSimulator`, object for use with `CPPStandaloneDevice.
+    ``RuntimeSimulator``, object for use with ``RuntimeDevice``, or
+    ``CPPStandaloneSimulator``, object for use with
+    ``CPPStandaloneDevice``.
 
     Parameters
     ----------
@@ -38,9 +39,9 @@ def configure_simulator():
     Returns
     -------
     brian2modelfitting.simulator.Simulator
-        Either `RuntimeSimulator` or `CPPStandaloneSimulator` depending
-        on the currently active `Device` object describing the
-        available computational engine.
+        Either ``RuntimeSimulator`` or ``CPPStandaloneSimulator``
+        depending on the currently active ``Device`` object describing
+        the available computational engine.
     """
     simulators = {'CPPStandaloneDevice': CPPStandaloneSimulator(),
                   'RuntimeDevice': RuntimeSimulator()}
@@ -53,8 +54,8 @@ def configure_simulator():
 
 
 def get_full_namespace(additional_namespace, level=0):
-    """Return the namespace with added `additional_namespace`, in which
-    references to external parameters or functions are stored.
+    """Return the namespace with added ``additional_namespace``, in
+    which references to external parameters or functions are stored.
 
     Parameters
     ----------
@@ -83,8 +84,8 @@ def get_param_dict(param_values, param_names, n_values):
     Parameters
     ----------
     param_values : iterable
-        Iterable of size (`n_samples`, `len(param_names)` containing
-        parameter values.
+        Iterable of size (``n_samples``, ``len(param_names)``
+        containing parameter values.
     param_names : iterable
         Iterable containing parameter names
     n_values : int
@@ -119,7 +120,7 @@ def calc_prior(param_names, **params):
     Return
     ------
     sbi.utils.torchutils.BoxUniform
-        `sbi` compatible object that contains a uniform prior
+        ``sbi`` compatible object that contains a uniform prior
         distribution over a given set of parameter
     """
     for param_name in param_names:
@@ -138,10 +139,11 @@ def calc_prior(param_names, **params):
 class Inferencer(object):
     """Class for simulation-based inference.
 
-    It offers an interface similar to that of `Fitter` class but
+    It offers an interface similar to that of ``Fitter`` class but
     instead of fitting, neural density estimator is trained using a
-    generative model. This class serves as a wrapper for `sbi` library
-    for inferencing posterior over unknown parameters of a given model.
+    generative model. This class serves as a wrapper for ``sbi``
+    library for inferencing posterior over unknown parameters of a
+    given model.
 
     Parameters
     ----------
@@ -151,13 +153,13 @@ class Inferencer(object):
         Single cell model equations.
     input : dict
         Input traces in dictionary format, where key corresponds to the
-        name of the input variable as defined in `model` and value
+        name of the input variable as defined in ``model`` and value
         corresponds to a single dimensional array of data traces.
     output : dict
         Dictionary of recorded (or simulated) output data traces, where
         key corresponds to the name of the output variable as defined
-        in `model` and value corresponds to a single dimensional array
-        of recorded data traces.
+        in ``model`` and value corresponds to a single dimensional
+        array of recorded data traces.
     method : str, optional
         Integration method.
     threshold : str, optional
@@ -167,12 +169,12 @@ class Inferencer(object):
         The (possibly multi-line) string with the code to execute on
         reset.
     refractory : str, optional
-        Either the length of the refractory period (e.g., `2*ms`), a
+        Either the length of the refractory period (e.g., ``2*ms``), a
         string expression that evaluates to the length of the
-        refractory period after each spike (e.g., `'(1 + rand())*ms'`),
+        refractory period after each spike, e.g., ``'(1 + rand())*ms'``,
         or a string expression evaluating to a boolean value, given the
-        condition under which the neuron stays refractory after a spike
-        (e.g., `'v > -20*mV'`).
+        condition under which the neuron stays refractory after a spike,
+        e.g., ``'v > -20*mV'``.
     param_init : dict, optional
         Dictionary of state variables to be initialized with respective
         values.
@@ -190,8 +192,8 @@ class Inferencer(object):
 
         # input data traces
         if not isinstance(input, Mapping):
-            raise TypeError('`input` argument must be a dictionary mapping'
-                            ' the name of the input variable and `input`.')
+            raise TypeError('``input`` argument must be a dictionary mapping'
+                            ' the name of the input variable and ``input``.')
         if len(input) > 1:
             raise NotImplementedError('Only a single input is supported.')
         input_var = list(input.keys())[0]
@@ -201,8 +203,8 @@ class Inferencer(object):
 
         # output data traces
         if not isinstance(output, Mapping):
-            raise TypeError('`output` argument must be a dictionary mapping'
-                            ' the name of the output variable and `output`')
+            raise TypeError('``output`` argument must be a dictionary mapping'
+                            ' the name of the output variable and ``output``')
         output_var = list(output.keys())
         output = list(output.values())
         for o_var in output_var:
@@ -243,7 +245,7 @@ class Inferencer(object):
             output_eqs = f'{o_var}_target = {output_expr} : {output_dim}'
             self.model += output_eqs
 
-        # create the `TimedArray` object for input w.r.t. a given time scale
+        # create ``TimedArray`` object for input w.r.t. a given time scale
         self.input_traces = TimedArray(input.transpose(), dt=self.dt)
 
         # handle initial values for the ODE system
@@ -256,7 +258,7 @@ class Inferencer(object):
                                  ' parameter in the model')
         self.param_init = param_init
 
-        # handle the rest of optional parameters for the `NeuronGroup` class
+        # handle the rest of optional parameters for the ``NeuronGroup`` class
         self.method = method
         self.threshold = threshold
         self.reset = reset
@@ -267,12 +269,12 @@ class Inferencer(object):
 
     @property
     def n_neurons(self):
-        """Return the number of neurons that are used in `NeuronGroup`
+        """Return the number of neurons that are used in ``NeuronGroup``
         class while generating data for training the neural density
         estimator.
 
-        Unlike the `Fitter` class, `Inferencer` does not take the total
-        number of samples in the constructor. Thus, this property
+        Unlike the ``Fitter`` class, ``Inferencer`` does not take the
+        total number of samples in the constructor. Thus, this property
         becomes available only after the simulation is performed.
 
         Parameters
@@ -286,7 +288,7 @@ class Inferencer(object):
         """
         if self.n_samples is None:
             raise ValueError('Number of samples is not yet defined.'
-                             'Call `generate_training_data` method first.')
+                             'Call ``generate_training_data`` method first.')
         return self.n_traces * self.n_samples
 
     def setup_simulator(self, network_name, n_neurons, output_var, param_init,
@@ -386,7 +388,7 @@ class Inferencer(object):
         Returns
         -------
         numpy.ndarray
-            Sampled prior of shape (`n_samples`, -1)
+            Sampled prior of shape (``n_samples``, -1)
         brian2modelfitting.simulator.Simulator
             Executed simulator.
         """
@@ -426,15 +428,15 @@ class Inferencer(object):
         n_samples : int
             The number of samples.
         n_rounds : int or str, optional
-            If `n_rounds`is set to 1, amortized inference will be
-            performed. Otherwise, if `n_rounds` is integer larger than
-            1, multi-round inference will be performed.
+            If ``n_rounds`` is set to 1, amortized inference will be
+            performed. Otherwise, if ``n_rounds`` is integer larger
+            than 1, multi-round inference will be performed.
         estimation_method : str
             Inference method. Either of SNPE, SNLE or SNRE. Currently,
             only SNPE is supported.
         density_estimator_model : str
-            The type of density estimator to be created. Either `mdn`,
-            `made`, `maf` or `nsf`.
+            The type of density estimator to be created. Either
+            ``mdn``, ``made``, ``maf`` or ``nsf``.
         params : dict
             Bounds for each parameter.
 
