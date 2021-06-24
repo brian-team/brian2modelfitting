@@ -416,7 +416,7 @@ class Inferencer(object):
                       name=network_name)
         return (theta, simulator)
 
-    def train(self, n_samples, n_rounds=1, estimation_method='SNPE',
+    def train(self, n_samples, features, n_rounds=1, estimation_method='SNPE',
               density_estimator_model='maf', **params):
         """Return the trained neural density estimator.
 
@@ -427,6 +427,9 @@ class Inferencer(object):
         ---------
         n_samples : int
             The number of samples.
+        features : list
+            List of callables that take the voltage trace and output
+            summary statistics stored in `numpy.array`.
         n_rounds : int or str, optional
             If ``n_rounds`` is set to 1, amortized inference will be
             performed. Otherwise, if ``n_rounds`` is integer larger
@@ -454,8 +457,10 @@ class Inferencer(object):
         x_o = []
         for o in self.output:
             o = np.array(o)
-            obs = extract_features(o.transpose())
-            x_o.append(obs.flatten())
+            obs = []
+            for feature in features:
+                obs.extend(feature(o.transpose()))
+            x_o.append(obs)
         x_o = torch.tensor(x_o, dtype=torch.float32)
         self.x_o = x_o
 
@@ -475,8 +480,10 @@ class Inferencer(object):
             x = []
             for ov in self.output_var:
                 x_val = obs[ov].get_value()
-                features = extract_features(x_val)
-                x.append(features)
+                summary_statistics = []
+                for feature in features:
+                    summary_statistics.append(feature(x_val))
+                x.append(summary_statistics)
             x = torch.tensor(x, dtype=torch.float32)
             x = x.view((self.n_samples, -1))
 
@@ -611,19 +618,10 @@ class Inferencer(object):
                       name=network_name)
 
         # create dictionary of traces for multiple observed output variables
-        if self.output_var > 1:
+        if len(self.output_var) > 1:
             for ov in self.output_var:
                 trace = getattr(simulator.statemonitor, ov)[:]
                 traces = {ov: trace}
         else:
             traces = getattr(simulator.statemonitor, self.output_var[0])[:]
         return traces
-
-
-def extract_features(obs):
-    obs_mean = obs.mean(axis=0)
-    obs_std = obs.std(axis=0)
-    obs_ptp = obs.ptp(axis=0)
-    return np.hstack((np.array(obs_mean).reshape(-1, 1),
-                      np.array(obs_std).reshape(-1, 1),
-                      np.array(obs_ptp).reshape(-1, 1)))
