@@ -1,5 +1,5 @@
-from brian2 import um, cm, ms, mV, amp, siemens, uF
-from brian2modelfitting import Inferencer
+from brian2 import *
+from brian2modelfitting import *
 import pandas as pd
 
 
@@ -42,7 +42,7 @@ inferencer = Inferencer(dt=dt, model=eqs,
                         param_init={'v': 'VT'})
 
 # Generate prior and train the neural density estimator
-inferencer.train(n_samples=15,
+inferencer.train(n_samples=1000,
                  features=[
                     lambda x: x.mean(axis=0),
                     lambda x: x.std(axis=0),
@@ -54,13 +54,34 @@ inferencer.train(n_samples=15,
                  g_kd=[6e-07 * siemens, 6e-05 * siemens],
                  Cm=[0.1 * uF * cm ** -2 * area, 2 * uF * cm ** -2 * area])
 
-# Draw samples from posterior and visualize the results
-labels_params = [r'$\overline{g}_{l}$', r'$\overline{g}_{Na}$',
-                 r'$\overline{g}_{K}$', r'$\overline{C}_{m}$']
+# Draw samples from posterior
 inferencer.sample((1000,))
 
 # Create pairplot from samples
-inferencer.pairplot()
+labels_params = [r'$\overline{g}_{l}$', r'$\overline{g}_{Na}$',
+                 r'$\overline{g}_{K}$', r'$\overline{C}_{m}$']
+inferencer.pairplot(labels=labels_params)
 
 # Generate traces by using a single sample from the trained posterior
-fits = inferencer.generate_traces()
+inf_traces = inferencer.generate_traces()
+
+# Visualize traces
+t = arange(0, out_traces.shape[1] * dt / ms, dt / ms)
+nrows = 2
+ncols = out_traces.shape[0]
+fig, axs = subplots(nrows, ncols, sharex=True,
+                    gridspec_kw={'height_ratios': [3, 1]}, figsize=(15, 4))
+for idx in range(ncols):
+    axs[0, idx].plot(out_traces[idx, :].T, label='measurements')
+    axs[0, idx].plot(inf_traces[idx, :].T / mV, label='fits')
+    axs[1, idx].plot(inp_traces[idx, :].T / amp, 'k-', label='stimulus')
+    axs[1, idx].set_xlabel('t, ms')
+    if idx == 0:
+        axs[0, idx].set_ylabel('$v$, mV')
+        axs[1, idx].set_ylabel('$I$, nA')
+handles, labels = [(h + l) for h, l
+                   in zip(axs[0, idx].get_legend_handles_labels(),
+                   axs[1, idx].get_legend_handles_labels())]
+fig.legend(handles, labels)
+tight_layout()
+show()
