@@ -266,8 +266,11 @@ class Inferencer(object):
         self.reset = reset
         self.refractory = refractory
 
-        # placeholder for the number of samples
+        # placeholder for samples
         self.n_samples = None
+        self.samples = None
+        # placeholder for the posterior
+        self.posterior = None
 
     @property
     def n_neurons(self):
@@ -677,10 +680,11 @@ class Inferencer(object):
         if posterior:
             p = posterior
         else:
-            try:
-                p = self.posterior
-            except NameError as e:
-                print(e, 'Posterior object is not found.')
+            p = self.posterior
+        if not p:
+            raise ValueError("Need to provide posterior argument if no "
+                             "posterior has been calculated by the 'infere' "
+                             "method.")
         samples = p.sample(shape)
         self.samples = samples
         return samples
