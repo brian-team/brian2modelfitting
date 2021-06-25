@@ -80,3 +80,6 @@ target/
 
 # Installation and auto-generated files
 brian2modelfitting.egg-info
+
+# sbi logs
+examples/sbi-logs/
