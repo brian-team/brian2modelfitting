@@ -17,7 +17,9 @@ from brian2.units.fundamentalunits import (DIMENSIONLESS,
                                            Quantity)
 import matplotlib.pyplot as plt
 import numpy as np
-from sbi.utils.get_nn_models import posterior_nn
+from sbi.utils.get_nn_models import (posterior_nn,
+                                     likelihood_nn,
+                                     classifier_nn)
 from sbi.utils.torchutils import BoxUniform
 import sbi.analysis
 import sbi.inference
@@ -139,7 +141,7 @@ def calc_prior(param_names, **params):
 class Inferencer(object):
     """Class for simulation-based inference.
 
-    It offers an interface similar to that of ``Fitter`` class but
+    It offers an interface similar to that of `.Fitter` class but
     instead of fitting, neural density estimator is trained using a
     generative model. This class serves as a wrapper for ``sbi``
     library for inferencing posterior over unknown parameters of a
@@ -269,11 +271,11 @@ class Inferencer(object):
 
     @property
     def n_neurons(self):
-        """Return the number of neurons that are used in ``NeuronGroup``
+        """Return the number of neurons that are used in `.NeuronGroup`
         class while generating data for training the neural density
         estimator.
 
-        Unlike the ``Fitter`` class, ``Inferencer`` does not take the
+        Unlike the `.Fitter` class, `.Inferencer` does not take the
         total number of samples in the constructor. Thus, this property
         becomes available only after the simulation is performed.
 
@@ -371,7 +373,7 @@ class Inferencer(object):
         prior = calc_prior(self.param_names, **params)
         return prior
 
-    def generate_training_data(self, n_samples, prior, level=1):
+    def generate_training_data(self, n_samples, prior):
         """Return sampled prior and executed simulator containing
         recorded variables to be used for training the neural density
         estimator.
@@ -382,15 +384,11 @@ class Inferencer(object):
             The number of samples.
         prior : sbi.utils.BoxUniform
             Uniformly distributed prior over given parameters.
-        level : int, optional
-            How far to go back to get the locals/globals.
 
         Returns
         -------
         numpy.ndarray
-            Sampled prior of shape (``n_samples``, -1)
-        brian2modelfitting.simulator.Simulator
-            Executed simulator.
+            Sampled prior of shape (``n_samples``, -1).
         """
         # set n_samples to class variable to be able to call self.n_neurons
         self.n_samples = n_samples
@@ -398,14 +396,34 @@ class Inferencer(object):
         # sample from prior
         theta = prior.sample((n_samples, ))
         theta = np.atleast_2d(theta.numpy())
+        return theta
 
+    def extract_summary_statistics(self, theta, features, level=1):
+        """Return summary statistics to be used for training the neural
+        density estimator.
+
+        Parameters
+        ----------
+        theta : numpy.ndarray
+            Sampled prior of shape (``n_samples``, -1).
+        features : list
+            List of callables that take the voltage trace and output
+            summary statistics stored in `numpy.array`.
+        level : int, optional
+            How far to go back to get the locals/globals.
+
+        Returns
+        -------
+        numpy.ndarray
+            Summary statistics.
+        """
         # repeat each row for how many input/output different trace are there
         _theta = np.repeat(theta, repeats=self.n_traces, axis=0)
 
         # create a dictionary with repeated sampled prior
         d_param = get_param_dict(_theta, self.param_names, self.n_neurons)
 
-        # setup and run the simulator
+        # set up and run the simulator
         network_name = 'infere'
         simulator = self.setup_simulator(network_name=network_name,
                                          n_neurons=self.n_neurons,
@@ -414,10 +432,131 @@ class Inferencer(object):
                                          level=level+1)
         simulator.run(self.sim_time, d_param, self.param_names, iteration=0,
                       name=network_name)
-        return (theta, simulator)
 
-    def train(self, n_samples, features, n_rounds=1, estimation_method='SNPE',
-              density_estimator_model='maf', **params):
+        # extract features
+        obs = simulator.statemonitor.recorded_variables
+        x = []
+        for ov in self.output_var:
+            x_val = obs[ov].get_value()
+            summary_statistics = []
+            for feature in features:
+                summary_statistics.append(feature(x_val))
+            x.append(summary_statistics)
+        x = np.array(x, dtype=np.float32)
+        x = x.reshape((self.n_samples, -1))
+        return x
+
+    def init_inference(self, inference_method, density_estimator_model, prior,
+                       **inference_kwargs):
+        """Return instantiated inference object.
+
+        Parameters
+        ----------
+        inference_method : str
+            Inference method. Either of SNPE, SNLE or SNRE.
+        density_estimator_model : str
+            The type of density estimator to be created. Either
+            ``mdn``, ``made``, ``maf``, ``nsf`` for SNPE and SNLE, or
+            ``linear``, ``mlp``, ``resnet`` for SNRE.
+        prior : sbi.utils.BoxUniform
+            Uniformly distributed prior over given parameters.
+        inference_kwargs : dict, optional
+            Additional keyword arguments for
+            ``sbi.utils.get_nn_models.posterior_nn`` method.
+
+        Returns
+        -------
+        sbi.inference.NeuralInference
+            Instantiated inference object.
+        """
+        try:
+            inference_method = str.upper(inference_method)
+            inference_method_fun = getattr(sbi.inference, inference_method)
+        except AttributeError:
+            raise NameError(f'Inference method {inference_method} is not '
+                            'supported. Choose between SNPE, SNLE or SNRE.')
+        finally:
+            if inference_method == 'SNPE':
+                density_estimator_builder = posterior_nn(
+                    model=density_estimator_model, **inference_kwargs)
+            elif inference_method == 'SNLE':
+                density_estimator_builder = likelihood_nn(
+                    model=density_estimator_model, **inference_kwargs)
+            else:
+                density_estimator_builder = classifier_nn(
+                    model=density_estimator_model, **inference_kwargs)
+        inference = inference_method_fun(prior, density_estimator_builder,
+                                         device='cpu',
+                                         show_progress_bars=True)
+        return inference
+
+    def train(self, inference, theta, x, *args, **train_kwargs):
+        """Return inference object with stored training data and
+        trained density estimator.
+
+        Parameters
+        ----------
+        inference : sbi.inference.NeuralInference
+            Instantiated inference object with stored paramaters and
+            simulation outputs prepared for training.
+        theta : torch.tensor
+            Sampled prior.
+        x : torch.tensor
+            Summary statistics.
+        args : list, optional
+            Contains a uniformly distributed sbi.utils.BoxUniform
+            prior/proposal. Used only for SNPE, for SNLE and SNRE,
+            ``proposal`` should not be passed to ``append_simulations``
+            method, thus ``args`` should not be passed.
+        train_kwargs : dict, optional
+            Additional keyword arguments for ``train`` method of
+            ``sbi.inference.NeuralInference`` object.
+
+        Returns
+        -------
+        tuple
+            ``sbi.inference.NeuralInference`` object with stored
+            paramaters and simulation outputs prepared for training and
+            trained neural density estimator object.
+        """
+        inference = inference.append_simulations(theta, x, *args)
+        density_estimator = inference.train(**train_kwargs)
+        return (inference, density_estimator)
+
+    def build_posterior(self, inference, density_estimator):
+        """Return instantiated inference object.
+
+        Parameters
+        ----------
+        inference : sbi.inference.NeuralInference
+            Instantiated inference object with stored paramaters and
+            simulation outputs prepared for training.
+        theta : torch.tensor
+            Sampled prior.
+        x : torch.tensor
+            Summary statistics.
+        args : list, optional
+            Contains a uniformly distributed sbi.utils.BoxUniform
+            prior/proposal. Used only for SNPE, for SNLE and SNRE,
+            ``proposal`` should not be passed to ``append_simulations``
+            method, thus ``args`` should not be passed.
+        train_kwargs : dict, optional
+            Additional keyword arguments for ``train`` method of
+            ``sbi.inference.NeuralInference`` object.
+
+        Returns
+        -------
+        tuple
+            ``sbi.inference.NeuralInference`` object with stored
+            paramaters and simulation outputs prepared for training and
+            ``sbi.inference.NeuralInference`` object from which.
+        """
+        posterior = inference.build_posterior(density_estimator)
+        return (inference, posterior)
+
+    def infere(self, n_samples, features, n_rounds=1, inference_method='SNPE',
+               density_estimator_model='maf', inference_kwargs={},
+               train_kwargs={}, posterior_kwargs={}, **params):
         """Return the trained neural density estimator.
 
         Currently only sequential neural posterior estimator is
@@ -434,12 +573,14 @@ class Inferencer(object):
             If ``n_rounds`` is set to 1, amortized inference will be
             performed. Otherwise, if ``n_rounds`` is integer larger
             than 1, multi-round inference will be performed.
-        estimation_method : str
+        inference_method : str
             Inference method. Either of SNPE, SNLE or SNRE. Currently,
             only SNPE is supported.
         density_estimator_model : str
             The type of density estimator to be created. Either
             ``mdn``, ``made``, ``maf`` or ``nsf``.
+        train_kwargs : dict, optional
+            Dictionary of arguments for training the posterior estimator.
         params : dict
             Bounds for each parameter.
 
@@ -450,8 +591,13 @@ class Inferencer(object):
         """
         if not isinstance(n_rounds, int):
             raise ValueError('Number of rounds must be a positive integer.')
-        if str.upper(estimation_method) != 'SNPE':
-            raise NotImplementedError('Only SNPE estimator is supported.')
+        try:
+            inference_method = str.upper(inference_method)
+        except ValueError as e:
+            print(e, '\nInvalid inference method.')
+        if inference_method not in ['SNPE', 'SNLE', 'SNRE']:
+            raise ValueError(f'Inference method {inference_method} is not '
+                             'supported. Choose between SNPE, SNLE or SNRE.')
 
         # observation the focus is on
         x_o = []
@@ -464,34 +610,44 @@ class Inferencer(object):
         x_o = torch.tensor(x_o, dtype=torch.float32)
         self.x_o = x_o
 
-        # initialize prior, density estimator and inference method
+        # initialize prior
         prior = self.initialize_prior(**params)
-        density_esimator = posterior_nn(density_estimator_model)
-        inference = sbi.inference.SNPE(prior, density_esimator)
 
-        # allocate empty list of posteriors, for multi-round inference only
+        # initialize inference object
+        inference = self.init_inference(inference_method,
+                                        density_estimator_model,
+                                        prior,
+                                        **inference_kwargs)
+
+        # allocate empty list of posteriors
         posteriors = []
         proposal = prior
-        for _ in range(n_rounds):
-            # extract the data and make adjustments for ``sbi``
-            theta, simulator = self.generate_training_data(n_samples, proposal)
+        if inference_method == 'SNPE':
+            args = [proposal]
+        else:
+            args = []
+        for round in range(n_rounds):
+            print(f'Round {round + 1} of inference.')
+
+            # extract the training data and make adjustments for ``sbi``
+            print('Generating training data...')
+            theta = self.generate_training_data(n_samples, proposal)
             theta = torch.tensor(theta, dtype=torch.float32)
-            obs = simulator.statemonitor.recorded_variables
-            x = []
-            for ov in self.output_var:
-                x_val = obs[ov].get_value()
-                summary_statistics = []
-                for feature in features:
-                    summary_statistics.append(feature(x_val))
-                x.append(summary_statistics)
-            x = torch.tensor(x, dtype=torch.float32)
-            x = x.view((self.n_samples, -1))
+
+            # extract the summary statistics and make adjustments for ``sbi``
+            x = self.extract_summary_statistics(theta, features)
+            x = torch.tensor(x)
 
             # pass the simulated data to the inference object and train it
-            de = inference.append_simulations(theta, x, proposal).train()
+            print('Training the neural density estimator...')
+            inference, density_estimator = self.train(inference,
+                                                      theta, x,
+                                                      *args, **train_kwargs)
 
             # use the density estimator to build the posterior
-            posterior = inference.build_posterior(de)
+            inference, posterior = self.build_posterior(inference,
+                                                        density_estimator,
+                                                        **posterior_kwargs)
 
             # append the current posterior to the list of posteriors
             posteriors.append(posterior)
@@ -597,6 +753,10 @@ class Inferencer(object):
                 print(e, 'Posterior object is not found.')
         params = p.sample((1, ))
 
+        # set output variable that is monitored
+        if output_var is None:
+            output_var = self.output_var
+
         # set up initial values
         if param_init is None:
             param_init = self.param_init
@@ -611,17 +771,17 @@ class Inferencer(object):
         network_name = 'generate_traces'
         simulator = self.setup_simulator('generate_traces',
                                          self.n_traces,
-                                         output_var=self.output_var,
+                                         output_var=output_var,
                                          param_init=param_init,
                                          level=level+1)
         simulator.run(self.sim_time, d_param, self.param_names, iteration=0,
                       name=network_name)
 
         # create dictionary of traces for multiple observed output variables
-        if len(self.output_var) > 1:
-            for ov in self.output_var:
+        if len(output_var) > 1:
+            for ov in output_var:
                 trace = getattr(simulator.statemonitor, ov)[:]
                 traces = {ov: trace}
         else:
-            traces = getattr(simulator.statemonitor, self.output_var[0])[:]
+            traces = getattr(simulator.statemonitor, output_var[0])[:]
         return traces
