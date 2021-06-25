@@ -713,8 +713,7 @@ class Inferencer(object):
                 print(e, '\nProvide samples or call ``sample`` method first.')
                 raise
         fig, axes = sbi.analysis.pairplot(s, **kwargs)
-        plt.show()
-        return (fig, axes)
+        return fig, axes
 
     def generate_traces(self, posterior=None, output_var=None, param_init=None,
                         level=0):
