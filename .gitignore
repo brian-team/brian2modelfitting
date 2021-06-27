@@ -83,3 +83,7 @@ brian2modelfitting.egg-info
 
 # sbi logs
 examples/sbi-logs/
+
+# other sbi and torch stuff
+examples/*.pt
+examples/*.pth
