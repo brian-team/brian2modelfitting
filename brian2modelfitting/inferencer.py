@@ -15,7 +15,6 @@ from brian2.units.fundamentalunits import (DIMENSIONLESS,
                                            fail_for_dimension_mismatch,
                                            get_dimensions,
                                            Quantity)
-import matplotlib.pyplot as plt
 import numpy as np
 from sbi.utils.get_nn_models import (posterior_nn,
                                      likelihood_nn,
@@ -162,6 +161,9 @@ class Inferencer(object):
         key corresponds to the name of the output variable as defined
         in ``model`` and value corresponds to a single dimensional
         array of recorded data traces.
+    features : list
+            List of callables that take the voltage trace and output
+            summary statistics stored in `numpy.array`.
     method : str, optional
         Integration method.
     threshold : str, optional
@@ -181,8 +183,8 @@ class Inferencer(object):
         Dictionary of state variables to be initialized with respective
         values.
     """
-    def __init__(self, dt, model, input, output, method=None, threshold=None,
-                 reset=None, refractory=None, param_init=None):
+    def __init__(self, dt, model, input, output, features, method=None,
+                 threshold=None, reset=None, refractory=None, param_init=None):
         # time scale
         self.dt = dt
 
@@ -271,6 +273,17 @@ class Inferencer(object):
         self.samples = None
         # placeholder for the posterior
         self.posterior = None
+        # observation the focus is on
+        x_o = []
+        for o in self.output:
+            o = np.array(o)
+            obs = []
+            for feature in features:
+                obs.extend(feature(o.transpose()))
+            x_o.append(obs)
+        x_o = torch.tensor(x_o, dtype=torch.float32)
+        self.x_o = x_o
+        self.features = features
 
     @property
     def n_neurons(self):
@@ -526,7 +539,8 @@ class Inferencer(object):
         density_estimator = inference.train(**train_kwargs)
         return (inference, density_estimator)
 
-    def build_posterior(self, inference, density_estimator):
+    def build_posterior(self, inference, density_estimator,
+                        **posterior_kwargs):
         """Return instantiated inference object.
 
         Parameters
@@ -543,9 +557,9 @@ class Inferencer(object):
             prior/proposal. Used only for SNPE, for SNLE and SNRE,
             ``proposal`` should not be passed to ``append_simulations``
             method, thus ``args`` should not be passed.
-        train_kwargs : dict, optional
-            Additional keyword arguments for ``train`` method of
-            ``sbi.inference.NeuralInference`` object.
+        posterior_kwargs : dict, optional
+            Additional keyword arguments for ``build_posterior`` method
+            of ``sbi.inference.NeuralInference`` object.
 
         Returns
         -------
@@ -554,10 +568,11 @@ class Inferencer(object):
             paramaters and simulation outputs prepared for training and
             ``sbi.inference.NeuralInference`` object from which.
         """
-        posterior = inference.build_posterior(density_estimator)
+        posterior = inference.build_posterior(density_estimator,
+                                              **posterior_kwargs)
         return (inference, posterior)
 
-    def infere(self, n_samples, features, n_rounds=1, inference_method='SNPE',
+    def infere(self, n_samples, n_rounds=1, inference_method='SNPE',
                density_estimator_model='maf', inference_kwargs={},
                train_kwargs={}, posterior_kwargs={}, **params):
         """Return the trained neural density estimator.
@@ -569,9 +584,6 @@ class Inferencer(object):
         ---------
         n_samples : int
             The number of samples.
-        features : list
-            List of callables that take the voltage trace and output
-            summary statistics stored in `numpy.array`.
         n_rounds : int or str, optional
             If ``n_rounds`` is set to 1, amortized inference will be
             performed. Otherwise, if ``n_rounds`` is integer larger
@@ -582,14 +594,19 @@ class Inferencer(object):
         density_estimator_model : str
             The type of density estimator to be created. Either
             ``mdn``, ``made``, ``maf`` or ``nsf``.
+        inference_kwargs : dict, optional
+            Additional keyword arguments for
+            ``sbi.utils.get_nn_models.posterior_nn`` method.
         train_kwargs : dict, optional
             Dictionary of arguments for training the posterior estimator.
+        posterior_kwargs : dict, optional
+            Dictionary of arguments for `.build_posterior` method.
         params : dict
             Bounds for each parameter.
 
         Returns
         -------
-        sbi.inference.posteriors.DirectPosterior
+        sbi.inference.NeuralPosterior
             Trained posterior.
         """
         if not isinstance(n_rounds, int):
@@ -601,17 +618,6 @@ class Inferencer(object):
         if inference_method not in ['SNPE', 'SNLE', 'SNRE']:
             raise ValueError(f'Inference method {inference_method} is not '
                              'supported. Choose between SNPE, SNLE or SNRE.')
-
-        # observation the focus is on
-        x_o = []
-        for o in self.output:
-            o = np.array(o)
-            obs = []
-            for feature in features:
-                obs.extend(feature(o.transpose()))
-            x_o.append(obs)
-        x_o = torch.tensor(x_o, dtype=torch.float32)
-        self.x_o = x_o
 
         # initialize prior
         prior = self.initialize_prior(**params)
@@ -638,7 +644,7 @@ class Inferencer(object):
             theta = torch.tensor(theta, dtype=torch.float32)
 
             # extract the summary statistics and make adjustments for ``sbi``
-            x = self.extract_summary_statistics(theta, features)
+            x = self.extract_summary_statistics(theta, self.features)
             x = torch.tensor(x)
 
             # pass the simulated data to the inference object and train it
@@ -656,7 +662,7 @@ class Inferencer(object):
             posteriors.append(posterior)
 
             # update the proposal given the observation
-            proposal = posterior.set_default_x(x_o)
+            proposal = posterior.set_default_x(self.x_o)
         self.posterior = posterior
         return posterior
 
@@ -685,7 +691,7 @@ class Inferencer(object):
             raise ValueError("Need to provide posterior argument if no "
                              "posterior has been calculated by the 'infere' "
                              "method.")
-        samples = p.sample(shape)
+        samples = p.sample(shape, **kwargs)
         self.samples = samples
         return samples
 
@@ -788,3 +794,48 @@ class Inferencer(object):
         else:
             traces = getattr(simulator.statemonitor, output_var[0])[:]
         return traces
+
+    def save(self, f, posterior=None):
+        """Saves the density estimator state dictionary to a disk file.
+
+        Parameters
+        ----------
+        posterior : sbi.inference.posteriors.DirectPosterior, optional
+            Posterior distribution.
+        f : str or os.PathLike
+            Path to file either as string or ``os.PathLike`` object
+            that contains file name.
+
+        Returns
+        -------
+        None
+        """
+        if posterior:
+            p = posterior
+        else:
+            p = self.posterior
+        if not p:
+            raise ValueError("Need to provide posterior argument if no "
+                             "posterior has been calculated by the 'infere' "
+                             "method.")
+        torch.save(p, f)
+
+    def load_posterior(self, f):
+        """Loads the density estimator state dictionary from a disk file.
+
+        Parameters
+        ----------
+        f : str or os.PathLike
+            Path to file either as string or ``os.PathLike`` object
+            that contains file name.
+
+        Returns
+        -------
+        sbi.inference.NeuralPosterior
+            Loaded neural posterior with defined method family, density
+            estimator state dictionary, prior over parameters and
+            output shape of the simulator.
+        """
+        p = torch.load(f)
+        self.posterior = p
+        return p
