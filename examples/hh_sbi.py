@@ -36,6 +36,10 @@ eqs = '''
 inferencer = Inferencer(dt=dt, model=eqs,
                         input={'I': inp_traces * amp},
                         output={'v': out_traces * mV},
+                        features=[
+                            lambda x: x.mean(axis=0),
+                            lambda x: x.std(axis=0),
+                            lambda x: x.ptp(axis=0)],
                         method='exponential_euler',
                         threshold='m > 0.5',
                         refractory='m > 0.5',
@@ -43,12 +47,7 @@ inferencer = Inferencer(dt=dt, model=eqs,
 
 # Generate prior and train the neural density estimator
 inferencer.infere(n_samples=1000,
-                  features=[
-                      lambda x: x.mean(axis=0),
-                      lambda x: x.std(axis=0),
-                      lambda x: x.ptp(axis=0)],
-                  n_rounds=2,
-                  density_estimator_model='made',
+                  n_rounds=1,
                   gl=[1e-09 * siemens, 1e-07 * siemens],
                   g_na=[2e-06 * siemens, 2e-04 * siemens],
                   g_kd=[6e-07 * siemens, 6e-05 * siemens],
