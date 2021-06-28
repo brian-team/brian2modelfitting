@@ -87,3 +87,7 @@ examples/sbi-logs/
 # other sbi and torch stuff
 examples/*.pt
 examples/*.pth
+
+# numpy files
+examples/*.npy
+examples/*.npz
