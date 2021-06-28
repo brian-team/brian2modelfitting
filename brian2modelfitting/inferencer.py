@@ -389,7 +389,7 @@ class Inferencer(object):
         prior = calc_prior(self.param_names, **params)
         return prior
 
-    def generate_training_data(self, n_samples, prior):
+    def generate_training_data(self, n_samples, prior, save=False):
         """Return sampled prior and executed simulator containing
         recorded variables to be used for training the neural density
         estimator.
@@ -400,6 +400,11 @@ class Inferencer(object):
             The number of samples.
         prior : sbi.utils.BoxUniform
             Uniformly distributed prior over given parameters.
+        save : bool or str, optional
+            Save training data for later use into ``.npz`` file. If set
+            to True, sampled prior over parameters will be stored to a
+            ``theta.npz`` file. Otherwise, if set to a string the name
+            of the file will be forwarded string value.
 
         Returns
         -------
@@ -412,9 +417,16 @@ class Inferencer(object):
         # sample from prior
         theta = prior.sample((n_samples, ))
         theta = np.atleast_2d(theta.numpy())
+
+        if save:
+            if isinstance(save, (str, )):
+                fn = save + '.npz'
+            else:
+                fn = 'theta.npz'
+            np.savez(fn, theta)
         return theta
 
-    def extract_summary_statistics(self, theta, features, level=1):
+    def extract_summary_statistics(self, theta, features, save=False, level=1):
         """Return summary statistics to be used for training the neural
         density estimator.
 
@@ -425,6 +437,11 @@ class Inferencer(object):
         features : list
             List of callables that take the voltage trace and output
             summary statistics stored in `numpy.array`.
+         save : bool or str, optional
+            Save training data for later use into ``.npz`` file. If set
+            to True, extracted features will be stored to a ``x.npz``
+            file. Otherwise, if set to a string the name of the file
+            will be forwarded string value.
         level : int, optional
             How far to go back to get the locals/globals.
 
@@ -460,6 +477,12 @@ class Inferencer(object):
             x.append(summary_statistics)
         x = np.array(x, dtype=np.float32)
         x = x.reshape((self.n_samples, -1))
+        if save:
+            if isinstance(save, (str, )):
+                fn = save + '.npz'
+            else:
+                fn = 'x.npz'
+            np.savez(fn, theta)
         return x
 
     def init_inference(self, inference_method, density_estimator_model, prior,
