@@ -162,8 +162,8 @@ class Inferencer(object):
         in ``model`` and value corresponds to a single dimensional
         array of recorded data traces.
     features : list
-            List of callables that take the voltage trace and output
-            summary statistics stored in `numpy.array`.
+        List of callables that take the voltage trace and output
+        summary statistics.
     method : str, optional
         Integration method.
     threshold : str, optional
@@ -659,7 +659,7 @@ class Inferencer(object):
         else:
             args = []
         for round in range(n_rounds):
-            print(f'Round {round + 1} of inference.')
+            print(f'Round {round + 1}/{n_rounds}.')
 
             # extract the training data and make adjustments for ``sbi``
             print('Generating training data...')
