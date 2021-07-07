@@ -172,7 +172,7 @@ class Inferencer(object):
     reset : str, optional
         The (possibly multi-line) string with the code to execute on
         reset.
-    refractory : str, optional
+    refractory : bool or str, optional
         Either the length of the refractory period (e.g., ``2*ms``), a
         string expression that evaluates to the length of the
         refractory period after each spike, e.g., ``'(1 + rand())*ms'``,
@@ -184,7 +184,7 @@ class Inferencer(object):
         values.
     """
     def __init__(self, dt, model, input, output, features, method=None,
-                 threshold=None, reset=None, refractory=None, param_init=None):
+                 threshold=None, reset=None, refractory=False, param_init=None):
         # time scale
         self.dt = dt
 
