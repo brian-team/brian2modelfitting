@@ -126,7 +126,7 @@ def calc_prior(param_names, **params):
     """
     for param_name in param_names:
         if param_name not in params:
-            raise TypeError(f'"Bounds must be set for parameter {param_name}')
+            raise TypeError(f'Bounds must be set for parameter {param_name}')
     prior_min = []
     prior_max = []
     for param_name in param_names:
@@ -184,7 +184,8 @@ class Inferencer(object):
         values.
     """
     def __init__(self, dt, model, input, output, features, method=None,
-                 threshold=None, reset=None, refractory=False, param_init=None):
+                 threshold=None, reset=None, refractory=False,
+                 param_init=None):
         # time scale
         self.dt = dt
 
@@ -284,6 +285,8 @@ class Inferencer(object):
         x_o = torch.tensor(x_o, dtype=torch.float32)
         self.x_o = x_o
         self.features = features
+        self.theta = None
+        self.x = None
 
     @property
     def n_neurons(self):
@@ -369,7 +372,7 @@ class Inferencer(object):
         simulator.initialize(network, param_init, name=network_name)
         return simulator
 
-    def initialize_prior(self, **params):
+    def init_prior(self, **params):
         """Return the prior uniform distribution over parameters.
 
         Parameters
@@ -389,7 +392,7 @@ class Inferencer(object):
         prior = calc_prior(self.param_names, **params)
         return prior
 
-    def generate_training_data(self, n_samples, prior, save=False):
+    def generate_training_data(self, n_samples, prior):
         """Return sampled prior and executed simulator containing
         recorded variables to be used for training the neural density
         estimator.
@@ -400,11 +403,6 @@ class Inferencer(object):
             The number of samples.
         prior : sbi.utils.BoxUniform
             Uniformly distributed prior over given parameters.
-        save : bool or str, optional
-            Save training data for later use into ``.npz`` file. If set
-            to True, sampled prior over parameters will be stored to a
-            ``theta.npz`` file. Otherwise, if set to a string the name
-            of the file will be forwarded string value.
 
         Returns
         -------
@@ -418,15 +416,9 @@ class Inferencer(object):
         theta = prior.sample((n_samples, ))
         theta = np.atleast_2d(theta.numpy())
 
-        if save:
-            if isinstance(save, (str, )):
-                fn = save + '.npz'
-            else:
-                fn = 'theta.npz'
-            np.savez(fn, theta)
         return theta
 
-    def extract_summary_statistics(self, theta, features, save=False, level=1):
+    def extract_summary_statistics(self, theta, level=1):
         """Return summary statistics to be used for training the neural
         density estimator.
 
@@ -434,14 +426,6 @@ class Inferencer(object):
         ----------
         theta : numpy.ndarray
             Sampled prior of shape (``n_samples``, -1).
-        features : list
-            List of callables that take the voltage trace and output
-            summary statistics stored in `numpy.array`.
-         save : bool or str, optional
-            Save training data for later use into ``.npz`` file. If set
-            to True, extracted features will be stored to a ``x.npz``
-            file. Otherwise, if set to a string the name of the file
-            will be forwarded string value.
         level : int, optional
             How far to go back to get the locals/globals.
 
@@ -472,18 +456,76 @@ class Inferencer(object):
         for ov in self.output_var:
             x_val = obs[ov].get_value()
             summary_statistics = []
-            for feature in features:
+            for feature in self.features:
                 summary_statistics.append(feature(x_val))
             x.append(summary_statistics)
         x = np.array(x, dtype=np.float32)
         x = x.reshape((self.n_samples, -1))
-        if save:
-            if isinstance(save, (str, )):
-                fn = save + '.npz'
-            else:
-                fn = 'x.npz'
-            np.savez(fn, theta)
         return x
+
+    def save_summary_statistics(self, f, theta=None, x=None):
+        """Save sampled prior data, theta, and extracted summary
+        statistics, x, into a single file in compressed ``.pz`` format.
+
+        Parameters
+        ----------
+        f : str or os.PathLike
+            Path to file either as string or ``os.PathLike`` object
+            that contains file name.
+        theta : numpy.ndarray, optional
+            Sampled prior.
+        x : numpy.ndarray, optional
+            Summary statistics.
+
+        Returns
+        -------
+        None
+        """
+        if theta is not None:
+            t = theta
+        elif self.theta is not None:
+            t = self.theta
+        else:
+            raise AttributeError('Provide sampled prior or call '
+                                 '``infere_step``method first.')
+        if x is not None:
+            pass
+        elif self.x is not None:
+            x = self.x
+        else:
+            raise AttributeError('Provide summary feautures or call '
+                                 '``infere_step``method first.')
+        np.savez_compressed(f, theta=t, x=x)
+
+    def load_summary_statistics(self, f, **kwargs):
+        """Load sampled prior data, theta, and extracted summary
+        statistics, x, from a compressed ``.npz`` format. Arrays should
+        be named either `arr_0` and `arr_1` or `theta` and `x` for
+        sampled priors and extracted features, respectively.
+
+        Parameters
+        ----------
+        f : str or os.PathLike
+            Path to file either as string or ``os.PathLike`` object
+            that contains file name.
+        kwargs : dict, optional
+            Additional keyword arguments for ``numpy.load`` method.
+
+        Returns
+        -------
+        tuple
+            Consisting of sampled prior and summary statistics arrays.
+        """
+        loaded = np.load(f, allow_pickle=True)
+        if loaded.files == ['theta', 'x'] or loaded.files == ['x', 'theta']:
+            theta = loaded['theta']
+            x = loaded['x']
+        elif loaded.files == ['arr_0', 'arr_1']:
+            theta = loaded['arr_0']
+            x = loaded['arr_1']
+        self.theta = theta
+        self.x = x
+        return (theta, x)
 
     def init_inference(self, inference_method, density_estimator_model, prior,
                        **inference_kwargs):
@@ -595,25 +637,89 @@ class Inferencer(object):
                                               **posterior_kwargs)
         return (inference, posterior)
 
-    def infere(self, n_samples, n_rounds=1, inference_method='SNPE',
-               density_estimator_model='maf', inference_kwargs={},
-               train_kwargs={}, posterior_kwargs={}, **params):
+    def infere_step(self, proposal, inference,
+                    n_samples=None, theta=None, x=None, level=1,
+                    train_kwargs={}, posterior_kwargs={}, *args):
         """Return the trained neural density estimator.
-
-        Currently only sequential neural posterior estimator is
-        supported.
 
         Parameter
         ---------
-        n_samples : int
+        proposal : ``sbi.utils.torchutils.BoxUniform``
+            Prior over parameters for current inference round.
+        inference : ``sbi.inference.NeuralInference``
+            Inference object obtained via `.init_inference` method.
+        n_samples : int, optional
             The number of samples.
+        theta : torch.tensor, optional
+            Sampled prior.
+        x : torch.tensor, optional
+            Summary statistics.
+        level : int, optional
+        train_kwargs : dict, optional
+            Dictionary of arguments for training a posterior estimator.
+        posterior_kwargs : dict, optional
+            Dictionary of arguments for `.build_posterior` method.
+        args : list, optional
+            Additional arguments for train method if SNPE is used as
+            an inference method.
+
+        Returns
+        -------
+        sbi.inference.NeuralPosterior
+            Trained posterior.
+        """
+        # extract the training data and make adjustments for ``sbi``
+        if theta is None:
+            if n_samples is None:
+                raise ValueError('Either provide ``theta`` or ``n_samples``.')
+            else:
+                theta = self.generate_training_data(n_samples, proposal)
+        self.theta = theta
+        theta = torch.tensor(theta, dtype=torch.float32)
+
+        # extract the summary statistics and make adjustments for ``sbi``
+        if x is None:
+            if n_samples is None:
+                raise ValueError('Either provide ``x`` or ``n_samples``.')
+            else:
+                x = self.extract_summary_statistics(theta, level=level+1)
+        self.x = x
+        x = torch.tensor(x)
+
+        # pass the simulated data to the inference object and train it
+        print('Training the neural density estimator...')
+        inference, density_estimator = self.train(inference,
+                                                  theta, x,
+                                                  *args, **train_kwargs)
+
+        # use the density estimator to build the posterior
+        inference, posterior = self.build_posterior(inference,
+                                                    density_estimator,
+                                                    **posterior_kwargs)
+        self.posterior = posterior
+        return posterior
+
+    def infere(self, n_rounds=1,
+               n_samples=None, theta=None, x=None,
+               inference_method='SNPE', density_estimator_model='maf',
+               inference_kwargs={}, train_kwargs={}, posterior_kwargs={},
+               **params):
+        """Return the trained neural density estimator.
+
+        Parameter
+        ---------
         n_rounds : int or str, optional
             If ``n_rounds`` is set to 1, amortized inference will be
             performed. Otherwise, if ``n_rounds`` is integer larger
             than 1, multi-round inference will be performed.
+        n_samples : int
+            The number of samples.
+        theta : torch.tensor
+            Sampled prior.
+        x : torch.tensor
+            Summary statistics.
         inference_method : str
-            Inference method. Either of SNPE, SNLE or SNRE. Currently,
-            only SNPE is supported.
+            Inference method. Either of SNPE, SNLE or SNRE.
         density_estimator_model : str
             The type of density estimator to be created. Either
             ``mdn``, ``made``, ``maf`` or ``nsf``.
@@ -643,7 +749,26 @@ class Inferencer(object):
                              'supported. Choose between SNPE, SNLE or SNRE.')
 
         # initialize prior
-        prior = self.initialize_prior(**params)
+        if self.posterior is None:
+            prior = self.init_prior(**params)
+        else:
+            prior = self.posterior.set_default_x(self.x_o)
+
+        # extract the training data and make adjustments for ``sbi``
+        if theta is None:
+            if n_samples is None:
+                raise ValueError('Either provide ``theta`` or ``n_samples``.')
+            else:
+                theta = self.generate_training_data(n_samples, prior)
+        self.theta = theta
+
+        # extract the summary statistics and make adjustments for ``sbi``
+        if x is None:
+            if n_samples is None:
+                raise ValueError('Either provide ``x`` or ``n_samples``.')
+            else:
+                x = self.extract_summary_statistics(theta)
+        self.x = x
 
         # initialize inference object
         inference = self.init_inference(inference_method,
@@ -661,33 +786,55 @@ class Inferencer(object):
         for round in range(n_rounds):
             print(f'Round {round + 1}/{n_rounds}.')
 
-            # extract the training data and make adjustments for ``sbi``
-            print('Generating training data...')
-            theta = self.generate_training_data(n_samples, proposal)
-            theta = torch.tensor(theta, dtype=torch.float32)
-
-            # extract the summary statistics and make adjustments for ``sbi``
-            x = self.extract_summary_statistics(theta, self.features)
-            x = torch.tensor(x)
-
-            # pass the simulated data to the inference object and train it
-            print('Training the neural density estimator...')
-            inference, density_estimator = self.train(inference,
-                                                      theta, x,
-                                                      *args, **train_kwargs)
-
-            # use the density estimator to build the posterior
-            inference, posterior = self.build_posterior(inference,
-                                                        density_estimator,
-                                                        **posterior_kwargs)
+            posterior = self.infere_step(proposal, inference,
+                                         n_samples, self.theta, self.x, 1,
+                                         train_kwargs, posterior_kwargs, *args)
 
             # append the current posterior to the list of posteriors
             posteriors.append(posterior)
 
             # update the proposal given the observation
-            proposal = posterior.set_default_x(self.x_o)
+            if n_rounds > 1:
+                proposal = posterior.set_default_x(self.x_o)
         self.posterior = posterior
         return posterior
+
+    def save_posterior(self, f):
+        """Saves the density estimator state dictionary to a disk file.
+
+        Parameters
+        ----------
+        posterior : sbi.inference.posteriors.DirectPosterior, optional
+            Posterior distribution.
+        f : str or os.PathLike
+            Path to file either as string or ``os.PathLike`` object
+            that contains file name.
+
+        Returns
+        -------
+        None
+        """
+        torch.save(self.posterior, f)
+
+    def load_posterior(self, f):
+        """Loads the density estimator state dictionary from a disk file.
+
+        Parameters
+        ----------
+        f : str or os.PathLike
+            Path to file either as string or ``os.PathLike`` object
+            that contains file name.
+
+        Returns
+        -------
+        sbi.inference.NeuralPosterior
+            Loaded neural posterior with defined method family, density
+            estimator state dictionary, prior over parameters and
+            output shape of the simulator.
+        """
+        p = torch.load(f)
+        self.posterior = p
+        return p
 
     def sample(self, shape, posterior=None, **kwargs):
         """Return samples from posterior distribution.
@@ -708,13 +855,13 @@ class Inferencer(object):
         """
         if posterior:
             p = posterior
-        else:
+        elif posterior is None and self.posterior:
             p = self.posterior
-        if not p:
-            raise ValueError("Need to provide posterior argument if no "
-                             "posterior has been calculated by the 'infere' "
-                             "method.")
-        samples = p.sample(shape, **kwargs)
+        else:
+            raise ValueError('Need to provide posterior argument if no '
+                             'posterior has been calculated by the ``infere`` '
+                             'method.')
+        samples = p.sample(shape, x=self.x_o, **kwargs)
         self.samples = samples
         return samples
 
@@ -778,12 +925,13 @@ class Inferencer(object):
         # sample a single set of parameters from posterior distribution
         if posterior:
             p = posterior
+        elif posterior is None and self.posterior:
+            p = self.posterior
         else:
-            try:
-                p = self.posterior
-            except NameError as e:
-                print(e, 'Posterior object is not found.')
-        params = p.sample((1, ))
+            raise ValueError('Need to provide posterior argument if no '
+                             'posterior has been calculated by the ``infere`` '
+                             'method.')
+        params = p.sample((1, ), x=self.x_o)
 
         # set output variable that is monitored
         if output_var is None:
@@ -817,48 +965,3 @@ class Inferencer(object):
         else:
             traces = getattr(simulator.statemonitor, output_var[0])[:]
         return traces
-
-    def save(self, f, posterior=None):
-        """Saves the density estimator state dictionary to a disk file.
-
-        Parameters
-        ----------
-        posterior : sbi.inference.posteriors.DirectPosterior, optional
-            Posterior distribution.
-        f : str or os.PathLike
-            Path to file either as string or ``os.PathLike`` object
-            that contains file name.
-
-        Returns
-        -------
-        None
-        """
-        if posterior:
-            p = posterior
-        else:
-            p = self.posterior
-        if not p:
-            raise ValueError("Need to provide posterior argument if no "
-                             "posterior has been calculated by the 'infere' "
-                             "method.")
-        torch.save(p, f)
-
-    def load_posterior(self, f):
-        """Loads the density estimator state dictionary from a disk file.
-
-        Parameters
-        ----------
-        f : str or os.PathLike
-            Path to file either as string or ``os.PathLike`` object
-            that contains file name.
-
-        Returns
-        -------
-        sbi.inference.NeuralPosterior
-            Loaded neural posterior with defined method family, density
-            estimator state dictionary, prior over parameters and
-            output shape of the simulator.
-        """
-        p = torch.load(f)
-        self.posterior = p
-        return p
