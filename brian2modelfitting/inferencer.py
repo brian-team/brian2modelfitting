@@ -638,7 +638,7 @@ class Inferencer(object):
         return (inference, posterior)
 
     def infere_step(self, proposal, inference,
-                    n_samples=None, theta=None, x=None, level=1,
+                    n_samples=None, theta=None, x=None,
                     train_kwargs={}, posterior_kwargs={}, *args):
         """Return the trained neural density estimator.
 
@@ -650,17 +650,17 @@ class Inferencer(object):
             Inference object obtained via `.init_inference` method.
         n_samples : int, optional
             The number of samples.
-        theta : torch.tensor, optional
+        theta : numpy.ndarray, optional
             Sampled prior.
-        x : torch.tensor, optional
+        x : numpy.ndarray, optional
             Summary statistics.
-        level : int, optional
         train_kwargs : dict, optional
-            Dictionary of arguments for training a posterior estimator.
+            Additional keyword arguments for training the posterior
+            estimator.
         posterior_kwargs : dict, optional
             Dictionary of arguments for `.build_posterior` method.
         args : list, optional
-            Additional arguments for train method if SNPE is used as
+            Additional arguments for `.train` method if SNPE is used as
             an inference method.
 
         Returns
@@ -682,12 +682,11 @@ class Inferencer(object):
             if n_samples is None:
                 raise ValueError('Either provide ``x`` or ``n_samples``.')
             else:
-                x = self.extract_summary_statistics(theta, level=level+1)
+                x = self.extract_summary_statistics(theta, level=2)
         self.x = x
         x = torch.tensor(x)
 
         # pass the simulated data to the inference object and train it
-        print('Training the neural density estimator...')
         inference, density_estimator = self.train(inference,
                                                   theta, x,
                                                   *args, **train_kwargs)
@@ -699,35 +698,40 @@ class Inferencer(object):
         self.posterior = posterior
         return posterior
 
-    def infere(self, n_rounds=1,
-               n_samples=None, theta=None, x=None,
+    def infere(self, n_samples=None, theta=None, x=None, n_rounds=1,
                inference_method='SNPE', density_estimator_model='maf',
                inference_kwargs={}, train_kwargs={}, posterior_kwargs={},
                **params):
-        """Return the trained neural density estimator.
+        """Return the trained posterior.
+
+        If ``theta`` and ``x`` are not provided, ``n_samples`` has to
+        be defined. Otherwise, if ``n_samples`` is provided, neither
+        ``theta`` nor ``x`` needs to be provided.
 
         Parameter
         ---------
-        n_rounds : int or str, optional
+        n_samples : int, optional
+            The number of samples.
+        theta : numpy.ndarray, optional
+            Sampled prior.
+        x : numpy.ndarray, optional
+            Summary statistics.
+        n_rounds : int, optional
             If ``n_rounds`` is set to 1, amortized inference will be
             performed. Otherwise, if ``n_rounds`` is integer larger
-            than 1, multi-round inference will be performed.
-        n_samples : int
-            The number of samples.
-        theta : torch.tensor
-            Sampled prior.
-        x : torch.tensor
-            Summary statistics.
-        inference_method : str
+            than 1, multi-round inference will be performed. This is
+            only valid if posterior has not been defined manually.
+        inference_method : str, optional
             Inference method. Either of SNPE, SNLE or SNRE.
-        density_estimator_model : str
+        density_estimator_model : str, optional
             The type of density estimator to be created. Either
             ``mdn``, ``made``, ``maf`` or ``nsf``.
         inference_kwargs : dict, optional
             Additional keyword arguments for
             ``sbi.utils.get_nn_models.posterior_nn`` method.
         train_kwargs : dict, optional
-            Dictionary of arguments for training the posterior estimator.
+            Additional keyword arguments for training the posterior
+            estimator.
         posterior_kwargs : dict, optional
             Dictionary of arguments for `.build_posterior` method.
         params : dict
@@ -738,8 +742,11 @@ class Inferencer(object):
         sbi.inference.NeuralPosterior
             Trained posterior.
         """
+        # handle the number of rounds
         if not isinstance(n_rounds, int):
             raise ValueError('Number of rounds must be a positive integer.')
+
+        # handle inference methods
         try:
             inference_method = str.upper(inference_method)
         except ValueError as e:
@@ -776,18 +783,25 @@ class Inferencer(object):
                                         prior,
                                         **inference_kwargs)
 
-        # allocate empty list of posteriors
+        # allocate empty list of posterior
         posteriors = []
+
+        # set a proposal
         proposal = prior
+
+        # additional arguments for `.train` method are needed only for SNPE
         if inference_method == 'SNPE':
             args = [proposal]
         else:
             args = []
+
+        # main inference loop
         for round in range(n_rounds):
             print(f'Round {round + 1}/{n_rounds}.')
 
+            # inference step
             posterior = self.infere_step(proposal, inference,
-                                         n_samples, self.theta, self.x, 1,
+                                         n_samples, self.theta, self.x,
                                          train_kwargs, posterior_kwargs, *args)
 
             # append the current posterior to the list of posteriors
