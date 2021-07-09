@@ -1,7 +1,6 @@
 from brian2 import *
 from brian2modelfitting import *
 from scipy.signal import find_peaks
-from scipy.stats import kurtosis, skew
 
 
 # Generate input and output data traces
@@ -46,6 +45,7 @@ t = arange(0, out_trace.shape[1] * dt / ms, dt / ms)
 start_syn = t[min(where(inp_trace != 0)[0])]
 end_syn = t[max(where(inp_trace != 0)[0])]
 
+
 def n_peaks(x):
     n_p = []
     for _x in x.transpose():
@@ -59,19 +59,21 @@ inferencer = Inferencer(dt=dt, model=eqs_inf,
                         output={'v': out_trace},
                         features=[lambda x: x[(t > start_syn) & (t < end_syn), :].mean(axis=0),
                                   lambda x: x[(t > start_syn) & (t < end_syn), :].std(axis=0),
-                                  lambda x: x[(t > start_syn) & (t < end_syn), :].ptp(axis=0),
+                                  lambda x: x[(t > start_syn) & (t < end_syn), :].max(axis=0),
                                   n_peaks],
                         method='exponential_euler',
                         threshold='v > -50 * mV',
                         reset='v = -70 * mV',
                         param_init={'v': -70 * mV})
 
-inferencer.infere(n_samples=10_000,
-                  inference_method='SNPE',
-                  density_estimator_model='mdn',
+inferencer.infere(n_samples=1000,
+                  inference_method='SNLE',
                   gl=[10*nS, 100*nS],
                   C=[0.1*nF, 10*nF])
 
-samples = inferencer.sample((10_000, ))
-inferencer.pairplot(samples)
+inferencer.sample((10000, ))
+inferencer.pairplot(labels=[r'$\overline{g}_{l}$', r'$C$'],
+                    points=[[1e-9, 30e-9]],
+                    points_offdiag={'markersize': 9},
+                    points_colors=['r'])
 show()
