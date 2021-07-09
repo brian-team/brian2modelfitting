@@ -85,14 +85,14 @@ inference = inferencer.init_inference(inference_method='SNPE',
                                       density_estimator_model='maf',
                                       prior=prior,
                                       hidden_features=50,
-                                      num_transforms=10,
-                                      num_bins=20,
                                       num_components=10)
 # First round of inference where no observation data is set to posterior
 posterior = inferencer.infere_step(proposal=prior,
                                    inference=inference,
                                    theta=theta_loaded, x=x_loaded,
-                                   train_kwargs={'learning_rate': 1e-4})
+                                   train_kwargs={'num_atoms': 10,
+                                                 'learning_rate': 0.0005,
+                                                 'show_train_summary': True})
 # Storing the trained posterior without a default observation
 path_to_posterior = __file__[:-3] + '_posterior.pth'
 inferencer.save_posterior(path_to_posterior)
@@ -106,8 +106,19 @@ inferencer.pairplot(labels=[r'$\overline{g}_{l}$',
                             r'$\overline{g}_{Na}$',
                             r'$\overline{g}_{K}$',
                             r'$\overline{C}_{m}$'])
-# ... and generate traces from a single sample of parameters
-inf_traces = inferencer.generate_traces(posterior=posterior_loaded)
+# ...and optionally, continue the multiround inference via ``infere`` method
+posterior_multi_round = inferencer.infere(n_rounds=2,
+                                          theta=theta_loaded, x=x_loaded,
+                                          inference_method='SNPE',
+                                          density_estimator_model='maf')
+inferencer.sample((10000, ))
+inferencer.pairplot(labels=[r'$\overline{g}_{l}$',
+                            r'$\overline{g}_{Na}$',
+                            r'$\overline{g}_{K}$',
+                            r'$\overline{C}_{m}$'])
+
+# Generate traces from a single sample of parameters
+inf_traces = inferencer.generate_traces()
 nrows = 2
 ncols = out_traces.shape[0]
 fig, axs = subplots(nrows, ncols, sharex=True,
@@ -126,9 +137,3 @@ handles, labels = [(h + l) for h, l
 fig.legend(handles, labels)
 tight_layout()
 show()
-
-# Optionally, continue the multiround inference using the ``infere`` method
-posterior_multi_round = inferencer.infere(n_rounds=2,
-                                          theta=theta_loaded, x=x_loaded,
-                                          inference_method='SNPE',
-                                          density_estimator_model='maf')
