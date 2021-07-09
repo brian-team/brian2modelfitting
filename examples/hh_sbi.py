@@ -53,27 +53,28 @@ inferencer = Inferencer(dt=dt, model=eqs,
                         features=[n_peaks,
                                   lambda x: x[(t > 5) & (t < 10), :].mean(axis=0),
                                   lambda x: x[(t > 5) & (t < 10), :].std(axis=0),
-                                  lambda x: x.ptp(axis=0)],
+                                  lambda x: x.max(axis=0)],
                         method='exponential_euler',
                         threshold='m > 0.5',
                         refractory='m > 0.5',
                         param_init={'v': 'VT'})
 
 # Generate prior and train the neural density estimator
-inferencer.infere(n_rounds=2,
-                  n_samples=1000,
+inferencer.infere(n_samples=1000,
+                  n_rounds=2,
                   gl=[1e-09*siemens, 1e-07*siemens],
                   g_na=[2e-06*siemens, 2e-04*siemens],
                   g_kd=[6e-07*siemens, 6e-05*siemens],
                   Cm=[0.1*uF*cm**-2*area, 2*uF*cm**-2*area])
 
 # Draw samples from posterior
-inferencer.sample((10000,))
+inferencer.sample((10000, ))
 
 # Create pairplot from samples
-labels_params = [r'$\overline{g}_{l}$', r'$\overline{g}_{Na}$',
-                 r'$\overline{g}_{K}$', r'$\overline{C}_{m}$']
-inferencer.pairplot(labels=labels_params)
+inferencer.pairplot(labels=[r'$\overline{g}_{l}$',
+                            r'$\overline{g}_{Na}$',
+                            r'$\overline{g}_{K}$',
+                            r'$\overline{C}_{m}$'])
 
 # Generate traces by using a single sample from the trained posterior
 inf_traces = inferencer.generate_traces()
