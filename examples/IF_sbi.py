@@ -49,7 +49,7 @@ end_syn = t[max(where(inp_trace != 0)[0])]
 def n_peaks(x):
     n_p = []
     for _x in x.transpose():
-        p_i = find_peaks(_x, height=-60)[0]
+        p_i = find_peaks(_x)[0]
         n_p.append(p_i.size)
     return n_p
 
@@ -57,9 +57,9 @@ def n_peaks(x):
 inferencer = Inferencer(dt=dt, model=eqs_inf,
                         input={'I_syn': inp_trace.reshape(1, -1)},
                         output={'v': out_trace},
-                        features=[lambda x: x[(t > start_syn) & (t < end_syn), :].mean(axis=0),
-                                  lambda x: x[(t > start_syn) & (t < end_syn), :].std(axis=0),
-                                  lambda x: x[(t > start_syn) & (t < end_syn), :].max(axis=0),
+                        features=[lambda x: x[(t > start_syn) & (t < end_syn), :].mean(axis=1),
+                                  lambda x: x[(t > start_syn) & (t < end_syn), :].std(axis=1),
+                                  lambda x: x[(t > start_syn) & (t < end_syn), :].max(axis=1),
                                   n_peaks],
                         method='exponential_euler',
                         threshold='v > -50 * mV',
@@ -67,7 +67,7 @@ inferencer = Inferencer(dt=dt, model=eqs_inf,
                         param_init={'v': -70 * mV})
 
 inferencer.infere(n_samples=1000,
-                  inference_method='SNLE',
+                  inference_method='SNPE',
                   gl=[10*nS, 100*nS],
                   C=[0.1*nF, 10*nF])
 

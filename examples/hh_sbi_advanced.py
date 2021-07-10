@@ -1,3 +1,5 @@
+import os
+
 from brian2 import *
 from brian2modelfitting import *
 import pandas as pd
@@ -66,18 +68,18 @@ prior = inferencer.init_prior(gl=[1e-09*siemens, 1e-07*siemens],
                               g_na=[2e-06*siemens, 2e-04*siemens],
                               g_kd=[6e-07*siemens, 6e-05*siemens],
                               Cm=[0.1*uF*cm**-2*area, 2*uF*cm**-2*area])
-# Generate training data
-theta = inferencer.generate_training_data(n_samples=1000,
-                                          prior=prior)
-# Extract summary stats
-x = inferencer.extract_summary_statistics(theta=theta, level=0)
-
-# Loading and storing of the data
-# For large training data, you can store it into .npz and reuse it later
+# Prepare training data
 path_to_data = __file__[:-3] + '_data.npz'
-inferencer.save_summary_statistics(path_to_data, theta, x)
-# Training data will be directly set to class variables once they are loaded
-theta_loaded, x_loaded = inferencer.load_summary_statistics(path_to_data)
+if os.path.exists(path_to_data):
+    theta, x = inferencer.load_summary_statistics(path_to_data)
+else:
+    # Generate training data
+    theta = inferencer.generate_training_data(n_samples=1000,
+                                              prior=prior)
+    # Extract summary stats
+    x = inferencer.extract_summary_statistics(theta=theta, level=0)
+    # Save the data for later use
+    inferencer.save_summary_statistics(path_to_data, theta, x)
 
 # Amortized inference
 # Training the neural density estimator
@@ -89,7 +91,7 @@ inference = inferencer.init_inference(inference_method='SNPE',
 # First round of inference where no observation data is set to posterior
 posterior = inferencer.infere_step(proposal=prior,
                                    inference=inference,
-                                   theta=theta_loaded, x=x_loaded,
+                                   theta=theta, x=x,
                                    train_kwargs={'num_atoms': 10,
                                                  'learning_rate': 0.0005,
                                                  'show_train_summary': True})
@@ -107,10 +109,7 @@ inferencer.pairplot(labels=[r'$\overline{g}_{l}$',
                             r'$\overline{g}_{K}$',
                             r'$\overline{C}_{m}$'])
 # ...and optionally, continue the multiround inference via ``infere`` method
-posterior_multi_round = inferencer.infere(n_rounds=2,
-                                          theta=theta_loaded, x=x_loaded,
-                                          inference_method='SNPE',
-                                          density_estimator_model='maf')
+posterior_multi_round = inferencer.infere(n_rounds=2)
 inferencer.sample((10000, ))
 inferencer.pairplot(labels=[r'$\overline{g}_{l}$',
                             r'$\overline{g}_{Na}$',

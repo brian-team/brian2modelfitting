@@ -197,8 +197,8 @@ class Inferencer(object):
 
         # input data traces
         if not isinstance(input, Mapping):
-            raise TypeError('``input`` argument must be a dictionary mapping'
-                            ' the name of the input variable and ``input``.')
+            raise TypeError('`input` argument must be a dictionary mapping'
+                            ' the name of the input variable and `input`.')
         if len(input) > 1:
             raise NotImplementedError('Only a single input is supported.')
         input_var = list(input.keys())[0]
@@ -208,8 +208,8 @@ class Inferencer(object):
 
         # output data traces
         if not isinstance(output, Mapping):
-            raise TypeError('``output`` argument must be a dictionary mapping'
-                            ' the name of the output variable and ``output``')
+            raise TypeError('`output` argument must be a dictionary mapping'
+                            ' the name of the output variable and `output`.')
         output_var = list(output.keys())
         output = list(output.values())
         for o_var in output_var:
@@ -309,7 +309,7 @@ class Inferencer(object):
         """
         if self.n_samples is None:
             raise ValueError('Number of samples is not yet defined.'
-                             'Call ``generate_training_data`` method first.')
+                             'Call `generate_training_data` method first.')
         return self.n_traces * self.n_samples
 
     def setup_simulator(self, network_name, n_neurons, output_var, param_init,
@@ -486,15 +486,15 @@ class Inferencer(object):
         elif self.theta is not None:
             t = self.theta
         else:
-            raise AttributeError('Provide sampled prior or call '
-                                 '``infere_step``method first.')
+            raise AttributeError('Provide sampled prior or call'
+                                 ' `infere_step` method first.')
         if x is not None:
             pass
         elif self.x is not None:
             x = self.x
         else:
             raise AttributeError('Provide summary feautures or call '
-                                 '``infere_step``method first.')
+                                 ' `infere_step` method first.')
         np.savez_compressed(f, theta=t, x=x)
 
     def load_summary_statistics(self, f, **kwargs):
@@ -517,12 +517,9 @@ class Inferencer(object):
             Consisting of sampled prior and summary statistics arrays.
         """
         loaded = np.load(f, allow_pickle=True)
-        if loaded.files == ['theta', 'x'] or loaded.files == ['x', 'theta']:
+        if set(loaded.files) == {'theta', 'x'}:
             theta = loaded['theta']
             x = loaded['x']
-        elif loaded.files == ['arr_0', 'arr_1']:
-            theta = loaded['arr_0']
-            x = loaded['arr_1']
         self.theta = theta
         self.x = x
         return (theta, x)
@@ -554,8 +551,8 @@ class Inferencer(object):
             inference_method = str.upper(inference_method)
             inference_method_fun = getattr(sbi.inference, inference_method)
         except AttributeError:
-            raise NameError(f'Inference method {inference_method} is not '
-                            'supported. Choose between SNPE, SNLE or SNRE.')
+            raise NameError(f'Inference method {inference_method} is not'
+                            ' supported. Choose between SNPE, SNLE or SNRE.')
         finally:
             if inference_method == 'SNPE':
                 density_estimator_builder = posterior_nn(
@@ -671,7 +668,7 @@ class Inferencer(object):
         # extract the training data and make adjustments for ``sbi``
         if theta is None:
             if n_samples is None:
-                raise ValueError('Either provide ``theta`` or ``n_samples``.')
+                raise ValueError('Either provide `theta` or `n_samples`.')
             else:
                 theta = self.generate_training_data(n_samples, proposal)
         self.theta = theta
@@ -680,7 +677,7 @@ class Inferencer(object):
         # extract the summary statistics and make adjustments for ``sbi``
         if x is None:
             if n_samples is None:
-                raise ValueError('Either provide ``x`` or ``n_samples``.')
+                raise ValueError('Either provide `x` or `n_samples`.')
             else:
                 x = self.extract_summary_statistics(theta, level=2)
         self.x = x
@@ -695,6 +692,7 @@ class Inferencer(object):
         inference, posterior = self.build_posterior(inference,
                                                     density_estimator,
                                                     **posterior_kwargs)
+        self.inference = inference
         self.posterior = posterior
         return posterior
 
@@ -742,46 +740,56 @@ class Inferencer(object):
         sbi.inference.NeuralPosterior
             Trained posterior.
         """
-        # handle the number of rounds
-        if not isinstance(n_rounds, int):
-            raise ValueError('Number of rounds must be a positive integer.')
+        if self.posterior is None:  # `.infere_step` has not been called
+            # handle the number of rounds
+            if not isinstance(n_rounds, int):
+                raise ValueError('`n_rounds` has to be a positive integer.')
 
-        # handle inference methods
-        try:
-            inference_method = str.upper(inference_method)
-        except ValueError as e:
-            print(e, '\nInvalid inference method.')
-        if inference_method not in ['SNPE', 'SNLE', 'SNRE']:
-            raise ValueError(f'Inference method {inference_method} is not '
-                             'supported. Choose between SNPE, SNLE or SNRE.')
+            # handle inference methods
+            try:
+                inference_method = str.upper(inference_method)
+            except ValueError as e:
+                print(e, '\nInvalid inference method.')
+            if inference_method not in ['SNPE', 'SNLE', 'SNRE']:
+                raise ValueError(f'Inference method {inference_method} is not'
+                                 ' supported.')
 
-        # initialize prior
-        if self.posterior is None:
+            # initialize prior
             prior = self.init_prior(**params)
-        else:
+
+            # extract the training data and make adjustments for ``sbi``
+            if theta is None:
+                if n_samples is None:
+                    raise ValueError('Either provide `theta` or `n_samples`.')
+                else:
+                    theta = self.generate_training_data(n_samples, prior)
+            self.theta = theta
+
+            # extract the summary statistics and make adjustments for ``sbi``
+            if x is None:
+                if n_samples is None:
+                    raise ValueError('Either provide `x` or `n_samples`.')
+                else:
+                    x = self.extract_summary_statistics(theta)
+            self.x = x
+
+            # initialize inference object
+            self.inference = self.init_inference(inference_method,
+                                                 density_estimator_model,
+                                                 prior,
+                                                 **inference_kwargs)
+
+            # additional args for `.train` method are needed only for SNPE
+            if inference_method == 'SNPE':
+                args = [prior]
+            else:
+                args = []
+        else:  # `.infere_step` has been called manually
             prior = self.posterior.set_default_x(self.x_o)
-
-        # extract the training data and make adjustments for ``sbi``
-        if theta is None:
-            if n_samples is None:
-                raise ValueError('Either provide ``theta`` or ``n_samples``.')
+            if self.posterior._method_family == 'snpe':
+                args = [prior]
             else:
-                theta = self.generate_training_data(n_samples, prior)
-        self.theta = theta
-
-        # extract the summary statistics and make adjustments for ``sbi``
-        if x is None:
-            if n_samples is None:
-                raise ValueError('Either provide ``x`` or ``n_samples``.')
-            else:
-                x = self.extract_summary_statistics(theta)
-        self.x = x
-
-        # initialize inference object
-        inference = self.init_inference(inference_method,
-                                        density_estimator_model,
-                                        prior,
-                                        **inference_kwargs)
+                args = []
 
         # allocate empty list of posterior
         posteriors = []
@@ -789,18 +797,12 @@ class Inferencer(object):
         # set a proposal
         proposal = prior
 
-        # additional arguments for `.train` method are needed only for SNPE
-        if inference_method == 'SNPE':
-            args = [proposal]
-        else:
-            args = []
-
         # main inference loop
         for round in range(n_rounds):
             print(f'Round {round + 1}/{n_rounds}.')
 
             # inference step
-            posterior = self.infere_step(proposal, inference,
+            posterior = self.infere_step(proposal, self.inference,
                                          n_samples, self.theta, self.x,
                                          train_kwargs, posterior_kwargs, *args)
 
@@ -872,9 +874,9 @@ class Inferencer(object):
         elif posterior is None and self.posterior:
             p = self.posterior
         else:
-            raise ValueError('Need to provide posterior argument if no '
-                             'posterior has been calculated by the ``infere`` '
-                             'method.')
+            raise ValueError('Need to provide posterior argument if no'
+                             ' posterior has been calculated by the `infere`'
+                             ' method.')
         samples = p.sample(shape, x=self.x_o, **kwargs)
         self.samples = samples
         return samples
@@ -904,7 +906,7 @@ class Inferencer(object):
             try:
                 s = self.samples
             except AttributeError as e:
-                print(e, '\nProvide samples or call ``sample`` method first.')
+                print(e, '\nProvide samples or call `sample` method first.')
                 raise
         fig, axes = sbi.analysis.pairplot(s, **kwargs)
         return fig, axes
@@ -942,9 +944,9 @@ class Inferencer(object):
         elif posterior is None and self.posterior:
             p = self.posterior
         else:
-            raise ValueError('Need to provide posterior argument if no '
-                             'posterior has been calculated by the ``infere`` '
-                             'method.')
+            raise ValueError('Need to provide posterior argument if no'
+                             ' posterior has been calculated by the `infere`'
+                             ' method.')
         params = p.sample((1, ), x=self.x_o)
 
         # set output variable that is monitored
