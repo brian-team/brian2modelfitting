@@ -1,3 +1,5 @@
+import os
+
 from brian2 import *
 from brian2modelfitting import *
 import pandas as pd
@@ -46,40 +48,76 @@ def n_peaks(x):
     return n_p
 
 
-# Simulation-based inference object instantiation
+# Step-by-step inference
+# Start with the regular instatiation of the class
 inferencer = Inferencer(dt=dt, model=eqs,
                         input={'I': inp_traces*amp},
                         output={'v': out_traces*mV},
                         features=[n_peaks,
                                   lambda x: x[(t > 5) & (t < 10), :].mean(axis=0),
                                   lambda x: x[(t > 5) & (t < 10), :].std(axis=0),
-                                  lambda x: x.max(axis=0)],
+                                  lambda x: x.ptp(axis=0)],
                         method='exponential_euler',
                         threshold='m > 0.5',
                         refractory='m > 0.5',
                         param_init={'v': 'VT'})
 
-# Generate prior and train the neural density estimator
-inferencer.infere(n_samples=1000,
-                  n_rounds=2,
-                  gl=[1e-09*siemens, 1e-07*siemens],
-                  g_na=[2e-06*siemens, 2e-04*siemens],
-                  g_kd=[6e-07*siemens, 6e-05*siemens],
-                  Cm=[0.1*uF*cm**-2*area, 2*uF*cm**-2*area])
+# Data generation
+# Initializing of the prior
+prior = inferencer.init_prior(gl=[1e-09*siemens, 1e-07*siemens],
+                              g_na=[2e-06*siemens, 2e-04*siemens],
+                              g_kd=[6e-07*siemens, 6e-05*siemens],
+                              Cm=[0.1*uF*cm**-2*area, 2*uF*cm**-2*area])
+# Prepare training data
+path_to_data = __file__[:-3] + '_data.npz'
+if os.path.exists(path_to_data):
+    theta, x = inferencer.load_summary_statistics(path_to_data)
+else:
+    # Generate training data
+    theta = inferencer.generate_training_data(n_samples=1000,
+                                              prior=prior)
+    # Extract summary stats
+    x = inferencer.extract_summary_statistics(theta=theta, level=0)
+    # Save the data for later use
+    inferencer.save_summary_statistics(path_to_data, theta, x)
 
-# Draw samples from posterior
+# Amortized inference
+# Training the neural density estimator
+inference = inferencer.init_inference(inference_method='SNPE',
+                                      density_estimator_model='maf',
+                                      prior=prior,
+                                      hidden_features=50,
+                                      num_components=10)
+# First round of inference where no observation data is set to posterior
+posterior = inferencer.infere_step(proposal=prior,
+                                   inference=inference,
+                                   theta=theta, x=x,
+                                   train_kwargs={'num_atoms': 10,
+                                                 'learning_rate': 0.0005,
+                                                 'show_train_summary': True})
+# Storing the trained posterior without a default observation
+path_to_posterior = __file__[:-3] + '_posterior.pth'
+inferencer.save_posterior(path_to_posterior)
+# Loading the trained posterior directly to Inferencer class
+posterior_loaded = inferencer.load_posterior(path_to_posterior)
+
+# Sampling from the posterior given observations, ...
+inferencer.sample((10000, ), posterior=posterior_loaded)
+# ...visualize the samples, ...
+inferencer.pairplot(labels=[r'$\overline{g}_{l}$',
+                            r'$\overline{g}_{Na}$',
+                            r'$\overline{g}_{K}$',
+                            r'$\overline{C}_{m}$'])
+# ...and optionally, continue the multiround inference via ``infere`` method
+posterior_multi_round = inferencer.infere(n_rounds=2)
 inferencer.sample((10000, ))
-
-# Create pairplot from samples
 inferencer.pairplot(labels=[r'$\overline{g}_{l}$',
                             r'$\overline{g}_{Na}$',
                             r'$\overline{g}_{K}$',
                             r'$\overline{C}_{m}$'])
 
-# Generate traces by using a single sample from the trained posterior
+# Generate traces from a single sample of parameters
 inf_traces = inferencer.generate_traces()
-
-# Visualize traces
 nrows = 2
 ncols = out_traces.shape[0]
 fig, axs = subplots(nrows, ncols, sharex=True,
