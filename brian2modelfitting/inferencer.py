@@ -933,7 +933,7 @@ class Inferencer(object):
         Returns
         -------
         tuple
-            Figure and axis of posterior distribution plot.
+            Figure and axis of conditional pairplot.
         """
         if density is not None:
             d = density
@@ -970,8 +970,8 @@ class Inferencer(object):
 
         Returns
         -------
-        tuple
-            Figure and axis of posterior distribution plot.
+        torch.tensor
+            Average conditional correlation matrix.
         """
         if density is not None:
             d = density
@@ -981,11 +981,11 @@ class Inferencer(object):
             except AttributeError as e:
                 print(e, '\nDensity is not available.')
                 raise
-        fig, axes = sbi.analysis.conditional_corrcoeff(density=d,
-                                                       condition=condition,
-                                                       limits=limits,
-                                                       *kwargs)
-        return fig, axes
+        cond_coeff = sbi.analysis.conditional_corrcoeff(density=d,
+                                                        condition=condition,
+                                                        limits=limits,
+                                                        *kwargs)
+        return cond_coeff
 
     def generate_traces(self, posterior=None, output_var=None, param_init=None,
                         level=0):
