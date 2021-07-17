@@ -911,6 +911,82 @@ class Inferencer(object):
         fig, axes = sbi.analysis.pairplot(s, **kwargs)
         return fig, axes
 
+    def conditional_pairplot(self, condition, limits, density=None, **kwargs):
+        """Plot conditional distribution given all other parameters.
+
+        Check ``sbi.analysis.plot.conditional_pairplot`` for more
+        details.
+
+        Parameters
+        ----------
+        condition : torch.tensor
+            Condition that all but the one/two regarded parameters are
+            fixed to.
+        limits : list or torch.tensor
+            Limits in between which each parameter will be evaulated.
+        density : sbi.inference.NeuralPosterior, optional
+            Posterior probability density.
+        **kwargs : dict, optional
+            Additional keyword arguments for the
+            ``sbi.analysis.plot.pairplot`` function.
+
+        Returns
+        -------
+        tuple
+            Figure and axis of posterior distribution plot.
+        """
+        if density is not None:
+            d = density
+        else:
+            try:
+                d = self.posterior
+            except AttributeError as e:
+                print(e, '\nDensity is not available.')
+                raise
+        fig, axes = sbi.analysis.conditional_pairplot(density=d,
+                                                      condition=condition,
+                                                      limits=limits,
+                                                      *kwargs)
+        return fig, axes
+
+    def conditional_corrcoeff(self, condition, limits, density=None, **kwargs):
+        """Plot conditional distribution given all other parameters.
+
+        Check ``sbi.analysis.conditional_density.conditional_corrcoeff``
+        for more details.
+
+        Parameters
+        ----------
+        condition : torch.tensor
+            Condition that all but the one/two regarded parameters are
+            fixed to.
+        limits : list or torch.tensor
+            Limits in between which each parameter will be evaulated.
+        density : sbi.inference.NeuralPosterior, optional
+            Posterior probability density.
+        **kwargs : dict, optional
+            Additional keyword arguments for the
+            ``sbi.analysis.plot.pairplot`` function.
+
+        Returns
+        -------
+        tuple
+            Figure and axis of posterior distribution plot.
+        """
+        if density is not None:
+            d = density
+        else:
+            try:
+                d = self.posterior
+            except AttributeError as e:
+                print(e, '\nDensity is not available.')
+                raise
+        fig, axes = sbi.analysis.conditional_corrcoeff(density=d,
+                                                       condition=condition,
+                                                       limits=limits,
+                                                       *kwargs)
+        return fig, axes
+
     def generate_traces(self, posterior=None, output_var=None, param_init=None,
                         level=0):
         """Generates traces for a single drawn sample from the trained
