@@ -161,7 +161,7 @@ class Inferencer(object):
         key corresponds to the name of the output variable as defined
         in ``model`` and value corresponds to a single dimensional
         array of recorded data traces.
-    features : list
+    features : list, optional
         List of callables that take the voltage trace and output
         summary statistics.
     method : str, optional
@@ -183,7 +183,7 @@ class Inferencer(object):
         Dictionary of state variables to be initialized with respective
         values.
     """
-    def __init__(self, dt, model, input, output, features, method=None,
+    def __init__(self, dt, model, input, output, features=None, method=None,
                  threshold=None, reset=None, refractory=False,
                  param_init=None):
         # time scale
@@ -275,13 +275,16 @@ class Inferencer(object):
         # placeholder for the posterior
         self.posterior = None
         # observation the focus is on
-        x_o = []
-        for o in self.output:
-            o = np.array(o)
-            obs = []
-            for feature in features:
-                obs.extend(feature(o.transpose()))
-            x_o.append(obs)
+        if features:
+            x_o = []
+            for o in self.output:
+                o = np.array(o)
+                obs = []
+                for feature in features:
+                    obs.extend(feature(o.transpose()))
+                x_o.append(obs)
+        else:
+            x_o = np.vstack(self.output)
         x_o = torch.tensor(x_o, dtype=torch.float32)
         self.x_o = x_o
         self.features = features
@@ -455,11 +458,15 @@ class Inferencer(object):
         x = []
         for ov in self.output_var:
             x_val = obs[ov].get_value()
-            summary_statistics = []
-            for feature in self.features:
-                summary_statistics.append(feature(x_val))
-            x.append(summary_statistics)
-        x = np.array(x, dtype=np.float32)
+            if self.features:
+                summary_statistics = []
+                for feature in self.features:
+                    summary_statistics.append(feature(x_val))
+                x.append(summary_statistics)
+                x = np.array(x, dtype=np.float32)
+            else:
+                x.append(x_val)
+                x = np.vstack(x).astype(np.float32)
         x = x.reshape((self.n_samples, -1))
         return x
 
@@ -893,7 +900,7 @@ class Inferencer(object):
             Samples used to build the pairplot.
         **kwargs : dict, optional
             Additional keyword arguments for the
-            ``sbi.analysis.plot.pairplot`` function.
+            ``sbi.analysis.pairplot`` function.
 
         Returns
         -------
@@ -928,7 +935,7 @@ class Inferencer(object):
             Posterior probability density.
         **kwargs : dict, optional
             Additional keyword arguments for the
-            ``sbi.analysis.plot.pairplot`` function.
+            ``sbi.analysis.conditional_pairplot`` function.
 
         Returns
         -------
@@ -966,7 +973,7 @@ class Inferencer(object):
             Posterior probability density.
         **kwargs : dict, optional
             Additional keyword arguments for the
-            ``sbi.analysis.plot.pairplot`` function.
+            ``sbi.analysis.conditional_corrcoeff`` function.
 
         Returns
         -------
