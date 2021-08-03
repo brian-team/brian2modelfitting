@@ -287,7 +287,6 @@ class Inferencer(object):
                 x_o.append(obs)
         else:
             x_o = np.vstack(self.output).reshape(self.n_traces, -1)
-        x_o = torch.tensor(x_o, dtype=torch.float32)
         self.x_o = x_o
         self.features = features
 
@@ -419,7 +418,6 @@ class Inferencer(object):
         # sample from prior
         theta = prior.sample((n_samples, ))
         theta = np.atleast_2d(theta.numpy())
-
         return theta
 
     def extract_summary_statistics(self, theta, level=1):
@@ -466,9 +464,9 @@ class Inferencer(object):
                 x.append(summary_statistics)
                 x = np.array(x, dtype=np.float32)
             else:
-                x.append(x_val)
-                x = np.vstack(x).astype(np.float32)
-        x = x.reshape((self.n_samples, -1))
+                x.append(x_val.T)
+        x = np.hstack(x).astype(np.float32)
+        # x = x.reshape((self.n_samples, -1))
         return x
 
     def save_summary_statistics(self, f, theta=None, x=None):
@@ -598,17 +596,15 @@ class Inferencer(object):
 
         Returns
         -------
-        tuple
-            ``sbi.inference.NeuralInference`` object with stored
-            paramaters and simulation outputs prepared for training and
-            trained neural density estimator object.
+        ``sbi.inference.NeuralInference``
+            trained inference object.
         """
-        inference = inference.append_simulations(theta, x, *args)
-        density_estimator = inference.train(**train_kwargs)
-        return (inference, density_estimator)
+        # inference = inference.append_simulations(theta, x, *args)
+        inference = inference.append_simulations(theta, x)
+        _ = inference.train(**train_kwargs)
+        return inference
 
-    def build_posterior(self, inference, density_estimator,
-                        **posterior_kwargs):
+    def build_posterior(self, inference, **posterior_kwargs):
         """Return instantiated inference object.
 
         Parameters
@@ -616,15 +612,6 @@ class Inferencer(object):
         inference : sbi.inference.NeuralInference
             Instantiated inference object with stored paramaters and
             simulation outputs prepared for training.
-        theta : torch.tensor
-            Sampled prior.
-        x : torch.tensor
-            Summary statistics.
-        args : list, optional
-            Contains a uniformly distributed sbi.utils.BoxUniform
-            prior/proposal. Used only for SNPE, for SNLE and SNRE,
-            ``proposal`` should not be passed to ``append_simulations``
-            method, thus ``args`` should not be passed.
         posterior_kwargs : dict, optional
             Additional keyword arguments for ``build_posterior`` method
             of ``sbi.inference.NeuralInference`` object.
@@ -634,10 +621,9 @@ class Inferencer(object):
         tuple
             ``sbi.inference.NeuralInference`` object with stored
             paramaters and simulation outputs prepared for training and
-            ``sbi.inference.NeuralInference`` object from which.
+            ``sbi.inference.NeuralPosterior`` object.
         """
-        posterior = inference.build_posterior(density_estimator,
-                                              **posterior_kwargs)
+        posterior = inference.build_posterior(**posterior_kwargs)
         return (inference, posterior)
 
     def infere_step(self, proposal, inference,
@@ -690,13 +676,10 @@ class Inferencer(object):
         x = torch.tensor(x)
 
         # pass the simulated data to the inference object and train it
-        inference, density_estimator = self.train(inference,
-                                                  theta, x,
-                                                  *args, **train_kwargs)
+        inference = self.train(inference, theta, x, *args, **train_kwargs)
 
         # use the density estimator to build the posterior
         inference, posterior = self.build_posterior(inference,
-                                                    density_estimator,
                                                     **posterior_kwargs)
         self.inference = inference
         self.posterior = posterior
@@ -791,7 +774,8 @@ class Inferencer(object):
             else:
                 args = []
         else:  # `.infere_step` has been called manually
-            prior = self.posterior.set_default_x(self.x_o)
+            x_o = torch.tensor(self.x_o, dtype=torch.float32)
+            prior = self.posterior.set_default_x(x_o)
             if self.posterior._method_family == 'snpe':
                 args = [prior]
             else:
@@ -817,7 +801,8 @@ class Inferencer(object):
 
             # update the proposal given the observation
             if n_rounds > 1:
-                proposal = posterior.set_default_x(self.x_o)
+                x_o = torch.tensor(self.x_o, dtype=torch.float32)
+                proposal = posterior.set_default_x(x_o)
         self.posterior = posterior
         return posterior
 
@@ -883,7 +868,8 @@ class Inferencer(object):
             raise ValueError('Need to provide posterior argument if no'
                              ' posterior has been calculated by the `infere`'
                              ' method.')
-        samples = p.sample(shape, x=self.x_o, **kwargs)
+        x_o = torch.tensor(self.x_o, dtype=torch.float32)
+        samples = p.sample(shape, x=x_o, **kwargs)
         self.samples = samples
         return samples.numpy()
 
@@ -1018,7 +1004,8 @@ class Inferencer(object):
         else:
             if self.posterior is not None:
                 if self.posterior.default_x is None:
-                    d = self.posterior.set_default_x(self.x_o)
+                    x_o = torch.tensor(self.x_o, dtype=torch.float32)
+                    d = self.posterior.set_default_x(x_o)
                 else:
                     d = self.posterior
             else:
@@ -1111,7 +1098,8 @@ class Inferencer(object):
         else:
             if self.posterior is not None:
                 if self.posterior.default_x is None:
-                    d = self.posterior.set_default_x(self.x_o)
+                    x_o = torch.tensor(self.x_o, dtype=torch.float32)
+                    d = self.posterior.set_default_x(x_o)
                 else:
                     d = self.posterior
             else:
@@ -1180,7 +1168,8 @@ class Inferencer(object):
             raise ValueError('Need to provide posterior argument if no'
                              ' posterior has been calculated by the `infere`'
                              ' method.')
-        params = p.sample((1, ), x=self.x_o)
+        x_o = torch.tensor(self.x_o, dtype=torch.float32)
+        params = p.sample((1, ), x=x_o)
 
         # set output variable that is monitored
         if output_var is None:
