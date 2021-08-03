@@ -599,8 +599,8 @@ class Inferencer(object):
         ``sbi.inference.NeuralInference``
             trained inference object.
         """
-        # inference = inference.append_simulations(theta, x, *args)
-        inference = inference.append_simulations(theta, x)
+        inference = inference.append_simulations(theta, x, *args)
+        #inference = inference.append_simulations(theta, x)
         _ = inference.train(**train_kwargs)
         return inference
 
@@ -852,7 +852,7 @@ class Inferencer(object):
             Desired shape of samples that are drawn from posterior.
         posterior : sbi.inference.posteriors.DirectPosterior, optional
             Posterior distribution.
-        **kwargs : dict, optional
+        kwargs : dict, optional
             Additional keyword arguments for ``sample`` method in
             ``sbi.inference.posteriors.DirectPosterior`` class
         Returns
@@ -897,7 +897,7 @@ class Inferencer(object):
         ticks : dict, optional
             Position of the ticks. If None, default ticks positions
             will be used.
-        **kwargs : dict, optional
+        kwargs : dict, optional
             Additional keyword arguments for the
             ``sbi.analysis.pairplot`` function.
 
@@ -989,7 +989,7 @@ class Inferencer(object):
         ticks : dict, optional
             Position of the ticks. If None, default ticks positions
             will be used.
-        **kwargs : dict, optional
+        kwargs : dict, optional
             Additional keyword arguments for the
             ``sbi.analysis.conditional_pairplot`` function.
 
@@ -1060,7 +1060,7 @@ class Inferencer(object):
                                                       subset=subset,
                                                       labels=labels,
                                                       ticks=ticks,
-                                                      *kwargs)
+                                                      **kwargs)
         return fig, axes
 
     def conditional_corrcoeff(self, condition, density=None, limits=None,
@@ -1083,7 +1083,7 @@ class Inferencer(object):
         subset : list, optional
             Parameters that are taken for conditional distribution, if
             None all parameters are considered.
-        **kwargs : dict, optional
+        kwargs : dict, optional
             Additional keyword arguments for the
             ``sbi.analysis.conditional_corrcoeff`` function.
 
@@ -1129,7 +1129,7 @@ class Inferencer(object):
                                                         limits=limits,
                                                         condition=condition,
                                                         subset=subset,
-                                                        *kwargs)
+                                                        **kwargs)
         return cond_coeff.numpy()
 
     def generate_traces(self, posterior=None, output_var=None, param_init=None,
