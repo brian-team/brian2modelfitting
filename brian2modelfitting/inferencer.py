@@ -161,7 +161,7 @@ class Inferencer(object):
         key corresponds to the name of the output variable as defined
         in ``model`` and value corresponds to a single dimensional
         array of recorded data traces.
-    features : list
+    features : list, optional
         List of callables that take the voltage trace and output
         summary statistics.
     method : str, optional
@@ -183,7 +183,7 @@ class Inferencer(object):
         Dictionary of state variables to be initialized with respective
         values.
     """
-    def __init__(self, dt, model, input, output, features, method=None,
+    def __init__(self, dt, model, input, output, features=None, method=None,
                  threshold=None, reset=None, refractory=False,
                  param_init=None):
         # time scale
@@ -219,7 +219,7 @@ class Inferencer(object):
         self.output = output
 
         # create variable for parameter names
-        self.param_names = model.parameter_names
+        self.param_names = sorted(model.parameter_names)
 
         # set the simulation time for a given time scale
         self.n_traces, n_steps = input.shape
@@ -269,24 +269,26 @@ class Inferencer(object):
         self.reset = reset
         self.refractory = refractory
 
-        # placeholder for samples
+        self.params = None
         self.n_samples = None
         self.samples = None
-        # placeholder for the posterior
         self.posterior = None
-        # observation the focus is on
-        x_o = []
-        for o in self.output:
-            o = np.array(o)
-            obs = []
-            for feature in features:
-                obs.extend(feature(o.transpose()))
-            x_o.append(obs)
-        x_o = torch.tensor(x_o, dtype=torch.float32)
-        self.x_o = x_o
-        self.features = features
         self.theta = None
         self.x = None
+
+        # observation the focus is on
+        for o in self.output:
+            o = np.array(o)
+            if features:
+                obs = []
+                for _o in o:
+                    for feature in features:
+                        obs.append(feature(_o))
+                x_o = np.array(obs, dtype=np.float32)
+            else:
+                x_o = o.ravel().astype(np.float32)
+        self.x_o = x_o
+        self.features = features
 
     @property
     def n_neurons(self):
@@ -334,7 +336,7 @@ class Inferencer(object):
         Returns
         -------
         brian2modelfitting.simulator.Simulator
-            Configured simulator w.r.t. to the available device.
+            Configured simulator w.r.t. the available device.
         """
         # configure the simulator
         simulator = configure_simulator()
@@ -390,6 +392,7 @@ class Inferencer(object):
                 raise ValueError(f'Parameter {param} must be defined as a'
                                  ' model\'s parameter')
         prior = calc_prior(self.param_names, **params)
+        self.params = params
         return prior
 
     def generate_training_data(self, n_samples, prior):
@@ -415,7 +418,6 @@ class Inferencer(object):
         # sample from prior
         theta = prior.sample((n_samples, ))
         theta = np.atleast_2d(theta.numpy())
-
         return theta
 
     def extract_summary_statistics(self, theta, level=1):
@@ -452,15 +454,19 @@ class Inferencer(object):
 
         # extract features
         obs = simulator.statemonitor.recorded_variables
-        x = []
         for ov in self.output_var:
-            x_val = obs[ov].get_value()
-            summary_statistics = []
-            for feature in self.features:
-                summary_statistics.append(feature(x_val))
-            x.append(summary_statistics)
-        x = np.array(x, dtype=np.float32)
-        x = x.reshape((self.n_samples, -1))
+            o = obs[ov].get_value()
+            o = o.T
+            if self.features:
+                summary_statistics = []
+                # TODO: should be vectorized
+                for _o in o:
+                    for feature in self.features:
+                        summary_statistics.append(feature(_o))
+                x = np.array(summary_statistics, dtype=np.float32)
+                x = x.reshape(self.n_samples, -1)
+            else:
+                x = o.reshape(self.n_samples, -1).astype(np.float32)
         return x
 
     def save_summary_statistics(self, f, theta=None, x=None):
@@ -497,7 +503,7 @@ class Inferencer(object):
                                  ' `infere_step` method first.')
         np.savez_compressed(f, theta=t, x=x)
 
-    def load_summary_statistics(self, f, **kwargs):
+    def load_summary_statistics(self, f):
         """Load sampled prior data, theta, and extracted summary
         statistics, x, from a compressed ``.npz`` format. Arrays should
         be named either `arr_0` and `arr_1` or `theta` and `x` for
@@ -508,8 +514,6 @@ class Inferencer(object):
         f : str or os.PathLike
             Path to file either as string or ``os.PathLike`` object
             that contains file name.
-        kwargs : dict, optional
-            Additional keyword arguments for ``numpy.load`` method.
 
         Returns
         -------
@@ -592,17 +596,15 @@ class Inferencer(object):
 
         Returns
         -------
-        tuple
-            ``sbi.inference.NeuralInference`` object with stored
-            paramaters and simulation outputs prepared for training and
-            trained neural density estimator object.
+        ``sbi.inference.NeuralInference``
+            trained inference object.
         """
         inference = inference.append_simulations(theta, x, *args)
-        density_estimator = inference.train(**train_kwargs)
-        return (inference, density_estimator)
+        # inference = inference.append_simulations(theta, x)
+        _ = inference.train(**train_kwargs)
+        return inference
 
-    def build_posterior(self, inference, density_estimator,
-                        **posterior_kwargs):
+    def build_posterior(self, inference, **posterior_kwargs):
         """Return instantiated inference object.
 
         Parameters
@@ -610,15 +612,6 @@ class Inferencer(object):
         inference : sbi.inference.NeuralInference
             Instantiated inference object with stored paramaters and
             simulation outputs prepared for training.
-        theta : torch.tensor
-            Sampled prior.
-        x : torch.tensor
-            Summary statistics.
-        args : list, optional
-            Contains a uniformly distributed sbi.utils.BoxUniform
-            prior/proposal. Used only for SNPE, for SNLE and SNRE,
-            ``proposal`` should not be passed to ``append_simulations``
-            method, thus ``args`` should not be passed.
         posterior_kwargs : dict, optional
             Additional keyword arguments for ``build_posterior`` method
             of ``sbi.inference.NeuralInference`` object.
@@ -628,10 +621,9 @@ class Inferencer(object):
         tuple
             ``sbi.inference.NeuralInference`` object with stored
             paramaters and simulation outputs prepared for training and
-            ``sbi.inference.NeuralInference`` object from which.
+            ``sbi.inference.NeuralPosterior`` object.
         """
-        posterior = inference.build_posterior(density_estimator,
-                                              **posterior_kwargs)
+        posterior = inference.build_posterior(**posterior_kwargs)
         return (inference, posterior)
 
     def infere_step(self, proposal, inference,
@@ -684,13 +676,10 @@ class Inferencer(object):
         x = torch.tensor(x)
 
         # pass the simulated data to the inference object and train it
-        inference, density_estimator = self.train(inference,
-                                                  theta, x,
-                                                  *args, **train_kwargs)
+        inference = self.train(inference, theta, x, *args, **train_kwargs)
 
         # use the density estimator to build the posterior
         inference, posterior = self.build_posterior(inference,
-                                                    density_estimator,
                                                     **posterior_kwargs)
         self.inference = inference
         self.posterior = posterior
@@ -785,7 +774,8 @@ class Inferencer(object):
             else:
                 args = []
         else:  # `.infere_step` has been called manually
-            prior = self.posterior.set_default_x(self.x_o)
+            x_o = torch.tensor(self.x_o, dtype=torch.float32)
+            prior = self.posterior.set_default_x(x_o)
             if self.posterior._method_family == 'snpe':
                 args = [prior]
             else:
@@ -811,7 +801,8 @@ class Inferencer(object):
 
             # update the proposal given the observation
             if n_rounds > 1:
-                proposal = posterior.set_default_x(self.x_o)
+                x_o = torch.tensor(self.x_o, dtype=torch.float32)
+                proposal = posterior.set_default_x(x_o)
         self.posterior = posterior
         return posterior
 
@@ -861,12 +852,12 @@ class Inferencer(object):
             Desired shape of samples that are drawn from posterior.
         posterior : sbi.inference.posteriors.DirectPosterior, optional
             Posterior distribution.
-        **kwargs : dict, optional
+        kwargs : dict, optional
             Additional keyword arguments for ``sample`` method in
             ``sbi.inference.posteriors.DirectPosterior`` class
         Returns
         -------
-        torch.tensor
+        numpy.ndarray
             Samples from posterior of the shape as given in ``shape``.
         """
         if posterior:
@@ -877,11 +868,13 @@ class Inferencer(object):
             raise ValueError('Need to provide posterior argument if no'
                              ' posterior has been calculated by the `infere`'
                              ' method.')
-        samples = p.sample(shape, x=self.x_o, **kwargs)
+        x_o = torch.tensor(self.x_o, dtype=torch.float32)
+        samples = p.sample(shape, x=x_o, **kwargs)
         self.samples = samples
-        return samples
+        return samples.numpy()
 
-    def pairplot(self, samples=None, **kwargs):
+    def pairplot(self, samples=None, points=None, limits=None, subset=None,
+                 labels=None, ticks=None, **kwargs):
         """Plot samples in a 2-D grid with marginals and pairwise
         marginals.
 
@@ -891,9 +884,22 @@ class Inferencer(object):
         ----------
         samples : iterable, optional
             Samples used to build the pairplot.
-        **kwargs : dict, optional
+        points : dict, optional
+            Additional points to scatter, e.g., true parameter values,
+            if known.
+        limits : dict, optional
+            Limits for each parameter. If None, min and max of the
+            given samples will be used.
+        subset : list, optional
+            Which parameters to plot.
+        labels : dict, optional
+            Names for each parameter.
+        ticks : dict, optional
+            Position of the ticks. If None, default ticks positions
+            will be used.
+        kwargs : dict, optional
             Additional keyword arguments for the
-            ``sbi.analysis.plot.pairplot`` function.
+            ``sbi.analysis.pairplot`` function.
 
         Returns
         -------
@@ -903,13 +909,228 @@ class Inferencer(object):
         if samples is not None:
             s = samples
         else:
-            try:
+            if self.samples is not None:
                 s = self.samples
-            except AttributeError as e:
-                print(e, '\nProvide samples or call `sample` method first.')
-                raise
-        fig, axes = sbi.analysis.pairplot(s, **kwargs)
+            else:
+                raise ValueError('Samples are not available.')
+        if points:
+            for param_name in points.keys():
+                if param_name not in self.param_names:
+                    raise AttributeError(f'Invalid parameter: {param_name}')
+            points = np.array([[points[param_name].item()
+                               for param_name in self.param_names]])
+        if limits:
+            for param_name, lim_vals in limits.items():
+                if param_name not in self.param_names:
+                    raise AttributeError(f'Invalid parameter: {param_name}')
+                if len(lim_vals) != 2:
+                    raise ValueError('Invalid limits for parameter: '
+                                     f'{param_name}')
+            limits = [[limits[param_name][0].item(),
+                       limits[param_name][1].item()]
+                      for param_name in self.param_names]
+        if subset:
+            for param_name in subset:
+                if param_name not in self.param_names:
+                    raise AttributeError(f'Invalid parameter: {param_name}')
+            subset = [self.param_names.index(param_name)
+                      for param_name in subset]
+        if ticks:
+            for param_name, lim_vals in ticks.items():
+                if param_name not in self.param_names:
+                    raise AttributeError(f'Invalid parameter: {param_name}')
+                if len(lim_vals) != 2:
+                    raise ValueError('Invalid limits for parameter: '
+                                     f'{param_name}')
+            ticks = [[ticks[param_name][0].item(),
+                      ticks[param_name][1].item()]
+                     for param_name in self.param_names]
+        else:
+            ticks = []
+        if labels:
+            for param_name in labels.keys():
+                if param_name not in self.param_names:
+                    raise AttributeError(f'Invalid parameter: {param_name}')
+            labels = [labels[param_name] for param_name in self.param_names]
+        fig, axes = sbi.analysis.pairplot(samples=s,
+                                          points=points,
+                                          limits=limits,
+                                          subset=subset,
+                                          labels=labels,
+                                          ticks=ticks,
+                                          **kwargs)
         return fig, axes
+
+    def conditional_pairplot(self, condition, density=None, points=None,
+                             limits=None, subset=None, labels=None,
+                             ticks=None, **kwargs):
+        """Plot conditional distribution given all other parameters.
+
+        Check ``sbi.analysis.plot.conditional_pairplot`` for more
+        details.
+
+        Parameters
+        ----------
+        condition : numpy.ndarray
+            Condition that all but the one/two regarded parameters are
+            fixed to.
+        density : sbi.inference.NeuralPosterior, optional
+            Posterior probability density.
+        points : dict, optional
+            Additional points to scatter, e.g., true parameter values,
+            if known.
+        limits : dict, optional
+            Limits for each parameter. If None, min and max of the
+            given samples will be used.
+        subset : list, optional
+            Which parameters to plot.
+        labels : dict, optional
+            Names for each parameter.
+        ticks : dict, optional
+            Position of the ticks. If None, default ticks positions
+            will be used.
+        kwargs : dict, optional
+            Additional keyword arguments for the
+            ``sbi.analysis.conditional_pairplot`` function.
+
+        Returns
+        -------
+        tuple
+            Figure and axis of conditional pairplot.
+        """
+        condition = torch.from_numpy(condition)
+        if density is not None:
+            d = density
+        else:
+            if self.posterior is not None:
+                if self.posterior.default_x is None:
+                    x_o = torch.tensor(self.x_o, dtype=torch.float32)
+                    d = self.posterior.set_default_x(x_o)
+                else:
+                    d = self.posterior
+            else:
+                raise ValueError('Density is not available.')
+        if points:
+            for param_name in points.keys():
+                if param_name not in self.param_names:
+                    raise AttributeError(f'Invalid parameter: {param_name}')
+            points = np.array([[points[param_name].item()
+                               for param_name in self.param_names]])
+        if limits:
+            for param_name, lim_vals in limits.items():
+                if param_name not in self.param_names:
+                    raise AttributeError(f'Invalid parameter: {param_name}')
+                if len(lim_vals) != 2:
+                    raise ValueError('Invalid limits for parameter: '
+                                     f'{param_name}')
+            limits = [[limits[param_name][0].item(),
+                       limits[param_name][1].item()]
+                      for param_name in self.param_names]
+        else:
+            limits = [[self.params[param_name][0].item(),
+                       self.params[param_name][1].item()]
+                      for param_name in self.param_names]
+        if subset:
+            for param_name in subset:
+                if param_name not in self.param_names:
+                    raise AttributeError(f'Invalid parameter: {param_name}')
+            subset = [self.param_names.index(param_name)
+                      for param_name in subset]
+        if ticks:
+            for param_name, lim_vals in ticks.items():
+                if param_name not in self.param_names:
+                    raise AttributeError(f'Invalid parameter: {param_name}')
+                if len(lim_vals) != 2:
+                    raise ValueError('Invalid limits for parameter: '
+                                     f'{param_name}')
+            ticks = [[ticks[param_name][0].item(),
+                      ticks[param_name][1].item()]
+                     for param_name in self.param_names]
+        else:
+            ticks = []
+        if labels:
+            for param_name in labels.keys():
+                if param_name not in self.param_names:
+                    raise AttributeError(f'Invalid parameter: {param_name}')
+            labels = [labels[param_name] for param_name in self.param_names]
+        fig, axes = sbi.analysis.conditional_pairplot(density=d,
+                                                      condition=condition,
+                                                      limits=limits,
+                                                      points=points,
+                                                      subset=subset,
+                                                      labels=labels,
+                                                      ticks=ticks,
+                                                      **kwargs)
+        return fig, axes
+
+    def conditional_corrcoeff(self, condition, density=None, limits=None,
+                              subset=None, **kwargs):
+        """Plot conditional distribution given all other parameters.
+
+        Check ``sbi.analysis.conditional_density.conditional_corrcoeff``
+        for more details.
+
+        Parameters
+        ----------
+        condition : numpy.ndarray
+            Condition that all but the one/two regarded parameters are
+            fixed to.
+        density : sbi.inference.NeuralPosterior, optional
+            Posterior probability density.
+        limits : dict, optional
+            Limits for each parameter. If None, min and max of the
+            given samples will be used.
+        subset : list, optional
+            Parameters that are taken for conditional distribution, if
+            None all parameters are considered.
+        kwargs : dict, optional
+            Additional keyword arguments for the
+            ``sbi.analysis.conditional_corrcoeff`` function.
+
+        Returns
+        -------
+        numpy.ndarray
+            Average conditional correlation matrix.
+        """
+        condition = torch.from_numpy(condition)
+        if density is not None:
+            d = density
+        else:
+            if self.posterior is not None:
+                if self.posterior.default_x is None:
+                    x_o = torch.tensor(self.x_o, dtype=torch.float32)
+                    d = self.posterior.set_default_x(x_o)
+                else:
+                    d = self.posterior
+            else:
+                raise ValueError('Density is not available.')
+        if limits:
+            for param_name, lim_vals in limits.items():
+                if param_name not in self.param_names:
+                    raise AttributeError(f'Invalid parameter: {param_name}')
+                if len(lim_vals) != 2:
+                    raise ValueError('Invalid limits for parameter: '
+                                     f'{param_name}')
+            limits = [[limits[param_name][0].item(),
+                       limits[param_name][1].item()]
+                      for param_name in self.param_names]
+        else:
+            limits = [[self.params[param_name][0].item(),
+                       self.params[param_name][1].item()]
+                      for param_name in self.param_names]
+        limits = torch.tensor(limits)
+        if subset:
+            for param_name in subset:
+                if param_name not in self.param_names:
+                    raise AttributeError(f'Invalid parameter: {param_name}')
+            subset = [self.param_names.index(param_name)
+                      for param_name in subset]
+        cond_coeff = sbi.analysis.conditional_corrcoeff(density=d,
+                                                        limits=limits,
+                                                        condition=condition,
+                                                        subset=subset,
+                                                        **kwargs)
+        return cond_coeff.numpy()
 
     def generate_traces(self, posterior=None, output_var=None, param_init=None,
                         level=0):
@@ -947,7 +1168,8 @@ class Inferencer(object):
             raise ValueError('Need to provide posterior argument if no'
                              ' posterior has been calculated by the `infere`'
                              ' method.')
-        params = p.sample((1, ), x=self.x_o)
+        x_o = torch.tensor(self.x_o, dtype=torch.float32)
+        params = p.sample((1, ), x=x_o)
 
         # set output variable that is monitored
         if output_var is None:
