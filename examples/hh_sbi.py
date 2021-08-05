@@ -1,17 +1,15 @@
 from brian2 import *
 from brian2modelfitting import *
 import pandas as pd
-import numpy as np
-from scipy.signal import find_peaks
 
 
 # Load input and output data traces
 df_inp_traces = pd.read_csv('input_traces_hh.csv')
 df_out_traces = pd.read_csv('output_traces_hh.csv')
 inp_traces = df_inp_traces.to_numpy()
-inp_traces = inp_traces[:2, 1:]
+inp_traces = inp_traces[:3, 1:]
 out_traces = df_out_traces.to_numpy()
-out_traces = out_traces[:2, 1:]
+out_traces = out_traces[:3, 1:]
 
 # Model and its parameters
 area = 20_000*um**2
@@ -37,31 +35,21 @@ eqs = '''
 # Time domain
 t = arange(0, out_traces.shape[1]*dt/ms, dt/ms)
 
-
-def n_peaks(x):
-    n_p = []
-    for _x in x.transpose():
-        p_i = find_peaks(_x, height=0)[0]
-        n_p.append(p_i.size - sum(np.diff(t[p_i]) < 4))
-    return n_p
-
-
 # Simulation-based inference object instantiation
 inferencer = Inferencer(dt=dt, model=eqs,
                         input={'I': inp_traces*amp},
                         output={'v': out_traces*mV},
-                        features=[n_peaks,
-                                  lambda x: x[(t > 5) & (t < 10), :].mean(axis=0),
-                                  lambda x: x[(t > 5) & (t < 10), :].std(axis=0),
-                                  lambda x: x.max(axis=0)],
+                        features=[lambda x: x[(t > 5) & (t < 10)].mean(),
+                                  lambda x: x[(t > 5) & (t < 10)].std(),
+                                  lambda x: x.max()],
                         method='exponential_euler',
                         threshold='m > 0.5',
                         refractory='m > 0.5',
                         param_init={'v': 'VT'})
 
 # Generate prior and train the neural density estimator
-inferencer.infere(n_samples=1000,
-                  n_rounds=2,
+inferencer.infere(n_samples=10000,
+                  n_rounds=1,
                   gl=[1e-09*siemens, 1e-07*siemens],
                   g_na=[2e-06*siemens, 2e-04*siemens],
                   g_kd=[6e-07*siemens, 6e-05*siemens],
@@ -71,10 +59,14 @@ inferencer.infere(n_samples=1000,
 inferencer.sample((10000, ))
 
 # Create pairplot from samples
-inferencer.pairplot(labels=[r'$\overline{g}_{l}$',
-                            r'$\overline{g}_{Na}$',
-                            r'$\overline{g}_{K}$',
-                            r'$\overline{C}_{m}$'])
+inferencer.pairplot(limits={'gl': [1e-09*siemens, 1e-07*siemens],
+                            'g_na': [2e-06*siemens, 2e-04*siemens],
+                            'g_kd': [6e-07*siemens, 6e-05*siemens],
+                            'Cm': [0.1*uF*cm**-2*area, 2*uF*cm**-2*area]},
+                    labels={'gl': r'$\overline{g}_{l}$',
+                            'g_na': r'$\overline{g}_{Na}$',
+                            'g_kd': r'$\overline{g}_{K}$',
+                            'Cm': r'$\overline{C}_{m}$'})
 
 # Generate traces by using a single sample from the trained posterior
 inf_traces = inferencer.generate_traces()
@@ -85,9 +77,9 @@ ncols = out_traces.shape[0]
 fig, axs = subplots(nrows, ncols, sharex=True,
                     gridspec_kw={'height_ratios': [3, 1]}, figsize=(15, 4))
 for idx in range(ncols):
-    axs[0, idx].plot(t, out_traces[idx, :].T, label='measurements')
-    axs[0, idx].plot(t, inf_traces[idx, :].T/mV, label='fits')
-    axs[1, idx].plot(t, inp_traces[idx, :].T/nA, 'k-', label='stimulus')
+    axs[0, idx].plot(t, out_traces[idx, :], lw=3, label='measurements')
+    axs[0, idx].plot(t, inf_traces[idx, :]/mV, '--', lw=3,label='fits')
+    axs[1, idx].plot(t, inp_traces[idx, :]/nA, 'k-', label='stimulus')
     axs[1, idx].set_xlabel('t, ms')
     if idx == 0:
         axs[0, idx].set_ylabel('$v$, mV')
