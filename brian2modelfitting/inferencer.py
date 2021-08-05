@@ -277,16 +277,16 @@ class Inferencer(object):
         self.x = None
 
         # observation the focus is on
-        if features:
-            x_o = []
-            for o in self.output:
-                o = np.array(o)
+        for o in self.output:
+            o = np.array(o)
+            if features:
                 obs = []
-                for feature in features:
-                    obs.extend(feature(o.transpose()))
-                x_o.append(obs)
-        else:
-            x_o = np.vstack(self.output).reshape(self.n_traces, -1)
+                for _o in o:
+                    for feature in features:
+                        obs.append(feature(_o))
+                x_o = np.array(obs, dtype=np.float32)
+            else:
+                x_o = o.ravel().astype(np.float32)
         self.x_o = x_o
         self.features = features
 
@@ -454,19 +454,19 @@ class Inferencer(object):
 
         # extract features
         obs = simulator.statemonitor.recorded_variables
-        x = []
         for ov in self.output_var:
-            x_val = obs[ov].get_value()
+            o = obs[ov].get_value()
+            o = o.T
             if self.features:
                 summary_statistics = []
-                for feature in self.features:
-                    summary_statistics.append(feature(x_val))
-                x.append(summary_statistics)
-                x = np.array(x, dtype=np.float32)
+                # TODO: should be vectorized
+                for _o in o:
+                    for feature in self.features:
+                        summary_statistics.append(feature(_o))
+                x = np.array(summary_statistics, dtype=np.float32)
+                x = x.reshape(self.n_samples, -1)
             else:
-                x.append(x_val.T)
-        x = np.hstack(x).astype(np.float32)
-        # x = x.reshape((self.n_samples, -1))
+                x = o.reshape(self.n_samples, -1).astype(np.float32)
         return x
 
     def save_summary_statistics(self, f, theta=None, x=None):
@@ -600,7 +600,7 @@ class Inferencer(object):
             trained inference object.
         """
         inference = inference.append_simulations(theta, x, *args)
-        #inference = inference.append_simulations(theta, x)
+        # inference = inference.append_simulations(theta, x)
         _ = inference.train(**train_kwargs)
         return inference
 
