@@ -425,7 +425,7 @@ class Inferencer(object):
         theta = np.atleast_2d(theta.numpy())
         return theta
 
-    def extract_summary_statistics(self, theta, level=1):
+    def extract_summary_statistics(self, theta, level=0):
         """Return summary statistics for training the neural density
         estimator.
 
@@ -777,7 +777,7 @@ class Inferencer(object):
                 if n_samples is None:
                     raise ValueError('Either provide `x` or `n_samples`.')
                 else:
-                    x = self.extract_summary_statistics(theta)
+                    x = self.extract_summary_statistics(theta, level=1)
             self.x = x
 
             # initialize inference object
