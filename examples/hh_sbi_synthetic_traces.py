@@ -51,8 +51,8 @@ eqs = '''
     dm/dt = alpham*(1-m) - betam*m : 1
     dn/dt = alphan*(1-n) - betan*n : 1
     dh/dt = alphah*(1-h) - betah*h : 1
-    alpham = (-0.32/mV) * (Vm - VT - 13.*mV) / (exp((-(Vm - VT - 13.*mV))/(4.*mV)) - 1)/ms : Hz
-    betam = (0.28/mV) * (Vm - VT - 40.*mV) / (exp((Vm - VT - 40.*mV)/(5.*mV)) - 1)/ms : Hz
+    alpham = (-0.32/mV) * (Vm - VT - 13.*mV) / (exp((-(Vm - VT - 13.*mV)) / (4.*mV)) - 1)/ms : Hz
+    betam = (0.28/mV) * (Vm - VT - 40.*mV) / (exp((Vm - VT - 40.*mV) / (5.*mV)) - 1)/ms : Hz
     alphah = 0.128 * exp(-(Vm - VT - 17.*mV) / (18.*mV))/ms : Hz
     betah = 4/(1 + exp((-(Vm - VT - 40.*mV)) / (5.*mV)))/ms : Hz
     alphan = (-0.032/mV) * (Vm - VT - 15.*mV) / (exp((-(Vm - VT - 15.*mV)) / (5.*mV)) - 1)/ms : Hz
@@ -71,11 +71,15 @@ inferencer = Inferencer(dt=dt, model=eqs,
                                     'm': '1/(1 + betam/alpham)',
                                     'h': '1/(1 + betah/alphah)',
                                     'n': '1/(1 + betan/alphan)'})
-inferencer.infere(n_samples=10_000,
-                  inference_method='SNPE',
-                  density_estimator_model='mdn',
-                  gNa=[.5*uS, 80.*uS],
-                  gK=[1e-4*uS, 15.*uS])
+
+# Amortized inference
+inferencer.infer(n_samples=10_000,
+                 inference_method='SNPE',
+                 density_estimator_model='mdn',
+                 gNa=[.5*uS, 80.*uS],
+                 gK=[1e-4*uS, 15.*uS])
+
+# Sample from posterior
 inferencer.sample((10_000, ))
 
 # Visualize estimated posterior distribution
@@ -83,8 +87,8 @@ inferencer.pairplot(limits={'gNa': [.5*uS, 80.*uS],
                             'gK': [1e-4*uS, 15.*uS]},
                     ticks={'gNa': [.5*uS, 80.*uS],
                            'gK': [1e-4*uS, 15.*uS]},
-                    labels={'gNa': r'$\overline{g}_{Na}$',
-                            'gK': r'$\overline{g}_{K}$'},
+                    labels={'gNa': r'$\overline{g}_\mathrm{Na}$',
+                            'gK': r'$\overline{g}_\mathrm{K}$'},
                     points={'gNa': 32*uS,
                             'gK': 1*uS},
                     points_offdiag={'markersize': 6},
@@ -103,5 +107,4 @@ axs[0].legend()
 axs[1].plot(t, I_inj.ravel()/nA, 'k-', label='stimulus')
 axs[1].set(xlabel='t, ms', ylabel='I, nA')
 axs[1].legend()
-
 show()
