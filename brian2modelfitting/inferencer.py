@@ -726,7 +726,8 @@ class Inferencer(object):
             Inference method. Either of SNPE, SNLE or SNRE.
         density_estimator_model : str, optional
             The type of density estimator to be created. Either
-            ``mdn``, ``made``, ``maf`` or ``nsf``.
+            ``mdn``, ``made``, ``maf``, ``nsf`` for SNPE and SNLE, or
+            ``linear``, ``mlp``, ``resnet`` for SNRE.
         inference_kwargs : dict, optional
             Additional keyword arguments for the inferencer method
             definition.
