@@ -277,12 +277,12 @@ class Inferencer(object):
         self.x = None
 
         # observation the focus is on
-        for o in self.output:
+        for ov, o in zip(self.output_var, self.output):
             o = np.array(o)
             if features:
                 obs = []
                 for _o in o:
-                    for feature in features:
+                    for feature in features[ov]:
                         obs.append(feature(_o))
                 x_o = np.array(obs, dtype=np.float32)
             else:
@@ -461,7 +461,7 @@ class Inferencer(object):
                 summary_statistics = []
                 # TODO: should be vectorized
                 for _o in o:
-                    for feature in self.features:
+                    for feature in self.features[ov]:
                         summary_statistics.append(feature(_o))
                 x = np.array(summary_statistics, dtype=np.float32)
                 x = x.reshape(self.n_samples, -1)
