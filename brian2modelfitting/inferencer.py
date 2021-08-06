@@ -10,7 +10,6 @@ from brian2.equations.equations import Equations
 from brian2.groups.neurongroup import NeuronGroup
 from brian2.input.timedarray import TimedArray
 from brian2.monitors.statemonitor import StateMonitor
-from brian2.units.allunits import *  # all physical units
 from brian2.units.fundamentalunits import (DIMENSIONLESS,
                                            fail_for_dimension_mismatch,
                                            get_dimensions,
@@ -29,8 +28,8 @@ from .simulator import RuntimeSimulator, CPPStandaloneSimulator
 
 def configure_simulator():
     """Return the configured simulator, which can be either
-    `.RuntimeSimulator`, object for use with `.RuntimeDevice`, or
-    `.CPPStandaloneSimulator`, object for use with
+    `.RuntimeSimulator`, object for the use with `.RuntimeDevice`, or
+    `.CPPStandaloneSimulator`, object for the use with
     `.CPPStandaloneDevice`.
 
     Parameters
@@ -62,15 +61,16 @@ def get_full_namespace(additional_namespace, level=0):
     ----------
     additional_namespace : dict
         References to external parameters or functions, where key is
-        the name and value is the value of the external param/func.
+        the name and value is the value of the external parameter or
+        function.
     level : int, optional
         How far to go back to get the locals/globals.
 
     Returns
     -------
     dict
-        Namespace with additional references to external parameters or
-        functions.
+        Namespace with additional references to the external parameters
+        or functions.
     """
     namespace = {key: value
                  for key, value in get_local_namespace(level=level + 1).items()
@@ -95,8 +95,8 @@ def get_param_dict(param_values, param_names, n_values):
     Returns
     -------
     dict
-        Dictionary containing key-value pairs thet correspond to a
-        parameter name and value(s)
+        Dictionary containing key-value pairs that correspond to a
+        parameter name and value(s).
     """
     param_values = np.array(param_values)
     param_dict = dict()
@@ -106,23 +106,24 @@ def get_param_dict(param_values, param_names, n_values):
 
 
 def calc_prior(param_names, **params):
-    """Return prior distributparion over given parameters. Note that the
-    only available prior distribution currently supported is
-    multidimensional uniform distribution defined on a box.
+    """Return the prior distribution over given parameters.
+
+    N.B. The only currently supported prior distribution is
+    the multi-dimensional uniform distribution defined on a box.
 
     Parameters
     ----------
     param_names : iterable
         Iterable containing parameter names.
     params : dict
-        Dictionary with keys that correspond to parameter names, and
-        values should be a single dimensional lists or arrays
+        Dictionary with keys that correspond to parameter names, values
+        are a single dimensional lists or arrays.
 
     Return
     ------
     sbi.utils.torchutils.BoxUniform
         ``sbi`` compatible object that contains a uniform prior
-        distribution over a given set of parameter
+        distribution over a given set of parameters.
     """
     for param_name in param_names:
         if param_name not in params:
@@ -140,11 +141,12 @@ def calc_prior(param_names, **params):
 class Inferencer(object):
     """Class for simulation-based inference.
 
-    It offers an interface similar to that of `.Fitter` class but
+    It offers an interface similar to that of the `.Fitter` class but
     instead of fitting, neural density estimator is trained using a
-    generative model. This class serves as a wrapper for ``sbi``
-    library for inferencing posterior over unknown parameters of a
-    given model.
+    generative model which ultimately provides the posterior
+    distribution over free parameters.
+    This class serves as a wrapper for ``sbi`` library for inferencing
+    posterior over unknown parameters of a given model.
 
     Parameters
     ----------
@@ -153,17 +155,21 @@ class Inferencer(object):
     model : str or brian2.equations.equations.Equations
         Single cell model equations.
     input : dict
-        Input traces in dictionary format, where key corresponds to the
+        Input traces in dictionary format where key corresponds to the
         name of the input variable as defined in ``model`` and value
-        corresponds to a single dimensional array of data traces.
+        corresponds to an array of input traces.
     output : dict
         Dictionary of recorded (or simulated) output data traces, where
         key corresponds to the name of the output variable as defined
-        in ``model`` and value corresponds to a single dimensional
-        array of recorded data traces.
-    features : list, optional
-        List of callables that take the voltage trace and output
-        summary statistics.
+        in ``model`` and value corresponds to a an array of recorded
+        traces.
+    features : dict, optional
+        Dictionary of callables that take the 1-dimensional voltage
+        trace and output summary statistics. Keys correspond to output
+        variable names, while values are lists of callables.
+        If features are not provided, automatic feature extraction will
+        be performed either by using the default multi-layer perceptron
+        or by using the user-provided embedding network.
     method : str, optional
         Integration method.
     threshold : str, optional
@@ -269,13 +275,6 @@ class Inferencer(object):
         self.reset = reset
         self.refractory = refractory
 
-        self.params = None
-        self.n_samples = None
-        self.samples = None
-        self.posterior = None
-        self.theta = None
-        self.x = None
-
         # observation the focus is on
         for ov, o in zip(self.output_var, self.output):
             o = np.array(o)
@@ -289,6 +288,14 @@ class Inferencer(object):
                 x_o = o.ravel().astype(np.float32)
         self.x_o = x_o
         self.features = features
+
+        # additional placeholders
+        self.params = None
+        self.n_samples = None
+        self.samples = None
+        self.posterior = None
+        self.theta = None
+        self.x = None
 
     @property
     def n_neurons(self):
@@ -310,7 +317,7 @@ class Inferencer(object):
             Total number of neurons.
         """
         if self.n_samples is None:
-            raise ValueError('Number of samples is not yet defined.'
+            raise ValueError('Number of samples have not been yet defined.'
                              'Call `generate_training_data` method first.')
         return self.n_traces * self.n_samples
 
@@ -396,9 +403,7 @@ class Inferencer(object):
         return prior
 
     def generate_training_data(self, n_samples, prior):
-        """Return sampled prior and executed simulator containing
-        recorded variables to be used for training the neural density
-        estimator.
+        """Return sampled prior given the total number of samples.
 
         Parameter
         ---------
@@ -415,19 +420,20 @@ class Inferencer(object):
         # set n_samples to class variable to be able to call self.n_neurons
         self.n_samples = n_samples
 
-        # sample from prior
+        # sample from the prior distribution
         theta = prior.sample((n_samples, ))
         theta = np.atleast_2d(theta.numpy())
         return theta
 
     def extract_summary_statistics(self, theta, level=1):
-        """Return summary statistics to be used for training the neural
-        density estimator.
+        """Return summary statistics for training the neural density
+        estimator.
 
         Parameters
         ----------
         theta : numpy.ndarray
-            Sampled prior of shape (``n_samples``, -1).
+            Sampled prior with ``n_samples`` rows, while then umber of
+            columns is equal to the number of free parameters.
         level : int, optional
             How far to go back to get the locals/globals.
 
@@ -452,7 +458,7 @@ class Inferencer(object):
         simulator.run(self.sim_time, d_param, self.param_names, iteration=0,
                       name=network_name)
 
-        # extract features
+        # extract features for each output variable and each trace
         obs = simulator.statemonitor.recorded_variables
         for ov in self.output_var:
             o = obs[ov].get_value()
@@ -470,13 +476,13 @@ class Inferencer(object):
         return x
 
     def save_summary_statistics(self, f, theta=None, x=None):
-        """Save sampled prior data, theta, and extracted summary
-        statistics, x, into a single file in compressed ``.pz`` format.
+        """Save sampled prior, and extracted summary statistics into a
+        single file in compressed ``.npz`` format.
 
         Parameters
         ----------
         f : str or os.PathLike
-            Path to file either as string or ``os.PathLike`` object
+            Path to a file either as string or ``os.PathLike`` object
             that contains file name.
         theta : numpy.ndarray, optional
             Sampled prior.
@@ -493,21 +499,19 @@ class Inferencer(object):
             t = self.theta
         else:
             raise AttributeError('Provide sampled prior or call'
-                                 ' `infere_step` method first.')
+                                 ' `infer_step` method first.')
         if x is not None:
             pass
         elif self.x is not None:
             x = self.x
         else:
             raise AttributeError('Provide summary feautures or call '
-                                 ' `infere_step` method first.')
+                                 ' `infer_step` method first.')
         np.savez_compressed(f, theta=t, x=x)
 
     def load_summary_statistics(self, f):
-        """Load sampled prior data, theta, and extracted summary
-        statistics, x, from a compressed ``.npz`` format. Arrays should
-        be named either `arr_0` and `arr_1` or `theta` and `x` for
-        sampled priors and extracted features, respectively.
+        """Load samples from a prior and extracted summary statistics
+        from a compressed ``.npz`` file.
 
         Parameters
         ----------
@@ -518,7 +522,7 @@ class Inferencer(object):
         Returns
         -------
         tuple
-            Consisting of sampled prior and summary statistics arrays.
+            Sampled prior and summary statistics arrays.
         """
         loaded = np.load(f, allow_pickle=True)
         if set(loaded.files) == {'theta', 'x'}:
@@ -544,7 +548,11 @@ class Inferencer(object):
             Uniformly distributed prior over given parameters.
         inference_kwargs : dict, optional
             Additional keyword arguments for
-            ``sbi.utils.get_nn_models.posterior_nn`` method.
+            ``sbi.utils.get_nn_models.posterior_nn`` method. The user
+            is free to provide own embedding network to learn features
+            from potentially high-dimensional simulation outputs. By
+            default multi-layer perceptron is used if no user defined
+            embedding network is provided.
 
         Returns
         -------
@@ -573,8 +581,7 @@ class Inferencer(object):
         return inference
 
     def train(self, inference, theta, x, *args, **train_kwargs):
-        """Return inference object with stored training data and
-        trained density estimator.
+        """Return trained neural inference object.
 
         Parameters
         ----------
@@ -587,25 +594,30 @@ class Inferencer(object):
             Summary statistics.
         args : list, optional
             Contains a uniformly distributed sbi.utils.BoxUniform
-            prior/proposal. Used only for SNPE, for SNLE and SNRE,
+            proposal. Used only for SNPE, for SNLE and SNRE,
             ``proposal`` should not be passed to ``append_simulations``
-            method, thus ``args`` should not be passed.
+            method, thus ``args`` should not be passed. The args should
+            be provided only if the parameters were not sampled from
+            the prior, e.g., during the multi-round inference.
+            For SNLE and SNRE, args can hold the number of round from
+            which the data is stemmed from. Round 0 means from prior.
+            This is used only if the `discard_prior_samples` are set to
+            True inside the `train_kwargs`.
         train_kwargs : dict, optional
             Additional keyword arguments for ``train`` method of
             ``sbi.inference.NeuralInference`` object.
 
         Returns
         -------
-        ``sbi.inference.NeuralInference``
-            trained inference object.
+        sbi.inference.NeuralInference
+            Trained inference object.
         """
         inference = inference.append_simulations(theta, x, *args)
-        # inference = inference.append_simulations(theta, x)
         _ = inference.train(**train_kwargs)
         return inference
 
     def build_posterior(self, inference, **posterior_kwargs):
-        """Return instantiated inference object.
+        """Return inference and neural posterior objects.
 
         Parameters
         ----------
@@ -626,9 +638,9 @@ class Inferencer(object):
         posterior = inference.build_posterior(**posterior_kwargs)
         return (inference, posterior)
 
-    def infere_step(self, proposal, inference,
-                    n_samples=None, theta=None, x=None,
-                    train_kwargs={}, posterior_kwargs={}, *args):
+    def infer_step(self, proposal, inference,
+                   n_samples=None, theta=None, x=None,
+                   train_kwargs={}, posterior_kwargs={}, *args):
         """Return the trained neural density estimator.
 
         Parameter
@@ -685,10 +697,10 @@ class Inferencer(object):
         self.posterior = posterior
         return posterior
 
-    def infere(self, n_samples=None, theta=None, x=None, n_rounds=1,
-               inference_method='SNPE', density_estimator_model='maf',
-               inference_kwargs={}, train_kwargs={}, posterior_kwargs={},
-               **params):
+    def infer(self, n_samples=None, theta=None, x=None, n_rounds=1,
+              inference_method='SNPE', density_estimator_model='maf',
+              inference_kwargs={}, train_kwargs={}, posterior_kwargs={},
+              **params):
         """Return the trained posterior.
 
         If ``theta`` and ``x`` are not provided, ``n_samples`` has to
@@ -708,28 +720,33 @@ class Inferencer(object):
             performed. Otherwise, if ``n_rounds`` is integer larger
             than 1, multi-round inference will be performed. This is
             only valid if posterior has not been defined manually.
+            Otherwise, if this method is called after posterior has
+            already been built, multi-round inference is performed.
         inference_method : str, optional
             Inference method. Either of SNPE, SNLE or SNRE.
         density_estimator_model : str, optional
             The type of density estimator to be created. Either
             ``mdn``, ``made``, ``maf`` or ``nsf``.
         inference_kwargs : dict, optional
-            Additional keyword arguments for
-            ``sbi.utils.get_nn_models.posterior_nn`` method.
+            Additional keyword arguments for the inferencer method
+            definition.
         train_kwargs : dict, optional
             Additional keyword arguments for training the posterior
             estimator.
         posterior_kwargs : dict, optional
-            Dictionary of arguments for `.build_posterior` method.
+            Additional keyword arguments for builing the posterior.
         params : dict
-            Bounds for each parameter.
+            Bounds for each parameter. Keys should correspond to names
+            of parameters as defined in the model equaions, values
+            are lists with lower and upper bounds with quantities of
+            respective parameter.
 
         Returns
         -------
         sbi.inference.NeuralPosterior
-            Trained posterior.
+            Approximated posterior distribution over parameters.
         """
-        if self.posterior is None:  # `.infere_step` has not been called
+        if self.posterior is None:
             # handle the number of rounds
             if not isinstance(n_rounds, int):
                 raise ValueError('`n_rounds` has to be a positive integer.')
@@ -738,7 +755,7 @@ class Inferencer(object):
             try:
                 inference_method = str.upper(inference_method)
             except ValueError as e:
-                print(e, '\nInvalid inference method.')
+                print(e, '\nInference method should be defined as string.')
             if inference_method not in ['SNPE', 'SNLE', 'SNRE']:
                 raise ValueError(f'Inference method {inference_method} is not'
                                  ' supported.')
@@ -768,12 +785,15 @@ class Inferencer(object):
                                                  prior,
                                                  **inference_kwargs)
 
-            # additional args for `.train` method are needed only for SNPE
+            # args for SNPE in `.train`
+            # args for SNRE and SNLE are not supported here, if needed the user
+            # could provide them by using more flexible inferface via
+            # `.infer_step` method
             if inference_method == 'SNPE':
                 args = [prior]
             else:
                 args = []
-        else:  # `.infere_step` has been called manually
+        else:  # `.infer_step` has been called manually
             x_o = torch.tensor(self.x_o, dtype=torch.float32)
             prior = self.posterior.set_default_x(x_o)
             if self.posterior._method_family == 'snpe':
@@ -781,7 +801,7 @@ class Inferencer(object):
             else:
                 args = []
 
-        # allocate empty list of posterior
+        # allocate empty list of posteriors
         posteriors = []
 
         # set a proposal
@@ -792,9 +812,9 @@ class Inferencer(object):
             print(f'Round {round + 1}/{n_rounds}.')
 
             # inference step
-            posterior = self.infere_step(proposal, self.inference,
-                                         n_samples, self.theta, self.x,
-                                         train_kwargs, posterior_kwargs, *args)
+            posterior = self.infer_step(proposal, self.inference,
+                                        n_samples, self.theta, self.x,
+                                        train_kwargs, posterior_kwargs, *args)
 
             # append the current posterior to the list of posteriors
             posteriors.append(posterior)
@@ -811,7 +831,7 @@ class Inferencer(object):
 
         Parameters
         ----------
-        posterior : sbi.inference.posteriors.DirectPosterior, optional
+        posterior : sbi.inference.NeuralPosterior, optional
             Posterior distribution.
         f : str or os.PathLike
             Path to file either as string or ``os.PathLike`` object
@@ -850,11 +870,11 @@ class Inferencer(object):
         ----------
         shape : tuple
             Desired shape of samples that are drawn from posterior.
-        posterior : sbi.inference.posteriors.DirectPosterior, optional
+        posterior : sbi.inference.NeuralPosterior, optional
             Posterior distribution.
         kwargs : dict, optional
-            Additional keyword arguments for ``sample`` method in
-            ``sbi.inference.posteriors.DirectPosterior`` class
+            Additional keyword arguments for ``sample`` method of
+            ``sbi.inference.NeuralPosterior`` object.
         Returns
         -------
         numpy.ndarray
@@ -866,8 +886,7 @@ class Inferencer(object):
             p = self.posterior
         else:
             raise ValueError('Need to provide posterior argument if no'
-                             ' posterior has been calculated by the `infere`'
-                             ' method.')
+                             ' posterior has computed built yet.')
         x_o = torch.tensor(self.x_o, dtype=torch.float32)
         samples = p.sample(shape, x=x_o, **kwargs)
         self.samples = samples
@@ -1139,7 +1158,7 @@ class Inferencer(object):
 
         Parameters
         ----------
-        posterior : sbi.inference.posteriors.DirectPosterior, optional
+        posterior : sbi.inference.NeuralPosterior, optional
             Posterior distribution.
         output_var: str or sequence of str
             Name of the output variable to be monitored, it can also be
