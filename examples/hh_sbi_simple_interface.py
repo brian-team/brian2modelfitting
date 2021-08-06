@@ -7,11 +7,11 @@ import pandas as pd
 df_inp_traces = pd.read_csv('input_traces_hh.csv')
 df_out_traces = pd.read_csv('output_traces_hh.csv')
 inp_traces = df_inp_traces.to_numpy()
-inp_traces = inp_traces[:3, 1:]
+inp_traces = inp_traces[[0, 1, 3], 1:]
 out_traces = df_out_traces.to_numpy()
-out_traces = out_traces[:3, 1:]
+out_traces = out_traces[[0, 1, 3], 1:]
 
-# Model and its parameters
+# Define model and its parameters
 area = 20_000*um**2
 El = -65*mV
 EK = -90*mV
@@ -39,36 +39,53 @@ t = arange(0, out_traces.shape[1]*dt/ms, dt/ms)
 inferencer = Inferencer(dt=dt, model=eqs,
                         input={'I': inp_traces*amp},
                         output={'v': out_traces*mV},
-                        features=[lambda x: x[(t > 5) & (t < 10)].mean(),
-                                  lambda x: x[(t > 5) & (t < 10)].std(),
-                                  lambda x: x.max()],
+                        features={'v': [lambda x: x[(t > 5) & (t < 10)].mean(),
+                                        lambda x: x[(t > 5) & (t < 10)].std(),
+                                        lambda x: x.max()]},
                         method='exponential_euler',
                         threshold='m > 0.5',
                         refractory='m > 0.5',
                         param_init={'v': 'VT'})
 
 # Generate prior and train the neural density estimator
-inferencer.infere(n_samples=10000,
-                  n_rounds=1,
-                  gl=[1e-09*siemens, 1e-07*siemens],
-                  g_na=[2e-06*siemens, 2e-04*siemens],
-                  g_kd=[6e-07*siemens, 6e-05*siemens],
-                  Cm=[0.1*uF*cm**-2*area, 2*uF*cm**-2*area])
+inferencer.infer(n_samples=10_000,
+                 n_rounds=1,
+                 gl=[1e-09*siemens, 1e-07*siemens],
+                 g_na=[2e-06*siemens, 2e-04*siemens],
+                 g_kd=[6e-07*siemens, 6e-05*siemens],
+                 Cm=[0.1*uF*cm**-2*area, 2*uF*cm**-2*area])
 
 # Draw samples from posterior
-inferencer.sample((10000, ))
+inferencer.sample((10_000, ))
 
-# Create pairplot from samples
-inferencer.pairplot(limits={'gl': [1e-09*siemens, 1e-07*siemens],
-                            'g_na': [2e-06*siemens, 2e-04*siemens],
-                            'g_kd': [6e-07*siemens, 6e-05*siemens],
-                            'Cm': [0.1*uF*cm**-2*area, 2*uF*cm**-2*area]},
-                    labels={'gl': r'$\overline{g}_{l}$',
-                            'g_na': r'$\overline{g}_{Na}$',
-                            'g_kd': r'$\overline{g}_{K}$',
-                            'Cm': r'$\overline{C}_{m}$'})
+# Visualize pairplot and conditional pairplot
+limits = {'gl': [1e-09*siemens, 1e-07*siemens],
+          'g_na': [2e-06*siemens, 2e-04*siemens],
+          'g_kd': [6e-07*siemens, 6e-05*siemens],
+          'Cm': [0.1*uF*cm**-2*area, 2*uF*cm**-2*area]}
+labels = {'gl': r'$\overline{g}_\mathrm{l}$',
+          'g_na': r'$\overline{g}_\mathrm{Na}$',
+          'g_kd': r'$\overline{g}_\mathrm{K}$',
+          'Cm': r'$\overline{C}_{m}$'}
+inferencer.pairplot(limits=limits,
+                    ticks=limits,
+                    labels=labels,
+                    figsize=(6, 6))
+condition = inferencer.sample((1, ))
+inferencer.conditional_pairplot(condition=condition,
+                                limits=limits,
+                                labels=labels,
+                                ticks=limits,
+                                figsize=(6, 6))
 
-# Generate traces by using a single sample from the trained posterior
+# Construct and visualize conditional coefficient matrix
+cond_coeff_mat = inferencer.conditional_corrcoeff(condition=condition,
+                                                  limits=limits)
+fig, ax = subplots(1,1, figsize=(6, 6))
+im = imshow(cond_coeff_mat, clim=[-1, 1])
+_ = fig.colorbar(im)
+
+# Generate and visualize traces by sampling posterior
 inf_traces = inferencer.generate_traces()
 
 # Visualize traces
