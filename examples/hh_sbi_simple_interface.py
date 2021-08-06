@@ -81,7 +81,7 @@ inferencer.conditional_pairplot(condition=condition,
 # Construct and visualize conditional coefficient matrix
 cond_coeff_mat = inferencer.conditional_corrcoeff(condition=condition,
                                                   limits=limits)
-fig, ax = subplots(1,1, figsize=(6, 6))
+fig, ax = subplots(1, 1, figsize=(6, 6))
 im = imshow(cond_coeff_mat, clim=[-1, 1])
 _ = fig.colorbar(im)
 
@@ -97,7 +97,7 @@ for idx in range(ncols):
     axs[0, idx].plot(t, out_traces[idx, :], lw=3, label='measurements')
     axs[0, idx].plot(t, inf_traces[idx, :]/mV, '--', lw=3,label='fits')
     axs[1, idx].plot(t, inp_traces[idx, :]/nA, 'k-', label='stimulus')
-    axs[1, idx].set_xlabel('t, ms')
+    axs[1, idx].set_xlabel('$t$, ms')
     if idx == 0:
         axs[0, idx].set_ylabel('$v$, mV')
         axs[1, idx].set_ylabel('$I$, nA')
