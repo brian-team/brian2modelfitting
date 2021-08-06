@@ -3,17 +3,15 @@ import os
 from brian2 import *
 from brian2modelfitting import *
 import pandas as pd
-import numpy as np
-from scipy.signal import find_peaks
 
 
 # Load input and output data traces
 df_inp_traces = pd.read_csv('input_traces_hh.csv')
 df_out_traces = pd.read_csv('output_traces_hh.csv')
 inp_traces = df_inp_traces.to_numpy()
-inp_traces = inp_traces[:2, 1:]
+inp_traces = inp_traces[[0, 1, 3], 1:]
 out_traces = df_out_traces.to_numpy()
-out_traces = out_traces[:2, 1:]
+out_traces = out_traces[[0, 1, 3], 1:]
 
 # Model and its parameters
 area = 20_000*um**2
@@ -39,31 +37,22 @@ eqs = '''
 # Time domain
 t = arange(0, out_traces.shape[1]*dt/ms, dt/ms)
 
-
-def n_peaks(x):
-    n_p = []
-    for _x in x.transpose():
-        p_i = find_peaks(_x, height=0)[0]
-        n_p.append(p_i.size - sum(np.diff(t[p_i]) < 4))
-    return n_p
-
-
 # Step-by-step inference
 # Start with the regular instatiation of the class
 inferencer = Inferencer(dt=dt, model=eqs,
                         input={'I': inp_traces*amp},
                         output={'v': out_traces*mV},
-                        features=[n_peaks,
-                                  lambda x: x[(t > 5) & (t < 10), :].mean(axis=0),
-                                  lambda x: x[(t > 5) & (t < 10), :].std(axis=0),
-                                  lambda x: x.ptp(axis=0)],
+                        features={'v': [lambda x: x.mean(),
+                                        lambda x: x[(t > 5) & (t < 10)].mean(),
+                                        lambda x: x[(t > 5) & (t < 10)].std(),
+                                        lambda x: x.ptp()]},
                         method='exponential_euler',
                         threshold='m > 0.5',
                         refractory='m > 0.5',
                         param_init={'v': 'VT'})
 
 # Data generation
-# Initializing of the prior
+# Initializing the prior
 prior = inferencer.init_prior(gl=[1e-09*siemens, 1e-07*siemens],
                               g_na=[2e-06*siemens, 2e-04*siemens],
                               g_kd=[6e-07*siemens, 6e-05*siemens],
@@ -74,47 +63,41 @@ if os.path.exists(path_to_data):
     theta, x = inferencer.load_summary_statistics(path_to_data)
 else:
     # Generate training data
-    theta = inferencer.generate_training_data(n_samples=1000,
+    theta = inferencer.generate_training_data(n_samples=10_000,
                                               prior=prior)
     # Extract summary stats
-    x = inferencer.extract_summary_statistics(theta=theta, level=0)
+    x = inferencer.extract_summary_statistics(theta)
     # Save the data for later use
     inferencer.save_summary_statistics(path_to_data, theta, x)
 
 # Amortized inference
 # Training the neural density estimator
 inference = inferencer.init_inference(inference_method='SNPE',
-                                      density_estimator_model='maf',
+                                      density_estimator_model='mdn',
                                       prior=prior,
                                       hidden_features=50,
                                       num_components=10)
 # First round of inference where no observation data is set to posterior
-posterior = inferencer.infere_step(proposal=prior,
-                                   inference=inference,
-                                   theta=theta, x=x,
-                                   train_kwargs={'num_atoms': 10,
-                                                 'learning_rate': 0.0005,
-                                                 'show_train_summary': True})
+posterior_amortized = inferencer.infer_step(proposal=prior,
+                                            inference=inference,
+                                            theta=theta, x=x,
+                                            train_kwargs={'num_atoms': 10})
 # Storing the trained posterior without a default observation
 path_to_posterior = __file__[:-3] + '_posterior.pth'
 inferencer.save_posterior(path_to_posterior)
-# Loading the trained posterior directly to Inferencer class
-posterior_loaded = inferencer.load_posterior(path_to_posterior)
 
 # Sampling from the posterior given observations, ...
-inferencer.sample((10000, ), posterior=posterior_loaded)
+inferencer.sample((10_000, ))
 # ...visualize the samples, ...
-inferencer.pairplot(labels=[r'$\overline{g}_{l}$',
-                            r'$\overline{g}_{Na}$',
-                            r'$\overline{g}_{K}$',
-                            r'$\overline{C}_{m}$'])
-# ...and optionally, continue the multiround inference via ``infere`` method
-posterior_multi_round = inferencer.infere(n_rounds=2)
-inferencer.sample((10000, ))
-inferencer.pairplot(labels=[r'$\overline{g}_{l}$',
-                            r'$\overline{g}_{Na}$',
-                            r'$\overline{g}_{K}$',
-                            r'$\overline{C}_{m}$'])
+labels = {'gl': r'$\overline{g}_\mathrm{l}$',
+          'g_na': r'$\overline{g}_\mathrm{Na}$',
+          'g_kd': r'$\overline{g}_\mathrm{K}$',
+          'Cm': r'$\overline{C}_{m}$'}
+inferencer.pairplot(labels=labels)
+# ...and optionally, continue the multiround inference using ``infer`` method
+posterior_multiround = inferencer.infer(n_rounds=2)
+inferencer.sample((10_000, ))
+inferencer.pairplot(labels=labels)
 
 # Generate traces from a single sample of parameters
 inf_traces = inferencer.generate_traces()
@@ -126,9 +109,9 @@ for idx in range(ncols):
     axs[0, idx].plot(t, out_traces[idx, :].T, label='measurements')
     axs[0, idx].plot(t, inf_traces[idx, :].T/mV, label='fits')
     axs[1, idx].plot(t, inp_traces[idx, :].T/nA, 'k-', label='stimulus')
-    axs[1, idx].set_xlabel('t, ms')
+    axs[1, idx].set_xlabel('$t$, ms')
     if idx == 0:
-        axs[0, idx].set_ylabel('$v$, mV')
+        axs[0, idx].set_ylabel('$V$, mV')
         axs[1, idx].set_ylabel('$I$, nA')
 handles, labels = [(h + l) for h, l
                    in zip(axs[0, idx].get_legend_handles_labels(),
