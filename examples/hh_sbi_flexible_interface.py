@@ -63,12 +63,12 @@ if os.path.exists(path_to_data):
     theta, x = inferencer.load_summary_statistics(path_to_data)
 else:
     # Generate training data
-    theta = inferencer.generate_training_data(n_samples=10_000,
+    theta = inferencer.generate_training_data(n_samples=1000,
                                               prior=prior)
     # Extract summary stats
     x = inferencer.extract_summary_statistics(theta)
     # Save the data for later use
-    inferencer.save_summary_statistics(path_to_data, theta, x)
+    #inferencer.save_summary_statistics(path_to_data, theta, x)
 
 # Amortized inference
 # Training the neural density estimator
