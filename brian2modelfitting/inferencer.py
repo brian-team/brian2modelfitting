@@ -592,7 +592,7 @@ class Inferencer(object):
             Sampled prior.
         x : torch.tensor
             Summary statistics.
-        args : list, optional
+        args : tuple, optional
             Contains a uniformly distributed sbi.utils.BoxUniform
             proposal. Used only for SNPE, for SNLE and SNRE,
             ``proposal`` should not be passed to ``append_simulations``
@@ -791,16 +791,16 @@ class Inferencer(object):
             # could provide them by using more flexible inferface via
             # `.infer_step` method
             if inference_method == 'SNPE':
-                args = [prior]
+                args = [prior, ]
             else:
-                args = []
+                args = [None, ]
         else:  # `.infer_step` has been called manually
             x_o = torch.tensor(self.x_o, dtype=torch.float32)
             prior = self.posterior.set_default_x(x_o)
             if self.posterior._method_family == 'snpe':
-                args = [prior]
+                args = [prior, ]
             else:
-                args = []
+                args = [None, ]
 
         # allocate empty list of posteriors
         posteriors = []
