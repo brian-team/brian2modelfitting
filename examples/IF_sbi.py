@@ -1,6 +1,5 @@
 from brian2 import *
 from brian2modelfitting import *
-from scipy.signal import find_peaks
 
 
 # Generate input and output data traces
@@ -23,7 +22,7 @@ neurons = NeuronGroup(1, eqs,
                       threshold='v > -50 * mV',
                       reset='v = -70 * mV',
                       method='exponential_euler')
-neurons.v = -70 * mV
+neurons.v = -70*mV
 neurons.set_states({'gl': 30*nS,
                     'C': 1*nF})
 monitor = StateMonitor(neurons, 'v', record=True)
@@ -49,10 +48,9 @@ inferencer = Inferencer(dt=dt, model=eqs_inf,
                         reset='v = -70 * mV',
                         param_init={'v': -70 * mV})
 
-inferencer.infere(n_samples=10000,
-                  inference_method='SNPE',
-                  gl=[10*nS, 100*nS],
-                  C=[0.1*nF, 10*nF])
+inferencer.infer(n_samples=10_000,
+                 gl=[10*nS, 100*nS],
+                 C=[0.1*nF, 10*nF])
 
 inferencer.sample((10000, ))
 inferencer.pairplot(labels={'gl': r'$\overline{g}_{l}$',
