@@ -700,7 +700,7 @@ class Inferencer(object):
     def infer(self, n_samples=None, theta=None, x=None, n_rounds=1,
               inference_method='SNPE', density_estimator_model='maf',
               inference_kwargs={}, train_kwargs={}, posterior_kwargs={},
-              **params):
+              restart=False, **params):
         """Return the trained posterior.
 
         If ``theta`` and ``x`` are not provided, ``n_samples`` has to
@@ -736,6 +736,11 @@ class Inferencer(object):
             estimator.
         posterior_kwargs : dict, optional
             Additional keyword arguments for builing the posterior.
+        restart : bool, optional
+            When the method is called for a second time, set to True if
+            amortized inference should be performed. If False,
+            multi-round inference with the existing posterior will be
+            performed.
         params : dict
             Bounds for each parameter. Keys should correspond to names
             of parameters as defined in the model equaions, values
@@ -747,6 +752,8 @@ class Inferencer(object):
         sbi.inference.NeuralPosterior
             Approximated posterior distribution over parameters.
         """
+        if restart:
+            self.posterior = None
         if self.posterior is None:
             # handle the number of rounds
             if not isinstance(n_rounds, int):
