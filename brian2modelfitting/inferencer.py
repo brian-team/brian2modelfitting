@@ -24,6 +24,7 @@ import sbi.inference
 import torch
 
 from .simulator import RuntimeSimulator, CPPStandaloneSimulator
+from .utils import tqdm
 
 
 def configure_simulator():
@@ -816,8 +817,7 @@ class Inferencer(object):
         proposal = prior
 
         # main inference loop
-        for round in range(n_rounds):
-            print(f'Round {round + 1}/{n_rounds}.')
+        for _ in tqdm(range(n_rounds)):
 
             # inference step
             posterior = self.infer_step(proposal, self.inference,
@@ -831,6 +831,7 @@ class Inferencer(object):
             if n_rounds > 1:
                 x_o = torch.tensor(self.x_o, dtype=torch.float32)
                 proposal = posterior.set_default_x(x_o)
+
         self.posterior = posterior
         return posterior
 
