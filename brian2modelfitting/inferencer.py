@@ -466,7 +466,8 @@ class Inferencer(object):
         obs = simulator.statemonitor.recorded_variables
         x = []
         if self.features:
-            for ov in self.output_var:
+            for ov in tqdm(self.output_var, desc='Extracting features',
+                           total=len(self.output), leave=True):
                 summary_statistics = []
                 o = obs[ov].get_value()
                 # TODO: should be vectorized
@@ -478,7 +479,8 @@ class Inferencer(object):
                 x.append(_x)
             x = np.hstack(x)
         else:
-            for ov in self.output_var:
+            for ov in tqdm(self.output_var, desc='Aranging output traces',
+                           total=len(self.output)):
                 o = obs[ov].get_value().T
                 x.append(o.reshape(self.n_samples, -1).astype(np.float32))
             x = np.hstack(x)
@@ -825,7 +827,11 @@ class Inferencer(object):
         proposal = prior
 
         # main inference loop
-        for _ in tqdm(range(n_rounds)):
+        if self.posterior or n_rounds > 1:
+            tqdm_desc = f'{n_rounds}-round focused inference'
+        else:
+            tqdm_desc = 'Amortized inference'
+        for _ in tqdm(range(n_rounds), desc=tqdm_desc):
 
             # inference step
             posterior = self.infer_step(proposal, self.inference,
