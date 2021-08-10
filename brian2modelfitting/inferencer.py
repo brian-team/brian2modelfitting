@@ -9,6 +9,7 @@ from brian2.devices.device import get_device, device
 from brian2.equations.equations import Equations
 from brian2.groups.neurongroup import NeuronGroup
 from brian2.input.timedarray import TimedArray
+from brian2.monitors.spikemonitor import SpikeMonitor
 from brian2.monitors.statemonitor import StateMonitor
 from brian2.units.fundamentalunits import (DIMENSIONLESS,
                                            fail_for_dimension_mismatch,
@@ -220,7 +221,7 @@ class Inferencer(object):
         output_var = list(output.keys())
         output = list(output.values())
         for o_var in output_var:
-            if o_var not in model.names:
+            if o_var != 'spikes' and o_var not in model.names:
                 raise NameError(f'{o_var} is not a model variable')
         self.output_var = output_var
         self.output = output
@@ -235,11 +236,14 @@ class Inferencer(object):
         # handle multiple output variables
         self.output_dim = []
         for o_var, out in zip(self.output_var, self.output):
-            self.output_dim.append(model[o_var].dim)
-            fail_for_dimension_mismatch(out, self.output_dim[-1],
-                                        'The provided target values must have'
-                                        ' the same units as the variable'
-                                        f' {o_var}')
+            if o_var == 'spikes':
+                self.output_dim.append(DIMENSIONLESS)
+            else:
+                self.output_dim.append(model[o_var].dim)
+                fail_for_dimension_mismatch(out, self.output_dim[-1],
+                                            'The provided target values must'
+                                            ' have the same units as the'
+                                            f' variable {o_var}')
 
         # add input to equations
         self.model = model
@@ -251,11 +255,12 @@ class Inferencer(object):
         # add output to equations
         counter = 0
         for o_var, o_dim in zip(self.output_var, self.output_dim):
-            counter += 1
-            output_expr = f'output_var_{counter}(t, i % n_traces)'
-            output_dim = ('1' if o_dim is DIMENSIONLESS else repr(o_dim))
-            output_eqs = f'{o_var}_target = {output_expr} : {output_dim}'
-            self.model += output_eqs
+            if o_var != 'spikes':
+                counter += 1
+                output_expr = f'output_var_{counter}(t, i % n_traces)'
+                output_dim = ('1' if o_dim is DIMENSIONLESS else repr(o_dim))
+                output_eqs = f'{o_var}_target = {output_expr} : {output_dim}'
+                self.model += output_eqs
 
         # create ``TimedArray`` object for input w.r.t. a given time scale
         self.input_traces = TimedArray(input.transpose(), dt=self.dt)
@@ -281,9 +286,18 @@ class Inferencer(object):
         if features:
             for ov, o in zip(self.output_var, self.output):
                 o = np.array(o)
-                for _o in o:
-                    for feature in features[ov]:
-                        obs.append(feature(_o))
+                if ov == 'spikes':
+                    obs.extend(o.ravel())
+                else:
+                    for _o in o:
+                        for feature in features[ov]:
+                            obs.append(feature(_o))
+            x_o = np.array(obs, dtype=np.float32)
+        elif features is None and 'spikes' in self.output_var:
+            for ov, o in zip(self.output_var, self.output):
+                o = np.array(o)
+                if ov == 'spikes':
+                    obs.extend(o.ravel())
             x_o = np.array(obs, dtype=np.float32)
         else:
             for o in self.output:
@@ -357,10 +371,11 @@ class Inferencer(object):
                                         'n_traces': self.n_traces},
                                        level=level+1)
         counter = 0
-        for out in self.output:
-            counter += 1
-            namespace[f'output_var_{counter}'] = TimedArray(out.transpose(),
-                                                            dt=self.dt)
+        for o_var, out in zip(self.output_var, self.output):
+            if o_var != 'spikes':
+                counter += 1
+                namespace[f'output_var_{counter}'] = TimedArray(out.T,
+                                                                dt=self.dt)
 
         # setup neuron group
         kwds = {}
@@ -377,9 +392,18 @@ class Inferencer(object):
                               namespace=namespace,
                               name='neurons',
                               **kwds)
+
+        # create a network of neurons
         network = Network(neurons)
-        network.add(StateMonitor(source=neurons, variables=output_var,
-                                 record=True, dt=self.dt, name='statemonitor'))
+        if isinstance(output_var, str):
+            output_var = [output_var]
+        if 'spikes' in output_var:
+            network.add(SpikeMonitor(neurons, name='spikemonitor'))
+        record_vars = [v for v in output_var if v != 'spikes']
+        if len(record_vars):
+            network.add(StateMonitor(source=neurons, variables=record_vars,
+                                     record=True, dt=self.dt,
+                                     name='statemonitor'))
 
         # initialize the simulator
         simulator.initialize(network, param_init, name=network_name)
@@ -464,16 +488,34 @@ class Inferencer(object):
 
         # extract features for each output variable and each trace
         obs = simulator.statemonitor.recorded_variables
+        if 'spikes' in self.output_var:
+            spike_trains = list(simulator.spikemonitor.spike_trains().values())
         x = []
         if self.features:
             for ov in tqdm(self.output_var, desc='Extracting features',
                            total=len(self.output), leave=True):
                 summary_statistics = []
-                o = obs[ov].get_value()
+                if ov != 'spikes':
+                    o = obs[ov].get_value()
                 # TODO: should be vectorized
-                for _o in o.T:
-                    for feature in self.features[ov]:
-                        summary_statistics.append(feature(_o))
+                for idx, _o in enumerate(o.T):
+                    if ov != 'spikes':
+                        for feature in self.features[ov]:
+                            summary_statistics.append(feature(_o))
+                    else:
+                        summary_statistics.append(spike_trains[idx].shape[0])
+                _x = np.array(summary_statistics, dtype=np.float32)
+                _x = _x.reshape(self.n_samples, -1)
+                x.append(_x)
+            x = np.hstack(x)
+        elif self.features is None and 'spikes' in self.output_var:
+            for ov in tqdm(self.output_var, desc='Extracting spikes',
+                           total=len(self.output), leave=True):
+                summary_statistics = []
+                # TODO: should be vectorized
+                if ov == 'spikes':
+                    for spike_train in spike_trains:
+                        summary_statistics.append(spike_train.shape[0])
                 _x = np.array(summary_statistics, dtype=np.float32)
                 _x = _x.reshape(self.n_samples, -1)
                 x.append(_x)
