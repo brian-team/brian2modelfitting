@@ -15,6 +15,7 @@ from brian2.units.fundamentalunits import (DIMENSIONLESS,
                                            fail_for_dimension_mismatch,
                                            get_dimensions,
                                            Quantity)
+from brian2.utils.logger import get_logger
 import numpy as np
 from sbi.utils.get_nn_models import (posterior_nn,
                                      likelihood_nn,
@@ -26,6 +27,9 @@ import torch
 
 from .simulator import RuntimeSimulator, CPPStandaloneSimulator
 from .utils import tqdm
+
+
+logger = get_logger(__name__)
 
 
 def configure_simulator():
@@ -487,7 +491,11 @@ class Inferencer(object):
                       name=network_name)
 
         # extract features for each output variable and each trace
-        obs = simulator.statemonitor.recorded_variables
+        try:
+            obs = simulator.statemonitor.recorded_variables
+        except KeyError:
+            logger.warn('The state monitor object is not defined.',
+                        name_suffix='statemonitor_definition')
         if 'spikes' in self.output_var:
             spike_trains = list(simulator.spikemonitor.spike_trains().values())
         x = []
