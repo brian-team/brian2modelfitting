@@ -277,16 +277,19 @@ class Inferencer(object):
         self.refractory = refractory
 
         # observation the focus is on
-        for ov, o in zip(self.output_var, self.output):
-            o = np.array(o)
-            if features:
-                obs = []
+        obs = []
+        if features:
+            for ov, o in zip(self.output_var, self.output):
+                o = np.array(o)
                 for _o in o:
                     for feature in features[ov]:
                         obs.append(feature(_o))
-                x_o = np.array(obs, dtype=np.float32)
-            else:
-                x_o = o.ravel().astype(np.float32)
+            x_o = np.array(obs, dtype=np.float32)
+        else:
+            for o in self.output:
+                o = np.array(o)
+                obs.append(o.ravel().astype(np.float32))
+            x_o = np.concatenate(obs)
         self.x_o = x_o
         self.features = features
 
@@ -461,19 +464,24 @@ class Inferencer(object):
 
         # extract features for each output variable and each trace
         obs = simulator.statemonitor.recorded_variables
-        for ov in self.output_var:
-            o = obs[ov].get_value()
-            o = o.T
-            if self.features:
+        x = []
+        if self.features:
+            for ov in self.output_var:
                 summary_statistics = []
+                o = obs[ov].get_value()
                 # TODO: should be vectorized
-                for _o in o:
+                for _o in o.T:
                     for feature in self.features[ov]:
                         summary_statistics.append(feature(_o))
-                x = np.array(summary_statistics, dtype=np.float32)
-                x = x.reshape(self.n_samples, -1)
-            else:
-                x = o.reshape(self.n_samples, -1).astype(np.float32)
+                _x = np.array(summary_statistics, dtype=np.float32)
+                _x = _x.reshape(self.n_samples, -1)
+                x.append(_x)
+            x = np.hstack(x)
+        else:
+            for ov in self.output_var:
+                o = obs[ov].get_value().T
+                x.append(o.reshape(self.n_samples, -1).astype(np.float32))
+            x = np.hstack(x)
         return x
 
     def save_summary_statistics(self, f, theta=None, x=None):
