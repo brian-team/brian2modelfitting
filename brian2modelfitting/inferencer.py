@@ -16,6 +16,7 @@ from brian2.units.fundamentalunits import (DIMENSIONLESS,
                                            get_dimensions,
                                            Quantity)
 from brian2.utils.logger import get_logger
+from brian2modelfitting.fitter import get_spikes
 import numpy as np
 from sbi.utils.get_nn_models import (posterior_nn,
                                      likelihood_nn,
@@ -289,19 +290,9 @@ class Inferencer(object):
         obs = []
         if features:
             for ov, o in zip(self.output_var, self.output):
-                o = np.array(o)
-                if ov == 'spikes':
-                    obs.extend(o.ravel())
-                else:
-                    for _o in o:
-                        for feature in features[ov]:
-                            obs.append(feature(_o))
-            x_o = np.array(obs, dtype=np.float32)
-        elif features is None and 'spikes' in self.output_var:
-            for ov, o in zip(self.output_var, self.output):
-                o = np.array(o)
-                if ov == 'spikes':
-                    obs.extend(o.ravel())
+                for _o in o:
+                    for feature in features[ov]:
+                        obs.append(feature(_o))
             x_o = np.array(obs, dtype=np.float32)
         else:
             for o in self.output:
@@ -504,26 +495,15 @@ class Inferencer(object):
                            total=len(self.output), leave=True):
                 summary_statistics = []
                 if ov != 'spikes':
-                    o = obs[ov].get_value()
+                    o = obs[ov].get_value().T
                 # TODO: should be vectorized
-                for idx, _o in enumerate(o.T):
+                for i in range(self.n_neurons):
                     if ov != 'spikes':
                         for feature in self.features[ov]:
-                            summary_statistics.append(feature(_o))
+                            summary_statistics.append(feature(o[i, :]))
                     else:
-                        summary_statistics.append(spike_trains[idx].shape[0])
-                _x = np.array(summary_statistics, dtype=np.float32)
-                _x = _x.reshape(self.n_samples, -1)
-                x.append(_x)
-            x = np.hstack(x)
-        elif self.features is None and 'spikes' in self.output_var:
-            for ov in tqdm(self.output_var, desc='Extracting spikes',
-                           total=len(self.output), leave=True):
-                summary_statistics = []
-                # TODO: should be vectorized
-                if ov == 'spikes':
-                    for spike_train in spike_trains:
-                        summary_statistics.append(spike_train.shape[0])
+                        for feature in self.features[ov]:
+                            summary_statistics.append(feature(spike_trains[i]))
                 _x = np.array(summary_statistics, dtype=np.float32)
                 _x = _x.reshape(self.n_samples, -1)
                 x.append(_x)
@@ -1290,7 +1270,11 @@ class Inferencer(object):
         # create dictionary of traces for multiple observed output variables
         if len(output_var) > 1:
             for ov in output_var:
-                trace = getattr(simulator.statemonitor, ov)[:]
+                if ov == 'spikes':
+                    trace = get_spikes(simulator.spikemonitor, 1,
+                                       self.n_traces)[0]
+                else:
+                    trace = getattr(simulator.statemonitor, ov)[:]
                 traces = {ov: trace}
         else:
             traces = getattr(simulator.statemonitor, output_var[0])[:]
