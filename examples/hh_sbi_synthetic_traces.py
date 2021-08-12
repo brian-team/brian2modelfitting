@@ -4,7 +4,6 @@ from brian2 import *
 
 # Input and output data traces simulation
 dt = 0.05*ms
-defaultclock.dt = dt
 t_on = 50*ms
 t_total = 350*ms
 t_off = t_total - t_on
@@ -13,9 +12,9 @@ gleak = 10*nS
 Eleak = -70*mV
 VT = -60*mV
 C = 200*pF
-gNa = 32*uS
+gNa = 32*uS  # 1st "unknown" parameter to infer
 ENa = 53*mV
-gK = 1*uS
+gK = 1*uS  # 2nd "unknown" parameter to infer
 EK = -107*mV
 eqs = '''
     dVm/dt = -(gNa*m**3*h*(Vm - ENa) + gK*n**4*(Vm - EK) + gleak*(Vm - Eleak) - I_inj) / C : volt
@@ -58,7 +57,7 @@ eqs = '''
     alphan = (-0.032/mV) * (Vm - VT - 15.*mV) / (exp((-(Vm - VT - 15.*mV)) / (5.*mV)) - 1)/ms : Hz
     betan = 0.5*exp(-(Vm - VT - 10.*mV) / (40.*mV))/ms : Hz
 
-    # The parameters to fit
+    # parameters to fit
     gNa : siemens (constant)
     gK : siemens (constant)
     '''
@@ -72,7 +71,7 @@ inferencer = Inferencer(dt=dt, model=eqs,
                                     'h': '1/(1 + betah/alphah)',
                                     'n': '1/(1 + betan/alphan)'})
 
-# Amortized inference
+# Amortized inference with automatic feature extraction by using a default MLP
 inferencer.infer(n_samples=10_000,
                  inference_method='SNPE',
                  density_estimator_model='mdn',
@@ -83,12 +82,13 @@ inferencer.infer(n_samples=10_000,
 inferencer.sample((10_000, ))
 
 # Visualize estimated posterior distribution
-inferencer.pairplot(limits={'gNa': [.5*uS, 80.*uS],
-                            'gK': [1e-4*uS, 15.*uS]},
-                    ticks={'gNa': [.5*uS, 80.*uS],
-                           'gK': [1e-4*uS, 15.*uS]},
-                    labels={'gNa': r'$\overline{g}_\mathrm{Na}$',
-                            'gK': r'$\overline{g}_\mathrm{K}$'},
+limits = {'gNa': [.5*uS, 80.*uS],
+          'gK': [1e-4*uS, 15.*uS]}
+labels= {'gNa': r'$\overline{g}_\mathrm{Na}$',
+         'gK': r'$\overline{g}_\mathrm{K}$'}
+inferencer.pairplot(limits=limits,
+                    ticks=limits,
+                    labels=labels,
                     points={'gNa': 32*uS,
                             'gK': 1*uS},
                     points_offdiag={'markersize': 6},
@@ -97,14 +97,15 @@ inferencer.pairplot(limits={'gNa': [.5*uS, 80.*uS],
 
 # Visualize traces for a single sample from posterior
 inf_trace = inferencer.generate_traces()
+
 fig, axs = subplots(2, 1, sharex=True,
-                    gridspec_kw={'height_ratios': [3, 1]},
-                    figsize=(6, 4))
-axs[0].plot(t, out_trace.ravel()/mV, label='simulated recordings')
-axs[0].plot(t, inf_trace.ravel()/mV, '--', label='posterior sample')
-axs[0].set(ylabel='Vm, mV')
+                    gridspec_kw={'height_ratios': [3, 1]}, figsize=(7, 3))
+axs[0].plot(t, out_trace.ravel()/mV, 'C3-', lw=3, label='simulated recordings')
+axs[0].plot(t, inf_trace.ravel()/mV, 'k--', lw=2, label='posterior sample')
+axs[0].set(ylabel='$V_m$, mV')
 axs[0].legend()
-axs[1].plot(t, I_inj.ravel()/nA, 'k-', label='stimulus')
-axs[1].set(xlabel='t, ms', ylabel='I, nA')
+axs[1].plot(t, I_inj.ravel()/nA, 'k-', lw=3, label='stimulus')
+axs[1].set(xlabel='$t$, s', ylabel='I, nA')
 axs[1].legend()
+tight_layout()
 show()

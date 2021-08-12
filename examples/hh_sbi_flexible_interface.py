@@ -36,22 +36,23 @@ eqs = '''
 
 # Time domain
 t = arange(0, out_traces.shape[1]*dt/ms, dt/ms)
+t_start, t_end = t[where(inp_traces[0, :] != 0)[0][[0, -1]]]
 
 # Step-by-step inference
 # Start with the regular instatiation of the class
 inferencer = Inferencer(dt=dt, model=eqs,
                         input={'I': inp_traces*amp},
                         output={'v': out_traces*mV},
-                        features={'v': [lambda x: x.mean(),
-                                        lambda x: x[(t > 5) & (t < 10)].mean(),
-                                        lambda x: x[(t > 5) & (t < 10)].std(),
-                                        lambda x: x.ptp()]},
+                        features={'v': [lambda x: mean(x),
+                                        lambda x: mean(x[(t > t_start) & (t < t_end)]),
+                                        lambda x: std(x[(t > t_start) & (t < t_end)]),
+                                        lambda x: ptp(x)]},
                         method='exponential_euler',
                         threshold='m > 0.5',
                         refractory='m > 0.5',
                         param_init={'v': 'VT'})
 
-# Data generation
+# Training data generation
 # Initializing the prior
 prior = inferencer.init_prior(gl=[1e-09*siemens, 1e-07*siemens],
                               g_na=[2e-06*siemens, 2e-04*siemens],
@@ -63,12 +64,12 @@ if os.path.exists(path_to_data):
     theta, x = inferencer.load_summary_statistics(path_to_data)
 else:
     # Generate training data
-    theta = inferencer.generate_training_data(n_samples=1000,
+    theta = inferencer.generate_training_data(n_samples=5_000,
                                               prior=prior)
     # Extract summary stats
     x = inferencer.extract_summary_statistics(theta)
     # Save the data for later use
-    #inferencer.save_summary_statistics(path_to_data, theta, x)
+    inferencer.save_summary_statistics(path_to_data, theta, x)
 
 # Amortized inference
 # Training the neural density estimator
@@ -104,11 +105,13 @@ inf_traces = inferencer.generate_traces()
 nrows = 2
 ncols = out_traces.shape[0]
 fig, axs = subplots(nrows, ncols, sharex=True,
-                    gridspec_kw={'height_ratios': [3, 1]}, figsize=(15, 4))
+                    gridspec_kw={'height_ratios': [3, 1]},
+                    figsize=(ncols * 3, 3))
 for idx in range(ncols):
-    axs[0, idx].plot(t, out_traces[idx, :].T, label='measurements')
-    axs[0, idx].plot(t, inf_traces[idx, :].T/mV, label='fits')
-    axs[1, idx].plot(t, inp_traces[idx, :].T/nA, 'k-', label='stimulus')
+    axs[0, idx].plot(t, out_traces[idx, :].T, 'C3-', lw=3, label='recordings')
+    axs[0, idx].plot(t, inf_traces[idx, :].T/mV, 'k--', lw=2,
+                     label='sampled traces')
+    axs[1, idx].plot(t, inp_traces[idx, :].T/nA, lw=3, c='k', label='stimuli')
     axs[1, idx].set_xlabel('$t$, ms')
     if idx == 0:
         axs[0, idx].set_ylabel('$V$, mV')
