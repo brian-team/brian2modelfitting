@@ -1274,8 +1274,12 @@ class Inferencer(object):
                     trace = get_spikes(simulator.spikemonitor, 1,
                                        self.n_traces)[0]
                 else:
-                    trace = getattr(simulator.statemonitor, ov)[:]
-                traces = {ov: trace}
+                    try:
+                        trace = getattr(simulator.statemonitor, ov)[:]
+                        traces = {ov: trace}
+                    except KeyError:
+                        logger.warn('No state monitor object found.'
+                                    ' Call again with specified `output_var`.')
         else:
             traces = getattr(simulator.statemonitor, output_var[0])[:]
         return traces
