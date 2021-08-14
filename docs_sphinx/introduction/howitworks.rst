@@ -1,10 +1,14 @@
+============
 How it works
 ============
 
+Fitting
+=======
+
 Model fitting script requires three components:
- - A **Fitter** of choice: object that will perform the optimization
- - A **metric**: to compare results and decide which one is the best
- - An **optimization** algorithm: to decide which parameter combinations to try
+ - a **fitter**: object that will perform the optimization
+ - a **metric**: objective function
+ - an **optimizer**: optimization algorithm
 
 All of which need to be initialized for fitting application.
 Each optimization works with a following scheme:
@@ -13,61 +17,63 @@ Each optimization works with a following scheme:
 
   opt = Optimizer()
   metric = Metric()
-
   fitter = Fitter(...)
   result, error = fitter.fit(metric=metric, optimizer=opt, ...)
 
 
-The proposed solution is developed using a modular approach, where both the optimization
-method and metric to be optimized can be easily swapped out by a custom implementation.
+The proposed solution is developed using a modular approach, where both the
+optimization method and the objective function can be easily swapped out by a
+user-defined custom implementation.
 
-`~.Fitter` objects require 'model' defined as an
+`~.Fitter` objects require a model defined as an
 `~brian2.equations.equations.Equations` object or as a string, that has
 parameters that will be optimized specified as constants in the following way:
 
 .. code:: python
 
   model = '''
-  ...
-  g_na : siemens (constant)
-  g_kd : siemens (constant)
-  gl   : siemens (constant)
-  '''
+      ...
+      g_na : siemens (constant)
+      g_kd : siemens (constant)
+      gl   : siemens (constant)
+      '''
 
 Initialization of Fitter requires:
-  - ``dt`` - time step
-  - ``input`` - a dictionary with the name of the input variable and a set of input traces (list or array)
-  - ``output`` - a dictionary with the name of the output variable(s) and a set of goal output (traces/spike trains) (list or array)
-  - ``n_samples`` - number of samples to draw in each round (limited by method)
-  - ``reset``, and ``threshold`` in case of spiking neurons (can take refractory as well)
+  - ``dt`` - the time step
+  - ``input`` - a dictionary with the name of the input variable and a set of
+  input traces (list or array)
+  - ``output`` - a dictionary with the name of the output variable(s) and a
+  set of goal output (traces/spike trains) (list or array)
+  - ``n_samples`` - a number of samples to draw in each round (limited by
+  method)
+  - ``reset`` and ``threshold`` in case of spiking neurons (can take
+  refractory as well)
 
 Additionally, upon call of `~brian2modelfitting.fitter.Fitter.fit()`,
 object requires:
 
- - ``n_rounds`` - number of rounds to optimize over
+ - ``n_rounds`` - a number of rounds to optimize over
  - parameters with ranges to be optimized over
-
-...as well as an ``optimizer`` and a ``metric``
 
 Each free parameter of the model that shall be fitted is defined by two values:
 
 .. code:: python
 
-  param_name = [min, max]
+  param_name = [lower_bound, upper_bound]
 
 Ready to use elements
 ---------------------
 
-Alongside three optimization classes:
+Optimization classes:
  - `~brian2modelfitting.fitter.TraceFitter`
  - `~brian2modelfitting.fitter.SpikeFitter`
  - `~brian2modelfitting.fitter.OnlineTraceFitter`
 
-We also provide ready optimizers:
+Optimization algorithms:
  - `~brian2modelfitting.optimizer.NevergradOptimizer`
  - `~brian2modelfitting.optimizer.SkoptOptimizer`
 
-and metrics:
+Metrics:
  - `~brian2modelfitting.metric.MSEMetric` (for `~brian2modelfitting.fitter.TraceFitter`)
  - `~brian2modelfitting.metric.GammaFactor` (for `~brian2modelfitting.fitter.SpikeFitter`)
 
@@ -85,11 +91,11 @@ Example of `~brian2modelfitting.fitter.TraceFitter` with all of the necessary ar
   result, error = fitter.fit(optimizer=optimizer,
                              metric=metric,
                              n_rounds=1,
-                             gl=[1e-8*siemens*cm**-2 * area, 1e-3*siemens*cm**-2 * area],)
+                             gl=[1e-8*siemens*cm**-2 * area, 1e-3*siemens*cm**-2 * area])
 
 Remarks
 -------
-- After performing first fitting, user can continue the optimization
+- After performing first fitting round, user can continue the optimization
   with another `~brian2modelfitting.fitter.Fitter.fit()` run.
 
 - Number of samples can not be changed between rounds or `~brian2modelfitting.fitter.Fitter.fit()`
@@ -101,3 +107,8 @@ Remarks
 
 - When using the `~brian2modelfitting.fitter.TraceFitter`, users can use a standard
   curve fitting algorithm for refinement by calling `~brian2modelfitting.fitter.TraceFitter.refine`.
+
+Simulation-based inference
+==========================
+
+tba
