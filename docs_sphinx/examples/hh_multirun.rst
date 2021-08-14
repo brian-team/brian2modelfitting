@@ -1,5 +1,5 @@
-Multirun of Hodgkin-Huxley
-==========================
+Multirun fitting of Hodgkin-Huxley
+==================================
 
 Here you can download the data:
 :download:`input_traces <../../examples/input_traces_hh.csv>`
