@@ -22,7 +22,7 @@ computed.
 By default, the toolbox supports a range of global derivative-free
 optimization methods, that include popular methods for model fitting:
 differential evolution, particle swarm optimization and covariance matrix
-adaptation (provided by the ``Nevergrad``, a gradient-free optimization
+adaptation (provided by the ``nevergrad``, a gradient-free optimization
 platform) as well as Bayesian optimization for black box functions (provided
 by ``scikit-optimize``, a sequential model-based optimization library). On the
 other hand, simulation-based inference is the process of finding parameters of
