@@ -26,16 +26,16 @@ adaptation (provided by the ``nevergrad``, a gradient-free optimization
 platform) as well as Bayesian optimization for black box functions (provided
 by ``scikit-optimize``, a sequential model-based optimization library). On the
 other hand, simulation-based inference is the process of finding parameters of
-a simulator from observations by taking a Bayesian approach via sequential
-neural posterior estimation, likelihood estimation or ration estimation
-(provided by the ``sbi``), where neural densitiy estimator, a deep neural
-network allowing probabilistic association between the data and underlying
-parameter space, is trained. After the network is trained, the approximated
-posterior distribution is available.
+a simulator from observations by taking a Bayesian approach, in our case, via
+sequential neural posterior estimation, likelihood estimation or ratio
+estimation (provided by the ``sbi``), where neural densitiy estimator, a deep
+neural network allowing probabilistic association between the data and
+underlying parameter space, is trained. After the network is trained, the
+approximated posterior distribution is available.
 
-Just like Brian itself, the `brian2modelfitting` toolbox is designed to be
-easy to use and to save time through automatic parallelization of the
-simulations using code generation.
+Just like Brian 2 simulator itself, the `.brian2modelfitting` toolbox is
+designed to be easy to use and to save time through automatic parallelization
+of the simulations using code generation.
 
 
 Contents
