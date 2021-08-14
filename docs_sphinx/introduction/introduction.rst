@@ -17,7 +17,7 @@ same time.
 It also allows the possiblity of simultaneous fitting/inferencing by taking
 into account multiple output variables including spike trains.
 
-In following documentation we assume that ``brian2modelfitting`` has been
+In following documentation we assume that `.brian2modelfitting` has been
 installed and imported as follows:
 
 .. code:: python
@@ -28,10 +28,9 @@ installed and imported as follows:
 Installation
 ------------
 
-To install the toolbox alongside Brian 2 simulator, use `pip` as follows:
-a pip utility:
+To install the toolbox alongside Brian 2 simulator, use ``pip`` as follows:
 
-.. code:: python
+.. code::
 
   pip install brian2modelfitting
 
@@ -41,9 +40,9 @@ Testing Model Fitting
 
 Version on master branch gets automatically tested with Travis services.
 To test the code yourself, you will need to have ``pytest`` installed and run
-the following command inside the `brian2modelfitting` root directory:
+the following command inside the `.brian2modelfitting` root directory:
 
 
-.. code:: python
+.. code::
 
     pytest
