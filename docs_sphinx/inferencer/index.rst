@@ -44,7 +44,7 @@ Simulation-based inference workflow
 
 The inferencer procedure is defined via three main steps:
 
-#. step
+#. step.
    Prior over unknown parameters needs to be defined, where the simplest
    choice would be uniform distribution given lower and upper bound
    (currently, this is only prior distribution supported through
@@ -56,12 +56,12 @@ The inferencer procedure is defined via three main steps:
    the output from a neuron model, we would feed a neural network with
    relevant electrophysiology features that outline the gist of the output
    sufficiently well.
-#. step
+#. step.
    A neural network learns association between the summary data statistics
    and unknown parameters (given the prior distribution over parameters).
    The learning method is heavily dependent on the choice of the inference
    technique.
-#. step
+#. step.
    The trained neural network is applied to the empirical data to infer
    posterior distribution over unknown parameters.  Optionally, this process
    can be repeated by using the trained posterior distribution over parameters
@@ -70,5 +70,5 @@ The inferencer procedure is defined via three main steps:
 Implementation
 --------------
 
-Go to :doc:`the tutorial section <../introduction/tutorial_sbi.rst>` for the
-in-depth implementation analysis.
+Go to `the tutorial section <https://brian2modelfitting.readthedocs.io/en/stable/introduction/tutorial_sbi.html>`_
+in  for the in-depth implementation analysis.
