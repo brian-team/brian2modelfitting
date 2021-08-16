@@ -92,11 +92,12 @@ def get_param_dict(param_values, param_names, n_values):
 
     Parameters
     ----------
-    param_values : iterable
-        Iterable of size (``n_samples``, ``len(param_names)``)
-        containing parameter values.
-    param_names : iterable
-        Iterable containing parameter names
+    param_values : numpy.ndarray
+        Parameter values in a 2-dimensional array with the number of
+        rows corresponding to a number of samples and the number of
+        columns corresponding to ``len(param_names).
+    param_names : list
+        List containing parameter names.
     n_values : int
         Total number of given values for a single parameter.
 
@@ -116,16 +117,17 @@ def get_param_dict(param_values, param_names, n_values):
 def calc_prior(param_names, **params):
     """Return the prior distribution over given parameters.
 
-    N.B. The only currently supported prior distribution is
-    the multi-dimensional uniform distribution defined on a box.
+    Note that the only currently supported prior distribution is the
+    multi-dimensional uniform distribution defined on a box.
 
     Parameters
     ----------
-    param_names : iterable
-        Iterable containing parameter names.
+    param_names : list
+        List containing parameter names.
     params : dict
-        Dictionary with keys that correspond to parameter names, values
-        are a single dimensional lists or arrays.
+        Dictionary with keys that correspond to parameter names, and
+        the respective values are 2-element lists that hold the upper
+        and the lower bound of a distribution.
 
     Return
     ------
@@ -147,12 +149,12 @@ def calc_prior(param_names, **params):
 
 
 class Inferencer(object):
-    """Class for simulation-based inference.
+    """Class for a simulation-based inference.
 
     It offers an interface similar to that of the `.Fitter` class but
-    instead of fitting, neural density estimator is trained using a
+    instead of fitting, a neural density estimator is trained using a
     generative model which ultimately provides the posterior
-    distribution over the unknown parameters.
+    distribution over unknown free parameters.
 
     Parameters
     ----------
@@ -161,25 +163,26 @@ class Inferencer(object):
     model : str or brian2.equations.equations.Equations
         Single cell model equations.
     input : dict
-        Input traces in dictionary format where key corresponds to the
-        name of the input variable as defined in ``model`` and value
-        corresponds to an array of input traces.
+        Input traces in the dictionary format where key corresponds to
+        the name of the input variable as defined in ``model``, and
+        value corresponds to an array of input traces.
     output : dict
         Dictionary of recorded (or simulated) output data traces, where
         key corresponds to the name of the output variable as defined
-        in ``model`` and value corresponds to a an array of recorded
+        in ``model``, and value corresponds to an array of recorded
         traces.
     features : dict, optional
-        Dictionary of callables that take the 1-dimensional voltage
-        trace and output summary statistics. Keys correspond to output
-        variable names, while values are lists of callables.
-        If features are not provided, automatic feature extraction will
-        be performed either by using the default multi-layer perceptron
-        or by using the user-provided embedding network.
+        Dictionary of callables that take a 1-dimensional voltage
+        trace or a spike train and output summary statistics. Keys
+        correspond to output variable names, while values are lists of
+        callables. If ``features`` are set to None, automatic feature
+        extraction process will occur instead either by using the
+        default multi-layer perceptron or by using the custom embedding
+        network.
     method : str, optional
         Integration method.
     threshold : str, optional
-        The condition which produces spikes. Should be a single line
+        The condition which produces spikes. It should be a single line
         boolean expression.
     reset : str, optional
         The (possibly multi-line) string with the code to execute on
@@ -193,7 +196,7 @@ class Inferencer(object):
         e.g., ``'v > -20*mV'``.
     param_init : dict, optional
         Dictionary of state variables to be initialized with respective
-        values.
+        values, i.e., initial conditions for the model.
     """
     def __init__(self, dt, model, input, output, features=None, method=None,
                  threshold=None, reset=None, refractory=False,
@@ -317,8 +320,8 @@ class Inferencer(object):
         estimator.
 
         Unlike the `.Fitter` class, `.Inferencer` does not take the
-        total number of samples in the constructor. Thus, this property
-        becomes available only after the simulation is performed.
+        total number of samples directly in the constructor. Thus, this
+        property becomes available only after the simulation is performed.
 
         Parameters
         ----------
@@ -331,7 +334,7 @@ class Inferencer(object):
         """
         if self.n_samples is None:
             raise ValueError('Number of samples have not been yet defined.'
-                             'Call `generate_training_data` method first.')
+                             ' Call `generate_training_data` method first.')
         return self.n_traces * self.n_samples
 
     def setup_simulator(self, network_name, n_neurons, output_var, param_init,
@@ -405,17 +408,20 @@ class Inferencer(object):
         return simulator
 
     def init_prior(self, **params):
-        """Return the prior uniform distribution over parameters.
+        """Return the prior uniform distribution over the parameters.
 
         Parameters
         ----------
         params : dict
-            Bounds for each parameter.
+            Dictionary with keys that correspond to parameter names,
+            and the respective values are 2-element lists that hold
+            the upper and the lower bound of a distribution.
 
         Returns
         -------
-        sbi.utils.BoxUniform
-            Uniformly distributed prior over given parameters.
+        sbi.utils.torchutils.BoxUniform
+            ``sbi``-compatible object that contains a uniform prior
+            distribution over a given set of parameters.
         """
         for param in params:
             if param not in self.param_names:
@@ -438,7 +444,9 @@ class Inferencer(object):
         Returns
         -------
         numpy.ndarray
-            Sampled prior of shape (``n_samples``, -1).
+            Sampled prior with the number of rows that corresponds to
+            the ``n_samples``, while the number of columns depends on
+            the number of free parameters.
         """
         # set n_samples to class variable to be able to call self.n_neurons
         self.n_samples = n_samples
@@ -449,14 +457,14 @@ class Inferencer(object):
         return theta
 
     def extract_summary_statistics(self, theta, level=0):
-        """Return summary statistics for training the neural density
-        estimator.
+        """Return the summary statistics for the process of training
+        of the neural density estimator.
 
         Parameters
         ----------
         theta : numpy.ndarray
-            Sampled prior with ``n_samples`` rows, while then umber of
-            columns is equal to the number of free parameters.
+            Sampled prior with ``n_samples`` rows, and the number of
+            columns corresponds to the number of free parameters.
         level : int, optional
             How far to go back to get the locals/globals.
 
@@ -517,8 +525,8 @@ class Inferencer(object):
         return x
 
     def save_summary_statistics(self, f, theta=None, x=None):
-        """Save sampled prior, and extracted summary statistics into a
-        single file in compressed ``.npz`` format.
+        """Save sampled prior and the extracted summary statistics into
+        a single compressed ``.npz`` file.
 
         Parameters
         ----------
@@ -551,8 +559,8 @@ class Inferencer(object):
         np.savez_compressed(f, theta=t, x=x)
 
     def load_summary_statistics(self, f):
-        """Load samples from a prior and extracted summary statistics
-        from a compressed ``.npz`` file.
+        """Load samples from a prior and the extracted summary
+        statistics from a compressed ``.npz`` file.
 
         Parameters
         ----------
@@ -563,7 +571,7 @@ class Inferencer(object):
         Returns
         -------
         tuple
-            Sampled prior and summary statistics arrays.
+            Sampled prior and the summary statistics arrays.
         """
         loaded = np.load(f, allow_pickle=True)
         if set(loaded.files) == {'theta', 'x'}:
@@ -571,7 +579,7 @@ class Inferencer(object):
             x = loaded['x']
         self.theta = theta
         self.x = x
-        return (theta, x)
+        return theta, x
 
     def init_inference(self, inference_method, density_estimator_model, prior,
                        sbi_device='cpu', **inference_kwargs):
@@ -580,35 +588,37 @@ class Inferencer(object):
         Parameters
         ----------
         inference_method : str
-            Inference method. Either of SNPE, SNLE or SNRE.
+            Inference method. Either SNPE, SNLE or SNRE.
         density_estimator_model : str
             The type of density estimator to be created. Either
             ``mdn``, ``made``, ``maf``, ``nsf`` for SNPE and SNLE, or
             ``linear``, ``mlp``, ``resnet`` for SNRE.
         prior : sbi.utils.BoxUniform
-            Uniformly distributed prior over given parameters.
+            Uniformly distributed prior over free parameters.
         sbi_device : str, optional
             Device on which the ``sbi`` will operate. By default this
-            is set to CPU and it is advisable to remain so for most
-            cases. In cases where the user provide custom embedding
+            is set to ``cpu`` and it is advisable to remain so for most
+            cases. In cases where the user provides custom embedding
             network through ``inference_kwargs`` argument, which will
             be trained more efficiently by using GPU, device should be
-            set accordingly.
+            set accordingly to either ``gpu`` or ``cuda``.
         inference_kwargs : dict, optional
             Additional keyword arguments for different density
             estimator builder functions:
             ``sbi.utils.get_nn_models.posterior_nn`` for SNPE,
             ``sbi.utils.get_nn_models.classifier_nn`` for SNRE, and
             ``sbi.utils.get_nn_models.likelihood_nn`` for SNLE. For
-            details check the ``sbi`` documentation. The most important
-            additional keyword augment the user is able to pass is
-            custom embedding network to learn features from potentially
+            details check the official ``sbi`` documentation. A single
+            highlighted keyword argument is a custom embedding network
+            that serves a purpose to learn features from potentially
             high-dimensional simulation outputs. By default multi-layer
             perceptron is used if no custom embedding network is
-            provided. For SNPE and SNLE,the user can pass an embedding
-            network for simulation outputs, while for SNRE, the user
-            may pass two embedding networks, one for parameters and one
-            for simulation outputs, respectively.
+            provided. For SNPE and SNLE, the user may pass an embedding
+            network for simulation outputs through ``embedding_net``
+            argument, while for SNRE, the user may pass two embedding
+            networks, one for parameters through
+            ``embedding_net_theta`` argument, and the other for
+            simulation outputs through ``embedding_net_x`` argument.
 
         Returns
         -------
@@ -654,38 +664,38 @@ class Inferencer(object):
         return inference
 
     def train(self, inference, theta, x, *args, **train_kwargs):
-        """Return trained neural inference object.
+        """Return the trained neural inference object.
 
         Parameters
         ----------
         inference : sbi.inference.NeuralInference
             Instantiated inference object with stored paramaters and
-            simulation outputs prepared for training.
+            simulation outputs prepared for the training process.
         theta : torch.tensor
             Sampled prior.
         x : torch.tensor
             Summary statistics.
         args : tuple, optional
-            Contains a uniformly distributed sbi.utils.BoxUniform
-            proposal. Used only for SNPE, for SNLE and SNRE,
-            ``proposal`` should not be passed to ``append_simulations``
-            method, thus ``args`` should not be passed. The args should
-            be provided only if the parameters were not sampled from
-            the prior, e.g., during the multi-round inference.
-            For SNLE and SNRE, args can hold the number of round from
-            which the data is stemmed from. Round 0 means from prior.
-            This is used only if the `discard_prior_samples` are set to
-            True inside the `train_kwargs`.
+            Contains a uniformly distributed proposal. Used only for
+            SNPE, for SNLE and SNRE, proposal should not be passed to
+            inference object, thus ``args`` should not be passed. The
+            additional arguments should be passed only if the
+            parameters were not sampled from the prior, e.g., during
+            the multi-round inference. For SNLE and SNRE, this can be
+            the number of round from which the data is stemmed from,
+            e.g., 0 means from the prior. This is used only if the
+            ``discard_prior_samples`` is set to True inside the
+            ``train_kwargs``.
         train_kwargs : dict, optional
-            Additional keyword arguments for ``train`` method of
-            ``sbi.inference.NeuralInference`` object. The user is able
-            to gain full control over training process by tuning
-            hyperparameters, i.e. batch size (by specifiying
-            ``training_batch_size`` argument), learning rate
-            (``learning_rate``), validation fraction
-            (``validation_fraction``), number of training epochs
-            (``max_num_epochs``), etc. For details, check the ``sbi``
-            documentation.
+            Additional keyword arguments for ``train`` method in the
+            ``sbi.inference.NeuralInference`` class. The user is able
+            to gain the full control over the training process by
+            tuning hyperparameters, e.g., the batch size (by specifiying
+            ``training_batch_size`` argument), the learning rate
+            (``learning_rate``), the validation fraction
+            (``validation_fraction``), the number of training epochs
+            (``max_num_epochs``), etc. For details, check the official
+            ``sbi`` documentation.
 
         Returns
         -------
@@ -697,37 +707,37 @@ class Inferencer(object):
         return inference
 
     def build_posterior(self, inference, **posterior_kwargs):
-        """Return inference and neural posterior objects.
+        """Return the updated inference and the neural posterior
+        objects.
 
         Parameters
         ----------
         inference : sbi.inference.NeuralInference
             Instantiated inference object with stored paramaters and
-            simulation outputs prepared for training.
+            simulation outputs.
         posterior_kwargs : dict, optional
             Additional keyword arguments for ``build_posterior`` method
-            in ``sbi.inference.NeuralInference`` classes. For details,
-            check the ``sbi`` documentation.
+            in all ``sbi.inference.NeuralInference``-type classes. For
+            details, check the official ``sbi`` documentation.
 
         Returns
         -------
         tuple
             ``sbi.inference.NeuralInference`` object with stored
             paramaters and simulation outputs prepared for training and
-            ``sbi.inference.NeuralPosterior`` object.
+            the neural posterior object.
         """
         posterior = inference.build_posterior(**posterior_kwargs)
-        return (inference, posterior)
+        return inference, posterior
 
-    def infer_step(self, proposal, inference,
-                   n_samples=None, theta=None, x=None,
-                   train_kwargs={}, posterior_kwargs={}, *args):
+    def infer_step(self, proposal, inference, n_samples=None, theta=None,
+                   x=None, train_kwargs={}, posterior_kwargs={}, *args):
         """Return the trained neural density estimator.
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         proposal : ``sbi.utils.torchutils.BoxUniform``
-            Prior over parameters for current inference round.
+            Prior over parameters for the current round of inference.
         inference : ``sbi.inference.NeuralInference``
             Inference object obtained via `.init_inference` method.
         n_samples : int, optional
@@ -737,17 +747,15 @@ class Inferencer(object):
         x : numpy.ndarray, optional
             Summary statistics.
         train_kwargs : dict, optional
-            Additional keyword arguments for training the posterior
-            estimator.
+            Additional keyword arguments for `.train`.
         posterior_kwargs : dict, optional
-            Dictionary of arguments for `.build_posterior` method.
+            Additional keyword arguments for `.build_posterior`.
         args : list, optional
-            Additional arguments for `.train` method if SNPE is used as
-            an inference method.
+            Additional arguments for `.train`.
 
         Returns
         -------
-        sbi.inference.NeuralPosterior
+        sbi.inference.posteriors.base_posterior.NeuralPosterior
             Trained posterior.
         """
         # extract the training data and make adjustments for the ``sbi``
@@ -784,12 +792,13 @@ class Inferencer(object):
               restart=False, device='cpu', **params):
         """Return the trained posterior.
 
-        If ``theta`` and ``x`` are not provided, ``n_samples`` has to
-        be defined. Otherwise, if ``n_samples`` is provided, neither
-        ``theta`` nor ``x`` needs to be provided.
+        Note that if ``theta`` and ``x`` are not provided,
+        ``n_samples`` has to be defined. Otherwise, if ``n_samples`` is
+        provided, neither ``theta`` nor ``x`` are needed and will be
+        ignored.
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         n_samples : int, optional
             The number of samples.
         theta : numpy.ndarray, optional
@@ -804,7 +813,7 @@ class Inferencer(object):
             Otherwise, if this method is called after posterior has
             already been built, multi-round inference is performed.
         inference_method : str, optional
-            Inference method. Either of SNPE, SNLE or SNRE.
+            Inference method. Either SNPE, SNLE or SNRE.
         density_estimator_model : str, optional
             The type of density estimator to be created. Either
             ``mdn``, ``made``, ``maf``, ``nsf`` for SNPE and SNLE, or
@@ -822,20 +831,20 @@ class Inferencer(object):
             performed.
         sbi_device : str, optional
             Device on which the ``sbi`` will operate. By default this
-            is set to CPU and it is advisable to remain so for most
+            is set to ``cpu`` and it is advisable to remain so for most
             cases. In cases where the user provide custom embedding
             network through ``inference_kwargs`` argument, which will
             be trained more efficiently by using GPU, device should be
-            set accordingly.
+            set accordingly to either ``gpu`` or ``cuda``.
         params : dict
             Bounds for each parameter. Keys should correspond to names
-            of parameters as defined in the model equaions, values
-            are lists with lower and upper bounds with quantities of
-            respective parameter.
+            of parameters as defined in the model equations, while
+            values are lists with the lower and the upper bound with
+            corresponding quantities of the parameter.
 
         Returns
         -------
-        sbi.inference.NeuralPosterior
+        sbi.inference.posteriors.base_posterior.NeuralPosterior
             Approximated posterior distribution over parameters.
         """
         if restart:
@@ -925,12 +934,12 @@ class Inferencer(object):
         return posterior
 
     def save_posterior(self, f):
-        """Saves the density estimator state dictionary to a disk file.
+        """Save the density estimator state dictionary to a disk file.
 
         Parameters
         ----------
-        posterior : sbi.inference.NeuralPosterior, optional
-            Posterior distribution.
+        posterior: neural posterior object, optional
+            Posterior distribution over parameters.
         f : str or os.PathLike
             Path to file either as string or ``os.PathLike`` object
             that contains file name.
@@ -942,7 +951,8 @@ class Inferencer(object):
         torch.save(self.posterior, f)
 
     def load_posterior(self, f):
-        """Loads the density estimator state dictionary from a disk file.
+        """Loads the density estimator state dictionary from a disk
+        file.
 
         Parameters
         ----------
@@ -952,10 +962,10 @@ class Inferencer(object):
 
         Returns
         -------
-        sbi.inference.NeuralPosterior
+        sbi.inference.posteriors.base_posterior.NeuralPosterior
             Loaded neural posterior with defined method family, density
-            estimator state dictionary, prior over parameters and
-            output shape of the simulator.
+            estimator state dictionary, the prior over parameters and
+            the output shape of the simulator.
         """
         p = torch.load(f)
         self.posterior = p
@@ -968,15 +978,16 @@ class Inferencer(object):
         ----------
         shape : tuple
             Desired shape of samples that are drawn from posterior.
-        posterior : sbi.inference.NeuralPosterior, optional
+        posterior: neural posterior object, optional
             Posterior distribution.
         kwargs : dict, optional
             Additional keyword arguments for ``sample`` method of
-            ``sbi.inference.NeuralPosterior`` object.
+            the neural posterior object.
         Returns
         -------
         numpy.ndarray
-            Samples from posterior of the shape as given in ``shape``.
+            Samples taken from the posterior of the shape as given in
+            ``shape``.
         """
         if posterior:
             p = posterior
@@ -992,28 +1003,34 @@ class Inferencer(object):
 
     def pairplot(self, samples=None, points=None, limits=None, subset=None,
                  labels=None, ticks=None, **kwargs):
-        """Plot samples in a 2-D grid with marginals and pairwise
-        marginals.
+        """Plot samples in a 2-dimensional grid with marginals and
+        pairwise marginals.
 
         Check ``sbi.analysis.plot.pairplot`` for more details.
 
         Parameters
         ----------
-        samples : iterable, optional
+        samples : list or numpy.ndarray, optional
             Samples used to build the pairplot.
         points : dict, optional
             Additional points to scatter, e.g., true parameter values,
             if known.
         limits : dict, optional
-            Limits for each parameter. If None, min and max of the
-            given samples will be used.
+            Limits for each parameter. Keys correspond to parameter
+            names as defined in the model, while values are lists with
+            limits defined as the Brian 2 quantity objects. If None,
+            min and max of the given samples will be used.
         subset : list, optional
-            Which parameters to plot.
+            The names as strings of parameters to plot.
         labels : dict, optional
-            Names for each parameter.
+            Names for each parameter. Keys correspond to parameter
+            names as defined in the model, while values are lists of
+            strings.
         ticks : dict, optional
-            Position of the ticks. If None, default ticks positions
-            will be used.
+            Position of the ticks. Keys correspond to parameter names
+            as defined in the model, while values are lists with ticks
+            defined as the Brian 2 quantity objects. If None, default
+            ticks positions will be used.
         kwargs : dict, optional
             Additional keyword arguments for the
             ``sbi.analysis.pairplot`` function.
@@ -1021,7 +1038,7 @@ class Inferencer(object):
         Returns
         -------
         tuple
-            Figure and axis of posterior distribution plot.
+            Figure and axis of the posterior distribution plot.
         """
         if samples is not None:
             s = samples
@@ -1083,29 +1100,34 @@ class Inferencer(object):
                              ticks=None, **kwargs):
         """Plot conditional distribution given all other parameters.
 
-        Check ``sbi.analysis.plot.conditional_pairplot`` for more
-        details.
+        Check ``sbi.analysis.conditional_pairplot`` for more details.
 
         Parameters
         ----------
         condition : numpy.ndarray
             Condition that all but the one/two regarded parameters are
             fixed to.
-        density : sbi.inference.NeuralPosterior, optional
+        density : neural posterior object, optional
             Posterior probability density.
         points : dict, optional
             Additional points to scatter, e.g., true parameter values,
             if known.
         limits : dict, optional
-            Limits for each parameter. If None, min and max of the
-            given samples will be used.
+            Limits for each parameter. Keys correspond to parameter
+            names as defined in the model, while values are lists with
+            limits defined as the Brian 2 quantity objects. If None,
+            min and max of the given samples will be used.
         subset : list, optional
-            Which parameters to plot.
+            The names as strings of parameters to plot.
         labels : dict, optional
-            Names for each parameter.
+            Names for each parameter. Keys correspond to parameter
+            names as defined in the model, while values are lists of
+            strings.
         ticks : dict, optional
-            Position of the ticks. If None, default ticks positions
-            will be used.
+            Position of the ticks. Keys correspond to parameter names
+            as defined in the model, while values are lists with ticks
+            defined as the Brian 2 quantity objects. If None, default
+            ticks positions will be used.
         kwargs : dict, optional
             Additional keyword arguments for the
             ``sbi.analysis.conditional_pairplot`` function.
@@ -1192,11 +1214,13 @@ class Inferencer(object):
         condition : numpy.ndarray
             Condition that all but the one/two regarded parameters are
             fixed to.
-        density : sbi.inference.NeuralPosterior, optional
+        density : neural posterior object, optional
             Posterior probability density.
         limits : dict, optional
-            Limits for each parameter. If None, min and max of the
-            given samples will be used.
+            Limits for each parameter. Keys correspond to parameter
+            names as defined in the model, while values are lists with
+            limits defined as the Brian 2 quantity objects. If None,
+            min and max of the given samples will be used.
         subset : list, optional
             Parameters that are taken for conditional distribution, if
             None all parameters are considered.
@@ -1256,11 +1280,11 @@ class Inferencer(object):
 
         Parameters
         ----------
-        posterior : sbi.inference.NeuralPosterior, optional
+        posterior: neural posterior object, optional
             Posterior distribution.
-        output_var: str or sequence of str
+        output_var: str or list
             Name of the output variable to be monitored, it can also be
-            a sequence of names to record multiple variables.
+            a list of names to record multiple variables.
         param_init : dict
             Dictionary of initial values for the model.
         level : int, optional
@@ -1269,9 +1293,9 @@ class Inferencer(object):
         Returns
         -------
         brian2.units.fundamentalunits.Quantity or dict
-            If a single output variable is observed, 2-D array of
-            traces generated by using a set of parameters sampled from
-            the trained posterior distribution of shape
+            If a single output variable is observed, 2-dimensional
+            array of traces generated by using a set of parameters
+            sampled from the trained posterior distribution of shape
             (``self.n_traces``, number of time steps). Otherwise, a
             dictionary with keys set to names of output variables, and
             values to generated traces of respective output variables.
