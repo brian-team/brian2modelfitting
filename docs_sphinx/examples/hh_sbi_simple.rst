@@ -1,16 +1,18 @@
 Inference on Hodgin-Huxley model: simple interface
 ==================================================
 
+You can also download and run this example by clicking here:
+:download:`hh_sbi_simple_interface.py <../../examples/hh_sbi_simple_interface.py>`
+
 Here you can download the data:
-:download:`input_traces <../../examples/input_traces_hh.csv>`
-:download:`output_traces <../../examples/output_traces_hh.csv>`
+:download:`input traces <../../examples/input_traces_hh.csv>`
+:download:`output traces <../../examples/output_traces_hh.csv>`
 
 .. code:: python
 
   from brian2 import *
   from brian2modelfitting import *
   import pandas as pd
-
 
 To load the data, use the following:
 
@@ -47,7 +49,7 @@ Then we have to define the model and its parameters:
       g_kd : siemens (constant)
       gl   : siemens (constant)
       Cm   : farad (constant)
-'''
+  '''
 
 Let's also specify time domain for more convenient plotting afterwards:
 
