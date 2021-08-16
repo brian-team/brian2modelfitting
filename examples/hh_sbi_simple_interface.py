@@ -8,9 +8,9 @@ from scipy.stats import kurtosis as kurt
 df_inp_traces = pd.read_csv('input_traces_hh.csv')
 df_out_traces = pd.read_csv('output_traces_hh.csv')
 inp_traces = df_inp_traces.to_numpy()
-inp_traces = inp_traces[[0, 1], 1:]
+inp_traces = inp_traces[[0, 1, 3, 4], 1:]
 out_traces = df_out_traces.to_numpy()
-out_traces = out_traces[[0, 1], 1:]
+out_traces = out_traces[[0, 1, 3, 4], 1:]
 
 # Define model and its parameters
 area = 20_000*um**2
@@ -42,7 +42,7 @@ t_start, t_end = t[where(inp_traces[0, :] != 0)[0][[0, -1]]]
 nrows = 2
 ncols = out_traces.shape[0]
 fig, axs = subplots(nrows, ncols, sharex=True,
-                    gridspec_kw={'height_ratios': [3, 1]}, figsize=(9, 3))
+                    gridspec_kw={'height_ratios': [3, 1]}, figsize=(12, 3))
 for idx in range(ncols):
     axs[0, idx].plot(t, out_traces[idx, :].T, lw=3, c='C3', label='recordings')
     axs[1, idx].plot(t, inp_traces[idx, :].T/nA, lw=3, c='k', label='stimulus')
@@ -57,7 +57,7 @@ fig.legend(handles, labels)
 tight_layout()
 
 
-# Obtain spike times manually
+# Obtain spike times manually from recordings
 def get_spike_times(x):
     x = x.copy()
     # put everything to -40 mV that is below -40 mV or has negative slope
@@ -70,17 +70,12 @@ def get_spike_times(x):
     ind = where(diff(x) < 0)
     spike_times = array(t)[ind]
 
-    # spike times for active stimulus
-    spike_times_stim = spike_times[
-        (spike_times > t_start) & (spike_times < t_end)
-        ]
-
     # number of spikes
-    if spike_times_stim.shape[0] > 0:
-        spike_times_stim = spike_times_stim[
-            append(1, diff(spike_times_stim)) > 0.5
+    if spike_times.shape[0] > 0:
+        spike_times = spike_times[
+            append(1, diff(spike_times)) > 0.5
         ]
-    return spike_times_stim / 1000  # in seconds
+    return spike_times / 1000  # in seconds
 
 
 # store spike times for each trace into the list
@@ -90,7 +85,7 @@ spike_times = [get_spike_times(out_trace) for out_trace in out_traces]
 nrows = 2
 ncols = out_traces.shape[0]
 fig, axs = subplots(nrows, ncols, sharex=True,
-                    gridspec_kw={'height_ratios': [3, 1]}, figsize=(9, 3))
+                    gridspec_kw={'height_ratios': [3, 1]}, figsize=(12, 3))
 for idx in range(ncols):
     spike_idx = in1d(t, spike_times[idx] * 1000).nonzero()[0]
     spike_v = (out_traces[idx, :].min(), out_traces[idx, :].max())
@@ -116,8 +111,9 @@ v_features = [
     lambda x: std(x[(t > t_start) & (t < t_end)]),  # AP std
     lambda x: kurt(x[(t > t_start) & (t < t_end)], fisher=False),  # AP kurt
     lambda x: mean(x[(t > .25 * t_start) & (t < .75 * t_start)]),  # resting
+    lambda x: mean(x[(t > t_end) & (t <= max(t))]),  # steady-state
 ]
-s_features = [lambda x: x.size]  # numbe of spikes in a spike train
+s_features = [lambda x: x.size]  # the number of spikes in a spike train
 
 # Simulation-based inference object instantiation
 inferencer = Inferencer(dt=dt, model=eqs,
@@ -175,7 +171,7 @@ inf_traces = inferencer.generate_traces(output_var='v')
 nrows = 2
 ncols = out_traces.shape[0]
 fig, axs = subplots(nrows, ncols, sharex=True,
-                    gridspec_kw={'height_ratios': [3, 1]}, figsize=(9, 3))
+                    gridspec_kw={'height_ratios': [3, 1]}, figsize=(12, 3))
 for idx in range(ncols):
     spike_idx = in1d(t, spike_times[idx]).nonzero()[0]
     spike_v = (out_traces[idx, :].min(), out_traces[idx, :].max())

@@ -49,9 +49,9 @@ eqs_inf = '''
 
 # Instantiate the inferencer object
 spike_features_list = [
-        lambda x: x.size,  # number of spikes
-        lambda x: 0. if diff(x).size == 0 else mean(diff(x)),  # mean ISI
-]
+    lambda x: x.size,  # number of spikes
+    lambda x: 0. if diff(x).size == 0 else mean(diff(x)),  # mean ISI
+    ]
 inferencer = Inferencer(dt=dt, model=eqs_inf,
                         input={'I_syn': inp_trace.reshape(1, -1)},
                         output={'spikes': [spike_times]},
@@ -95,7 +95,7 @@ for spike_time in spike_times:
 # Generate traces from a single sample of parameters
 inf_trace = inferencer.generate_traces(output_var='v')
 
-fig, axs = subplots(nrows, 1, sharex=True,
+fig, axs = subplots(2, 1, sharex=True,
                     gridspec_kw={'height_ratios': [3, 1]}, figsize=(7, 3))
 axs[0].plot(t, out_trace.T/mV, 'C3-', lw=3, label='recordings')
 axs[0].plot(t, inf_trace.T/mV, 'k--', lw=2, label='sampled traces')
