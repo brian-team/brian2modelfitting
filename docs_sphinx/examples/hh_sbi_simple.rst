@@ -1,7 +1,7 @@
 Inference on Hodgin-Huxley model: simple interface
 ==================================================
 
-You can also download and run this example by clicking here:
+You can also download and run a similar example available here:
 :download:`hh_sbi_simple_interface.py <../../examples/hh_sbi_simple_interface.py>`
 
 Here you can download the data:
