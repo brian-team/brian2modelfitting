@@ -32,7 +32,7 @@ eqs = '''
     g_kd : siemens (constant)
     gl   : siemens (constant)
     Cm   : farad (constant)
-'''
+    '''
 
 # Time domain
 t = arange(0, out_traces.shape[1]*dt/ms, dt/ms)
@@ -126,8 +126,8 @@ inferencer = Inferencer(dt=dt, model=eqs,
                         param_init={'v': 'VT'})
 
 # Multi-round inference
-posterior = inferencer.infer(n_samples=5_000,
-                             n_rounds=3,
+posterior = inferencer.infer(n_samples=10_000,
+                             n_rounds=2,
                              inference_method='SNPE',
                              density_estimator_model='mdn',
                              gl=[1e-09*siemens, 1e-07*siemens],
@@ -136,9 +136,9 @@ posterior = inferencer.infer(n_samples=5_000,
                              Cm=[0.1*uF*cm**-2*area, 2*uF*cm**-2*area])
 
 # Draw samples from posterior
-samples = inferencer.sample((5_000, ))
+samples = inferencer.sample((10_000, ))
 
-# Visualize pairplot and conditional pairplot
+# Visualize conditional pairwise relationships between parameter distributions
 limits = {'gl': [1e-9*siemens, 1e-07*siemens],
           'g_na': [2e-06*siemens, 2e-04*siemens],
           'g_kd': [6e-07*siemens, 6e-05*siemens],
@@ -166,7 +166,7 @@ im = imshow(cond_coeff_mat, clim=[-1, 1])
 _ = fig.colorbar(im)
 
 # Generate traces and visualize from a single sample of parameters
-inf_traces = inferencer.generate_traces(output_var='v')
+inf_traces = inferencer.generate_traces(n_samples=10_000, output_var='v')
 
 nrows = 2
 ncols = out_traces.shape[0]

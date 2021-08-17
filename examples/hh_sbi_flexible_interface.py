@@ -32,7 +32,7 @@ eqs = '''
     g_kd : siemens (constant)
     gl   : siemens (constant)
     Cm   : farad (constant)
-'''
+    '''
 
 # Time domain
 t = arange(0, out_traces.shape[1]*dt/ms, dt/ms)
@@ -43,10 +43,9 @@ t_start, t_end = t[where(inp_traces[0, :] != 0)[0][[0, -1]]]
 inferencer = Inferencer(dt=dt, model=eqs,
                         input={'I': inp_traces*amp},
                         output={'v': out_traces*mV},
-                        features={'v': [lambda x: mean(x),
+                        features={'v': [lambda x: max(x),
                                         lambda x: mean(x[(t > t_start) & (t < t_end)]),
-                                        lambda x: std(x[(t > t_start) & (t < t_end)]),
-                                        lambda x: ptp(x)]},
+                                        lambda x: std(x[(t > t_start) & (t < t_end)])]},
                         method='exponential_euler',
                         threshold='m > 0.5',
                         refractory='m > 0.5',
@@ -64,28 +63,25 @@ if os.path.exists(path_to_data):
     theta, x = inferencer.load_summary_statistics(path_to_data)
 else:
     # Generate training data
-    theta = inferencer.generate_training_data(n_samples=5_000,
+    theta = inferencer.generate_training_data(n_samples=10_000,
                                               prior=prior)
     # Extract summary stats
     x = inferencer.extract_summary_statistics(theta)
     # Save the data for later use
-    inferencer.save_summary_statistics(path_to_data, theta, x)
+    # inferencer.save_summary_statistics(path_to_data, theta, x)
 
 # Amortized inference
 # Training the neural density estimator
 inference = inferencer.init_inference(inference_method='SNPE',
                                       density_estimator_model='mdn',
-                                      prior=prior,
-                                      hidden_features=50,
-                                      num_components=10)
+                                      prior=prior)
 # First round of inference where no observation data is set to posterior
 posterior_amortized = inferencer.infer_step(proposal=prior,
                                             inference=inference,
-                                            theta=theta, x=x,
-                                            train_kwargs={'num_atoms': 10})
+                                            theta=theta, x=x)
 # Storing the trained posterior without a default observation
-path_to_posterior = __file__[:-3] + '_posterior.pth'
-inferencer.save_posterior(path_to_posterior)
+path_to_posterior = __file__[:-3] + '_posterior_amortized.pth'
+# inferencer.save_posterior(path_to_posterior)
 
 # Sampling from the posterior given observations, ...
 inferencer.sample((10_000, ))
@@ -95,8 +91,9 @@ labels = {'gl': r'$\overline{g}_\mathrm{l}$',
           'g_kd': r'$\overline{g}_\mathrm{K}$',
           'Cm': r'$\overline{C}_{m}$'}
 inferencer.pairplot(labels=labels)
+
 # ...and optionally, continue the multiround inference using ``infer`` method
-posterior_multiround = inferencer.infer(n_rounds=2)
+posterior_multiround = inferencer.infer()
 inferencer.sample((10_000, ))
 inferencer.pairplot(labels=labels)
 
