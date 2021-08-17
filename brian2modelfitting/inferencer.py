@@ -499,8 +499,8 @@ class Inferencer(object):
             spike_trains = list(simulator.spikemonitor.spike_trains().values())
         x = []
         if self.features:
-            for ov in tqdm(self.output_var, desc='Extracting features',
-                           total=len(self.output), leave=True):
+            for ov in self.output_var:
+                print(f'Extracting features for \'{ov}\'...')
                 summary_statistics = []
                 if ov != 'spikes':
                     o = obs[ov].get_value().T
@@ -517,8 +517,8 @@ class Inferencer(object):
                 x.append(_x)
             x = np.hstack(x)
         else:
-            for ov in tqdm(self.output_var, desc='Aranging output traces',
-                           total=len(self.output)):
+            print('Aranging traces for automatic feature extraction...')
+            for ov in self.output_var:
                 o = obs[ov].get_value().T
                 x.append(o.reshape(self.n_samples, -1).astype(np.float32))
             x = np.hstack(x)
@@ -661,6 +661,7 @@ class Inferencer(object):
             inference = inference_method_fun(prior, density_estimator_builder,
                                              device=sbi_device,
                                              show_progress_bars=True)
+        self.inference = inference
         return inference
 
     def train(self, inference, theta, x, *args, **train_kwargs):
@@ -883,10 +884,8 @@ class Inferencer(object):
             self.x = x
 
             # initialize inference object
-            self.inference = self.init_inference(inference_method,
-                                                 density_estimator_model,
-                                                 prior, device,
-                                                 **inference_kwargs)
+            _ = self.init_inference(inference_method, density_estimator_model,
+                                    prior, device, **inference_kwargs)
 
             # args for SNPE in `.train`
             # args for SNRE and SNLE are not supported here, if needed the user
@@ -903,6 +902,9 @@ class Inferencer(object):
                 args = [prior, ]
             else:
                 args = [None, ]
+            # generate data if the posterior already exist given proposal
+            self.theta = self.generate_training_data(self.n_samples, prior)
+            self.x = self.extract_summary_statistics(self.theta, level=1)
 
         # allocate empty list of posteriors
         posteriors = []
@@ -915,8 +917,7 @@ class Inferencer(object):
             tqdm_desc = f'{n_rounds}-round focused inference'
         else:
             tqdm_desc = 'Amortized inference'
-        for _ in tqdm(range(n_rounds), desc=tqdm_desc):
-
+        for round in tqdm(range(n_rounds), desc=tqdm_desc):
             # inference step
             posterior = self.infer_step(proposal, self.inference,
                                         n_samples, self.theta, self.x,
@@ -926,9 +927,16 @@ class Inferencer(object):
             posteriors.append(posterior)
 
             # update the proposal given the observation
-            if n_rounds > 1:
+            if n_rounds > 1 and round < n_rounds - 1:
                 x_o = torch.tensor(self.x_o, dtype=torch.float32)
                 proposal = posterior.set_default_x(x_o)
+                if posterior._method_family == 'snpe':
+                    args = [proposal, ]
+                else:
+                    args = [None, ]
+                self.theta = self.generate_training_data(self.n_samples,
+                                                         proposal)
+                self.x = self.extract_summary_statistics(self.theta, level=1)
 
         self.posterior = posterior
         return posterior
@@ -1273,16 +1281,19 @@ class Inferencer(object):
                                                         **kwargs)
         return cond_coeff.numpy()
 
-    def generate_traces(self, posterior=None, output_var=None, param_init=None,
-                        level=0):
+    def generate_traces(self, n_samples=1, posterior=None, output_var=None,
+                        param_init=None, level=0):
         """Generates traces for a single drawn sample from the trained
         posterior and all inputs.
 
         Parameters
         ----------
-        posterior: neural posterior object, optional
+        n_samples : int, optional
+            The number of parameters samples. If n_samples is larger
+            than 1, the mean value of sampled set will be used.
+        posterior : neural posterior object, optional
             Posterior distribution.
-        output_var: str or list
+        output_var : str or list
             Name of the output variable to be monitored, it can also be
             a list of names to record multiple variables.
         param_init : dict
@@ -1300,6 +1311,10 @@ class Inferencer(object):
             dictionary with keys set to names of output variables, and
             values to generated traces of respective output variables.
         """
+        if not isinstance(n_samples, int):
+            raise ValueError('`n_samples` argument needs to be a positive'
+                             ' integer.')
+
         # sample a single set of parameters from posterior distribution
         if posterior:
             p = posterior
@@ -1310,7 +1325,7 @@ class Inferencer(object):
                              ' posterior has been calculated by the `infere`'
                              ' method.')
         x_o = torch.tensor(self.x_o, dtype=torch.float32)
-        params = p.sample((1, ), x=x_o)
+        params = p.sample((n_samples, ), x=x_o).mean(axis=0)
 
         # set output variable that is monitored
         if output_var is None:
