@@ -68,7 +68,7 @@ else:
     # Extract summary stats
     x = inferencer.extract_summary_statistics(theta)
     # Save the data for later use
-    # inferencer.save_summary_statistics(path_to_data, theta, x)
+    inferencer.save_summary_statistics(path_to_data, theta, x)
 
 # Amortized inference
 # Training the neural density estimator
@@ -81,7 +81,7 @@ posterior_amortized = inferencer.infer_step(proposal=prior,
                                             theta=theta, x=x)
 # Storing the trained posterior without a default observation
 path_to_posterior = __file__[:-3] + '_posterior_amortized.pth'
-# inferencer.save_posterior(path_to_posterior)
+inferencer.save_posterior(path_to_posterior)
 
 # Sampling from the posterior given observations, ...
 inferencer.sample((10_000, ))
