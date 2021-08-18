@@ -1108,6 +1108,9 @@ class Inferencer(object):
                              ticks=None, **kwargs):
         """Plot conditional distribution given all other parameters.
 
+        The conditionals can be interpreted as slices through the
+        density at a location given by condition.
+
         Check ``sbi.analysis.conditional_pairplot`` for more details.
 
         Parameters
@@ -1212,7 +1215,15 @@ class Inferencer(object):
 
     def conditional_corrcoeff(self, condition, density=None, limits=None,
                               subset=None, **kwargs):
-        """Plot conditional distribution given all other parameters.
+        """Return the conditional correlation matrix of a distribution.
+
+        All but two parameters are conditioned with the condition as
+        defined in the ``condition`` argument and the Pearson
+        correlation coefficient is computed between the remaining two
+        parameters under the distribution. This is performed for all
+        pairs of parameters given whose names are defined in the
+        ``subset`` argument. The conditional correlation matrix is
+        stored in the 2-dimenstional array.
 
         Check ``sbi.analysis.conditional_density.conditional_corrcoeff``
         for more details.
