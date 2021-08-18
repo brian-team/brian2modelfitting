@@ -34,7 +34,7 @@ or
 
 .. code:: python
 
-  inferencer = Inferencer(..., param_init = init_conds)
+  inferencer = Inferencer(..., param_init=init_conds)
 
 Restart
 -------
@@ -47,7 +47,7 @@ to ``True``, the user can restart the optimizer and the optimization will
 start from scratch.
 
 Used by Fitter optimizer and metric can only be changed when the flat is
-`True`.
+``True``.
 
 The previously outlined ``restart`` argument is used in the similar fashion
 in `~brian2modelfitting.inferencer.Inferencer.infer()` method. It is set to
@@ -116,7 +116,7 @@ output variable as follows:
 If the user prefers automatic feature extraction, the ``features`` argument
 should not be defined (it should stay set to None).
 
-.. warning:: *The number of features - be aware*
+.. warning::
  
   If the user chooses to define a list of features for extracting the summary
   features, it is important to keep in mind that the total number of features
@@ -170,7 +170,7 @@ there is no need of specifying a metric, which is by default set to None.
 The errors are instead calculated with `~brian2.groups.group.Group.run_regularly`
 for each simulation.
   
-  .. code:: python
+.. code:: python
   
   fitter = OnlineTraceFitter(model=model,
                              input={'I': inp_traces},
@@ -201,8 +201,8 @@ classes allow the user can to generate the traces with optimized parameters.
 For a quick access to best fitted set of parameters `~brian2modelfitting.fitter.Fitter`
 classes provide ready to use functions:
 
- - `~brian2modelfitting.fitter.TraceFitter.generate_traces` inside `~brian2modelfitting.fitter.TraceFitter`
- - `~brian2modelfitting.fitter.SpikeFitter.generate_spikes` inside `~brian2modelfitting.fitter.SpikeFitter`
+ - `~brian2modelfitting.fitter.TraceFitter.generate_traces` inside `~brian2modelfitting.fitter.TraceFitter`;
+ - `~brian2modelfitting.fitter.SpikeFitter.generate_spikes` inside `~brian2modelfitting.fitter.SpikeFitter`.
 
 These functions can be called after the fitting procedure is finalized in the
 following manner, without any input arguments:
@@ -237,8 +237,8 @@ set to output variable names and with their respective values, will be
 returned instead.
 
 
-Customize ``generate`` for `~brian2modelfitting.fitter.Fitter`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Customize the ``generate`` method for `~brian2modelfitting.fitter.Fitter`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To create traces for other parameters, or generate traces after the spike
 train fitting, user can call the `~brian2modelfitting.fitter.Fitter.generate`
@@ -304,7 +304,7 @@ will default to the value used during the initialization of the `Fitter`
 
 Example output:
 ~~~~~~~~~~~~~~~
-- ``'list'``:
+- ``format='list'``:
 
 .. code:: python
 
@@ -313,7 +313,7 @@ Example output:
    ...]
 
 
-- ``'dict'``:
+- ``format='dict'``:
 
 .. code:: python
 
@@ -323,7 +323,7 @@ Example output:
    'errors': array([1.16788502, 0.5253008 , ...])}
 
 
-- ``'dataframe'``:
+- ``format='dataframe'``:
 
 .. code:: python
 
@@ -359,7 +359,7 @@ posterior:
   condition.
 
 To see this in action, go to our tutorial page and learn how to use each of
-the previouly outlined methods.
+these methods.
 
 Standalone mode
 ---------------
