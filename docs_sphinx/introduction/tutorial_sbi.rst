@@ -140,8 +140,8 @@ action potential and the standard deviatian of the action potential.
         ]
 
 
-``~brian2modelfitting.inferencer.Inferencer``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`~brian2modelfitting.inferencer.Inferencer`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The minimum set of arguments for the ``Inferencer`` class constructor are the
 time step, ``dt``, input data traces, ``input``, output data traces, ``output``
