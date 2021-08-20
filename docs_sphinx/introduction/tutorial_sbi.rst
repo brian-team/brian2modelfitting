@@ -58,6 +58,7 @@ of neural activity:
     fig, ax = plot_traces(t, inp_traces, out_traces)
 
 .. image:: ../_static/hh_sbi_recording_traces.png
+    :width: 70 %
 
 
 Toy-example: infer two free parameters
@@ -139,8 +140,8 @@ action potential and the standard deviatian of the action potential.
         ]
 
 
-``Inferencer``
-~~~~~~~~~~~~~~
+``~brian2modelfitting.inferencer.Inferencer``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The minimum set of arguments for the ``Inferencer`` class constructor are the
 time step, ``dt``, input data traces, ``input``, output data traces, ``output``
@@ -169,7 +170,7 @@ trace. Summary features are passed to the inference algorithm via the
                             refractory='m > 0.5',
                             param_init=init_conds)
 
-After the ``Inferencer`` object is created, we begin the inference process by
+After the ``inferencer`` object is created, we begin the inference process by
 calling ``infer`` method and defining the total number of samples that are used
 for the learning of a neural density estimator.
 
@@ -225,6 +226,7 @@ as follows:
                                   figsize=(6, 6))
 
 .. image:: ../_static/hh_sbi_toy_pairplot.png
+    :width: 70 %
 
 The inferred posterior is plotted against the ground truth parameters, and as
 can be seen, the ground truth parameters are located in a high-probability
@@ -244,6 +246,7 @@ We again use the ``plot_traces`` function as follows:
     fig, ax = plot_traces(t, inp_traces, out_traces, inf_traces=array(inf_traces/mV))
 
 .. image:: ../_static/hh_sbi_toy_inf_traces.png
+    :width: 70 %
 
 
 Additional free parameters
@@ -328,13 +331,13 @@ We can try to do the same as before:
     samples = inferencer.sample((10_000, ))
 
     limits = {'g_Na': [1*uS, 100*uS],
-            'g_K': [0.1*uS, 10*uS],
-            'g_l': [1*nS, 100*nS],
-            'Cm': [20*pF, 2*nF]}
+              'g_K': [0.1*uS, 10*uS],
+              'g_l': [1*nS, 100*nS],
+              'Cm': [20*pF, 2*nF]}
     labels = {'g_Na': r'$\overline{g}_{Na}$',
-            'g_K': r'$\overline{g}_{K}$',
-            'g_l': r'$\overline{g}_{l}$',
-            'Cm': r'$C_{m}$'}
+              'g_K': r'$\overline{g}_{K}$',
+              'g_l': r'$\overline{g}_{l}$',
+              'Cm': r'$C_{m}$'}
     fig, ax = inferencer.pairplot(limits=limits,
                                   labels=labels,
                                   ticks=limits,
@@ -344,6 +347,7 @@ We can try to do the same as before:
                                   figsize=(6, 6))
 
 .. image:: ../_static/hh_sbi_4params_3features_pairplot.png
+    :width: 70 %
 
 This could have been expected. The posterior distribution is estimated poorly
 using a simple approach as in the toy example.
@@ -364,7 +368,7 @@ amortized, it is accurate only for a specific observation.
     # note that the only difference is the number of rounds of inference
     posterior = inferencer.infer(n_samples=5_000,
                                  n_rounds=2,
-                                inference_method='SNPE',
+                                 inference_method='SNPE',
                                  density_estimator_model='maf',
                                  restart=True,
                                  g_Na=[1*uS, 100*uS],
@@ -383,6 +387,7 @@ amortized, it is accurate only for a specific observation.
                                   figsize=(6, 6))
                         
 .. image:: ../_static/hh_sbi_4params_multiround_3features_pairplot.png
+    :width: 70 %
 
 This seems as a promising approach for parameters that already have the
 high-probability regions of the posterior distribution around ground-truth
@@ -417,6 +422,7 @@ To visually prove that the spikes times are indeed correct, we use
     fig, ax = plot_traces(t, inp_traces, out_traces, spike_times_list[0])
 
 .. image:: ../_static/hh_sbi_4params_spike_train.png
+    :width: 70 %
 
 Now, let us create additional features that will be applied to voltage traces,
 and a few features that will be applied to spike trains:
@@ -477,14 +483,15 @@ The rest of the inference process stays pretty much the same:
     samples = inferencer.sample((10_000, ))
 
     fig, ax = inferencer.pairplot(limits=limits,
-                                 labels=labels,
-                                 ticks=limits,
-                                 points=ground_truth_params,
-                                 points_offdiag={'markersize': 5},
-                                 points_colors=['C3'],
-                                 figsize=(6, 6))
+                                  labels=labels,
+                                  ticks=limits,
+                                  points=ground_truth_params,
+                                  points_offdiag={'markersize': 5},
+                                  points_colors=['C3'],
+                                  figsize=(6, 6))
 
 .. image:: ../_static/hh_sbi_4params_8features_pairplot.png
+    :width: 70 %
 
 Let's also visualize the sampled trace, this time using the mean of ten
 thousands drawn samples:
@@ -496,6 +503,7 @@ thousands drawn samples:
     fig, ax = plot_traces(t, inp_traces, out_traces, inf_traces=array(inf_traces/mV))
 
 .. image:: ../_static/hh_sbi_4params_inf_traces.png
+    :width: 70 %
 
 Okay, now we are clearly getting somewhere and this should be a strong
 indicatior of the importance of crafting quality summary statistics.
@@ -548,6 +556,7 @@ Default settings
                                   figsize=(6, 6))
 
 .. image:: ../_static/hh_sbi_4params_default_automatic_ext_pairplot.png
+    :width: 70 %
 
 
 Custom embedding network
@@ -672,6 +681,7 @@ of the density estimator using additional keyword arguments in `~brian2modelfitt
                                   figsize=(6, 6))
 
 .. image:: ../_static/hh_sbi_4params_yulenet_pairplot.png
+    :width: 70 %
 
 
 Next steps
