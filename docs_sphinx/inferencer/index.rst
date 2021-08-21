@@ -2,12 +2,13 @@ Inferencer
 ==========
 
 Unlike more traditional inverse identification procedures that rely either on
-gradient or gradient-free methods, the ``Inferencer`` class supports
-simulation-based inference that has been established as a powerful alternative
-approach.
+gradient or gradient-free methods, the `~brian2modelfitting.inferencer.Inferencer`
+class supports simulation-based inference that has been established as a
+powerful alternative approach.
 
 The simulation-based inference is data-driven procedure supported by the
-`sbi <https://www.mackelab.org/sbi/>`_, ``PyTorch``-based toolbox by Macke lab.
+`sbi <https://www.mackelab.org/sbi/>`_, ``PyTorch``-based toolbox by Macke
+lab, [Tejero-Cantero2020]_.
 
 In general, this method yields twofold improvement over point-estimate fitting
 procedures:
@@ -25,15 +26,16 @@ procedures:
    by using deep neural networks which is trained in parallel with neural 
    density estimator. 
 
-The ``Inferencer`` class, in its core, is a fancy wrapper around the ``sbi``
-package where the focus is put on inferring the unknown parameters of the
-single-cell neuron models defined in Brian 2 simulator.
+The `~brian2modelfitting.inferencer.Inferencer` class, in its core, is a fancy
+wrapper around the ``sbi`` package,  where the focus is put on inferring the
+unknown parameters of the single-cell neuron models defined in Brian 2
+simulator.
 
 Neural density estimator
 ------------------------
 
 There are three main estimation techniques supported in ``sbi`` that the user
-can take the full control over seamlesly by using the ``Inferencer``:
+can take the full control over seamlesly by using the `~brian2modelfitting.inferencer.Inferencer`:
 
 #. sequential neural posterior estimation (SNPE)
 #. sequential neural likelihood estimation (SNLE)
@@ -70,5 +72,12 @@ The inferencer procedure is defined via three main steps:
 Implementation
 --------------
 
-Go to `the tutorial section <https://brian2modelfitting.readthedocs.io/en/stable/introduction/tutorial_sbi.html>`_
-in  for the in-depth implementation analysis.
+Go to :doc:`the tutorial section <../introduction/tutorial_sbi>` for the
+in-depth implementation analysis.
+
+References
+----------
+
+.. [Tejero-Cantero2020] Tejero-Cantero, A., Boelts, J. et al. "sbi: A toolkit
+                        for simulation-based inference" Journal of Open Source
+                        Software (JOOS), 5(52):2505. 2020.
