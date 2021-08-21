@@ -2,10 +2,10 @@ Tutorial: Inferencer
 ====================
 
 In this tutorial, we use simulation-based inference on the Hodgkin-Huxley
-neuron model, where different scenarios are considered. The data are
-synthetically generated from the model which enables the comparisson of the
-optimized parameter values with the ground truth parameter values as used in
-the generative model.
+neuron model, [Hodgkin1952]_, where different scenarios are considered. The
+data are synthetically generated from the model which enables the comparisson
+of the optimized parameter values with the ground truth parameter values as
+used in the generative model.
 
 We start with importing basic packages and modules. Note that
 ``tutorial_sbi_helpers`` contains three different functions that are used
@@ -177,7 +177,8 @@ argument.
 After the ``inferencer`` is instantiated, we may begin the inference process
 by calling `~brian2modelfitting.inferencer.Inferencer.infer` and defining the
 total number of samples that are used for the training of a neural density
-estimator.
+estimator. We use the sequential neural posterior estimation algorithm (SNPE),
+proposed in [Greenberg2019]_. 
 
 
 Posterior
@@ -583,10 +584,9 @@ only if a custom automatic feature extractor uses techniques that are actually
 faster to compute on the GPU.
 
 For this case, we use the YuleNet, a convolutional neural network, proposed in
-the paper by Rodrigues and Gramfort 2020, titled *Learning summary features of
-time series for likelihood free inference*, preprint available at: https://arxiv.org/abs/2012.02807.
-The authors outline impresive results where the automatic feature extraction by
-using the YuleNet is capable of outperforming carefully hand-crafted features.
+[Rodrigues2020]_. The authors outline impresive results where the automatic
+feature extraction by using the YuleNet is capable of outperforming carefully
+hand-crafted features.
 
 .. code:: python
 
@@ -705,3 +705,21 @@ Next steps
 
 To learn more read the reference API and check out more examples available
 :doc:`here <../examples/index>`.
+
+References
+----------
+
+.. [Hodgkin1952] Hodgkin, A. L., and Huxley, A. F. "A quantitative description
+                 of membrane current and its application to conduction and
+                 excitation in nerve" Journal of Physiology 117(4):500-44. 1952.
+                 doi: `10.1113/jphysiol.1952.sp004764 <https://doi.org/10.1113/jphysiol.1952.sp004764>`_
+
+.. [Greenberg2019] Greenberg, D. S., Nonnenmacher, M. et al. "Automatic
+                   posterior transformation for likelihood-free inference"
+                   36th International Conference on Machine Learning
+                   (ICML 2019). 2019. Available online: `arXiv:1905.07488 <https://arxiv.org/abs/1905.07488>`_
+
+.. [Rodrigues2020] Rodrigues, P. L. C. and Gramfort, A. "Learning summary
+                   features of time series for likelihood free inference" 3rd
+                   Workshop on Machine Learning and the Physical Sciences
+                   (NeurIPS 2020). 2020. Available online: `arXiv:2012.02807 <https://arxiv.org/abs/2012.02807>`_
