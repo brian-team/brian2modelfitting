@@ -156,6 +156,9 @@ class Inferencer(object):
     generative model which ultimately provides the posterior
     distribution over unknown free parameters.
 
+    To utilize simulation-based inference, this class uses a ``sbi``
+    library, for details see Tejero-Cantero 2020.
+
     Parameters
     ----------
     dt : brian2.units.fundamentalunits.Quantity
@@ -197,6 +200,12 @@ class Inferencer(object):
     param_init : dict, optional
         Dictionary of state variables to be initialized with respective
         values, i.e., initial conditions for the model.
+
+    References
+    ----------
+    * Tejero-Cantero, A., Boelts, J. et al. "sbi: A toolkit for
+      simulation-based inference" Journal of Open Source Software
+      (JOOS), 5(52):2505. 2020.
     """
     def __init__(self, dt, model, input, output, features=None, method=None,
                  threshold=None, reset=None, refractory=False,
@@ -790,7 +799,7 @@ class Inferencer(object):
     def infer(self, n_samples=None, theta=None, x=None, n_rounds=1,
               inference_method='SNPE', density_estimator_model='maf',
               inference_kwargs={}, train_kwargs={}, posterior_kwargs={},
-              restart=False, device='cpu', **params):
+              restart=False, sbi_device='cpu', **params):
         """Return the trained posterior.
 
         Note that if ``theta`` and ``x`` are not provided,
@@ -885,7 +894,7 @@ class Inferencer(object):
 
             # initialize inference object
             _ = self.init_inference(inference_method, density_estimator_model,
-                                    prior, device, **inference_kwargs)
+                                    prior, sbi_device, **inference_kwargs)
 
             # args for SNPE in `.train`
             # args for SNRE and SNLE are not supported here, if needed the user
