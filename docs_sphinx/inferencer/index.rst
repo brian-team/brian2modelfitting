@@ -80,4 +80,4 @@ References
 
 .. [Tejero-Cantero2020] Tejero-Cantero, A., Boelts, J. et al. "sbi: A toolkit
                         for simulation-based inference" Journal of Open Source
-                        Software (JOOS), 5(52):2505. 2020.
+                        Software 5(52):2505. 2020. doi: `10.21105/joss.02505 <https://doi.org/10.21105/joss.02505>`_
