@@ -95,7 +95,7 @@ def get_param_dict(param_values, param_names, n_values):
     param_values : numpy.ndarray
         Parameter values in a 2-dimensional array with the number of
         rows corresponding to a number of samples and the number of
-        columns corresponding to ``len(param_names).
+        columns corresponding to a number of parameters.
     param_names : list
         List containing parameter names.
     n_values : int
