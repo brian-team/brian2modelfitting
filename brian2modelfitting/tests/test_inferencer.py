@@ -71,6 +71,7 @@ def test_calc_prior():
     assert isinstance(prior_sbi_sampled[0, 0], np.float32)
     assert_equal(prior_sbi_sampled.shape, (n_samples, len(param_names)))
 
+
 E = 40*mV
 input_traces = np.zeros((10, 5))*volt
 for i in range(5):
@@ -104,7 +105,7 @@ def setup(request):
 
 
 @pytest.fixture
-def setup_feautres(request):
+def setup_features(request):
     dt = 0.01 * ms
     inferencer = Inferencer(dt=dt,
                             model=model,
@@ -170,8 +171,8 @@ def test_inferencer_init(setup):
     assert_almost_equal(inferencer.x_o, x_o)
 
 
-def test_inferencer_init_features(setup_feautres):
-    _, inferencer = setup_feautres
+def test_inferencer_init_features(setup_features):
+    _, inferencer = setup_features
     attr_inferencer = ['dt', 'output_var', 'output', 'param_names',
                        'n_traces', 'sim_time', 'output_dim', 'model',
                        'input_traces', 'param_init', 'method',
@@ -315,6 +316,8 @@ def test_infer_step(setup_full):
     posterior = inferencer.infer_step(proposal=prior,
                                       n_samples=10,
                                       inference=inference)
+    assert posterior._method_family == 'snpe'
+    assert_equal(np.array(posterior._x_shape), np.array([1, 5]))
 
 
 def test_infer_step_errors(setup_full):
@@ -329,6 +332,20 @@ def test_infer_step_errors(setup_full):
                                   inference=inference)
 
 
-def test_infer(setup_features):
-    _, inferncer = setup_features
-    posterior = inferencer.infer(n_samples=10)
+def test_infer(setup):
+    _, inferencer = setup
+    posterior = inferencer.infer(n_samples=10, g=[1*nS, 100*nS])
+    assert posterior == inferencer.posterior
+
+    posterior_multi_round = inferencer.infer(n_samples=10, n_rounds=2,
+                                             restart=True, g=[1*nS, 100*nS])
+    assert posterior_multi_round != posterior
+    assert posterior_multi_round == inferencer.posterior
+
+
+def test_load_posterior(setup):
+    _, inferencer = setup
+    _ = inferencer.infer(n_samples=10, g=[1*nS, 100*nS])
+    inferencer.save_posterior('posterior.pth')
+    posterior_load = inferencer.load_posterior('posterior.pth')
+    assert inferencer.posterior.net == posterior_load.net
