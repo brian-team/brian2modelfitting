@@ -83,11 +83,16 @@ brian2modelfitting.egg-info
 
 # sbi logs
 examples/sbi-logs/
+brian2modelfitting/tests/sbi-logs/
 
 # other sbi and torch stuff
 examples/*.pt
 examples/*.pth
+brian2modelfitting/tests/*.pt
+brian2modelfitting/tests/*.pth
 
 # numpy files
 examples/*.npy
 examples/*.npz
+brian2modelfitting/tests/*.npy
+brian2modelfitting/tests/*.npz
