@@ -46,6 +46,7 @@ setup(name='brian2modelfitting',
           'Operating System :: OS Independent',
           'Programming Language :: Python',
           'Programming Language :: Python :: 3',
-          'Topic :: Scientific/Engineering :: Bio-Informatics'],
+          'Topic :: Scientific/Engineering :: Bio-Informatics'
+          ],
       keywords='model fitting computational neuroscience',
       )
