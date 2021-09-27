@@ -1297,9 +1297,14 @@ class TraceFitter(Fitter):
         t_start_steps = [int(round(t_s / self.dt)) if t_w is None else 0
                          for t_s, t_w in zip(t_start, t_weights)]
 
-        def _calc_error(params):
-            param_dic = get_param_dic(params,
-                                      self.parameter_names, self.n_traces, 1)
+        # TODO: Move all this into a class
+        tested_parameters = []
+        errors = []
+        combined_errors = []
+        n_evaluations = [-1]
+
+        def _calc_error(x):
+            param_dic = get_param_dic(x, self.parameter_names, self.n_traces, 1)
             self.simulator.run(self.duration, param_dic,
                                self.parameter_names, iteration=iteration,
                                name='refine')
@@ -1316,6 +1321,62 @@ class TraceFitter(Fitter):
                 else:
                     residual = (trace - out) * sqrt(t_w)
                 one_residual.append((residual*norm).flatten())
+
+            output_len = [output[:, t_s_steps:].size
+                          for output, t_s_steps in zip(self.output,
+                                                       t_start_steps)]
+            end_idx = cumsum(output_len)
+            start_idx = hstack([0, end_idx[:-1]])
+            error = tuple([mean(r**2) for r in one_residual])
+            combined_error = sum(array(error))
+            errors.append(error)
+            combined_errors.append(combined_error)
+            best_idx = argmin(combined_errors)
+
+            if self.use_units:
+                norm_dim = get_dimensions(normalization[0]) ** 2
+                error_dim = self.output_dim[0] ** 2 * norm_dim
+                for output_dim, norm in zip(self.output_dim[1:],
+                                            normalization[1:]):
+                    norm_dim = get_dimensions(norm) ** 2
+                    other_dim = output_dim ** 2 * norm_dim
+                    fail_for_dimension_mismatch(error_dim, other_dim,
+                                                error_message='The error terms have mismatching '
+                                                              'units.')
+                all_errors = Quantity(combined_errors, dim=error_dim)
+                params = {p: Quantity(val, dim=self.model[p].dim)
+                          for p, val in zip(self.parameter_names, x)}
+                best_raw_error_normed = tuple([Quantity(raw_error,
+                                                        dim=output_dim ** 2 * get_dimensions(
+                                                            norm) ** 2)
+                                               for raw_error, output_dim, norm
+                                               in zip(errors[best_idx],
+                                                      self.output_dim,
+                                                      normalization)])
+                best_raw_error = tuple([Quantity(raw_error / norm ** 2,
+                                                 dim=output_dim ** 2)
+                                        for raw_error, output_dim, norm
+                                        in zip(errors[best_idx],
+                                               self.output_dim,
+                                               normalization)])
+            else:
+                all_errors = array(combined_errors)
+                params = {p: float(val) for p, val
+                          in zip(self.parameter_names, x)}
+                best_raw_error_normed = errors[best_idx]
+                best_raw_error = [err / norm ** 2
+                                  for norm, err in
+                                  zip(errors[best_idx], normalization)]
+            tested_parameters.append(params)
+
+            best_error = all_errors[best_idx]
+            best_params = tested_parameters[best_idx]
+            additional_info = {'objective_errors': best_raw_error,
+                               'objective_errors_normalized': best_raw_error_normed,
+                               'output_var': self.output_var}
+            callback_func(params, errors,
+                          best_params, best_error, n_evaluations[0], additional_info)
+            n_evaluations[0] += 1
             return array(hstack(one_residual))
 
         def _calc_gradient(params):
@@ -1337,79 +1398,9 @@ class TraceFitter(Fitter):
             gradient = array(residuals)
             return gradient.T
 
-        tested_parameters = []
-        errors = []
-        combined_errors = []
-        def _callback_wrapper(params, iter, resid, *args, **kwds):
-            output_len = [output[:, t_s_steps:].size
-                          for output, t_s_steps in zip(self.output,
-                                                       t_start_steps)]
-            end_idx = cumsum(output_len)
-            start_idx = hstack([0, end_idx[:-1]])
-            error = tuple([mean(resid[start:end]**2)
-                           for start, end in zip(start_idx, end_idx)])
-            combined_error = sum(array(error))
-            errors.append(error)
-            combined_errors.append(combined_error)
-            best_idx = argmin(combined_errors)
-
-            if self.use_units:
-                norm_dim = get_dimensions(normalization[0])**2
-                error_dim = self.output_dim[0]**2*norm_dim
-                for output_dim, norm in zip(self.output_dim[1:], normalization[1:]):
-                    norm_dim = get_dimensions(norm)**2
-                    other_dim = output_dim**2*norm_dim
-                    fail_for_dimension_mismatch(error_dim, other_dim,
-                                                error_message='The error terms have mismatching '
-                                                              'units.')
-                all_errors = Quantity(combined_errors, dim=error_dim)
-                params = {p: Quantity(val, dim=self.model[p].dim)
-                          for p, val in params.items()}
-                best_raw_error_normed = tuple([Quantity(raw_error,
-                                                        dim=output_dim**2*get_dimensions(norm)**2)
-                                               for raw_error, output_dim, norm
-                                               in zip(errors[best_idx],
-                                                      self.output_dim,
-                                                      normalization)])
-                best_raw_error = tuple([Quantity(raw_error / norm**2,
-                                                 dim=output_dim**2)
-                                        for raw_error, output_dim, norm
-                                        in zip(errors[best_idx],
-                                               self.output_dim,
-                                               normalization)])
-            else:
-                all_errors = array(combined_errors)
-                params = {p: float(val) for p, val in params.items()}
-                best_raw_error_normed = errors[best_idx]
-                best_raw_error = [err / norm**2
-                                  for norm, err in zip(errors[best_idx], normalization)]
-            tested_parameters.append(params)
-
-            best_error = all_errors[best_idx]
-            best_params = tested_parameters[best_idx]
-            additional_info = {'objective_errors': best_raw_error,
-                               'objective_errors_normalized': best_raw_error_normed,
-                               'output_var': self.output_var}
-            return callback_func(params, errors,
-                                 best_params, best_error, iter, additional_info)
-
         assert 'jac' not in kwds
         if calc_gradient:
             kwds.update({'jac': _calc_gradient})
-
-        # if 'iter_cb' in kwds:
-        #     # Use the given callback but raise a warning if callback is not
-        #     # set to None
-        #     if callback is not None:
-        #         logger.warn('The iter_cb keyword has been specified together '
-        #                     f'with callback={callback!r}. Only the iter_cb '
-        #                     'callback will be used. Use the standard '
-        #                     'callback mechanism or set callback=None to '
-        #                     'remove this warning.',
-        #                     name_suffix='iter_cb_callback')
-        #     iter_cb = kwds.pop('iter_cb')
-        # else:
-        #     iter_cb = _callback_wrapper
 
         result = least_squares(_calc_error, x0,
                                bounds=(min_bounds, max_bounds),

@@ -731,25 +731,6 @@ def test_fitter_callback(setup, caplog):
     tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS], callback=our_callback)
     assert len(calls)
 
-    # Use scipy's iter_cb instead of our callback mechanism
-
-    calls = []
-    def iter_cb(params, iter, resid, *args, **kws):
-        calls.append(iter)
-        assert isinstance(params, lmfit.Parameters)
-        assert isinstance(iter, int)
-        assert isinstance(resid, np.ndarray)
-
-    tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS], iter_cb=iter_cb)
-    assert len(caplog.records) == 1
-    assert len(calls)
-
-    calls.clear()
-    tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS], iter_cb=iter_cb,
-              callback=None)
-    assert len(caplog.records) == 1  # no additional warning
-    assert len(calls)
-
 
 def test_fit_restart(setup):
     dt, tf = setup
