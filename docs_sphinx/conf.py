@@ -97,5 +97,5 @@ intersphinx_mapping = {'python': ('https://docs.python.org/', None),
                        'matplotlib': ('http://matplotlib.org/', None),
                        'numpy': ('http://docs.scipy.org/doc/numpy/', None),
                        'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
-                       'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
-                       'lmfit': ('https://lmfit.github.io/lmfit-py/', None)}
+                       'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None)
+                       }

@@ -7,6 +7,7 @@ import sympy
 from numpy import (ones, array, arange, concatenate, mean, argmin, nanargmin,
                    reshape, zeros, sqrt, ndarray, broadcast_to, sum, cumsum,
                    hstack)
+from scipy.optimize import least_squares
 
 from brian2.parsing.sympytools import sympy_to_str, str_to_sympy
 from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions, fail_for_dimension_mismatch
@@ -1167,8 +1168,7 @@ class TraceFitter(Fitter):
                iteration=1e9, level=0, **kwds):
         """
         Refine the fitting results with a sequentially operating minimization
-        algorithm. Uses the `lmfit <https://lmfit.github.io/lmfit-py/>`_
-        package which itself makes use of
+        algorithm. The `~.scipy.optimize.least_squares` algorithm from
         `scipy.optimize <https://docs.scipy.org/doc/scipy/reference/optimize.html>`_.
         Has to be called after `~.TraceFitter.fit`, but a call with
         ``n_rounds=0`` is enough.
@@ -1221,31 +1221,23 @@ class TraceFitter(Fitter):
             Additional arguments can overwrite the bounds for individual
             parameters (if not given, the bounds previously specified in the
             call to `~.TraceFitter.fit` will be used). All other arguments will
-            be passed on to `.lmfit.minimize` and can be used to e.g. change the
-            method, or to specify method-specific arguments.
+            be passed on to `.~scipy.optimize.least_squares`.
 
         Returns
         -------
         parameters : dict
             The parameters at the end of the optimization process as a
             dictionary.
-        result : `.lmfit.MinimizerResult`
+        result : `.scipy.optimize.OptimizeResult`
             The result of the optimization process.
 
         Notes
         -----
-        The default method used by `lmfit` is least-squares minimization using
-        a Levenberg-Marquardt method. Note that there is no support for
-        specifying a `Metric`, the given output trace(s) will be subtracted
-        from the simulated trace(s) and passed on to the minimization algorithm.
-
-        This method always uses the runtime mode, independent of the selection
-        of the current device.
+        There is no support for specifying a `Metric`, the given output trace(s)
+        will be subtracted from the simulated trace(s) and passed on to the
+        minimization algorithm which will internally calculate the sum of
+        squares.
         """
-        try:
-            import lmfit
-        except ImportError:
-            raise ImportError('Refinement needs the "lmfit" package.')
         if params is None:
             if self.best_params is None:
                 raise TypeError('You need to either specify parameters or run '
@@ -1280,7 +1272,9 @@ class TraceFitter(Fitter):
         callback_func = callback_setup(callback, None)
 
         # Set up Parameter objects
-        parameters = lmfit.Parameters()
+        min_bounds = []
+        max_bounds = []
+        x0 = []
         for param_name in self.parameter_names:
             if param_name not in kwds:
                 if self.bounds is None:
@@ -1289,8 +1283,9 @@ class TraceFitter(Fitter):
                 min_bound, max_bound = self.bounds[param_name]
             else:
                 min_bound, max_bound = kwds.pop(param_name)
-            parameters.add(param_name, value=array(params[param_name]),
-                           min=array(min_bound), max=array(max_bound))
+            x0.append(params[param_name])
+            min_bounds.append(min_bound)
+            max_bounds.append(max_bound)
 
         self.simulator = self.setup_simulator('refine', self.n_traces,
                                               output_var=self.output_var,
@@ -1303,7 +1298,7 @@ class TraceFitter(Fitter):
                          for t_s, t_w in zip(t_start, t_weights)]
 
         def _calc_error(params):
-            param_dic = get_param_dic([params[p] for p in self.parameter_names],
+            param_dic = get_param_dic(params,
                                       self.parameter_names, self.n_traces, 1)
             self.simulator.run(self.duration, param_dic,
                                self.parameter_names, iteration=iteration,
@@ -1398,45 +1393,34 @@ class TraceFitter(Fitter):
             return callback_func(params, errors,
                                  best_params, best_error, iter, additional_info)
 
-        assert 'Dfun' not in kwds
+        assert 'jac' not in kwds
         if calc_gradient:
-            kwds.update({'Dfun': _calc_gradient})
-        if 'iter_cb' in kwds:
-            # Use the given callback but raise a warning if callback is not
-            # set to None
-            if callback is not None:
-                logger.warn('The iter_cb keyword has been specified together '
-                            f'with callback={callback!r}. Only the iter_cb '
-                            'callback will be used. Use the standard '
-                            'callback mechanism or set callback=None to '
-                            'remove this warning.',
-                            name_suffix='iter_cb_callback')
-            iter_cb = kwds.pop('iter_cb')
-        else:
-            iter_cb = _callback_wrapper
+            kwds.update({'jac': _calc_gradient})
 
-        # Translate arguments for newer lmfit versions
-        if LooseVersion(lmfit.__version__) >= '1.0.1':
-            max_nfev = kwds.pop('max_nfev', None)
-            args = ['maxfev', 'maxiter']
-            for arg in args:
-                if arg in kwds:
-                    if max_nfev is not None:
-                        raise ValueError('Only specifiy a single \'max_nfev\' argument.')
-                    max_nfev = kwds.pop(arg)
-            if max_nfev:
-                kwds['max_nfev'] = max_nfev
+        # if 'iter_cb' in kwds:
+        #     # Use the given callback but raise a warning if callback is not
+        #     # set to None
+        #     if callback is not None:
+        #         logger.warn('The iter_cb keyword has been specified together '
+        #                     f'with callback={callback!r}. Only the iter_cb '
+        #                     'callback will be used. Use the standard '
+        #                     'callback mechanism or set callback=None to '
+        #                     'remove this warning.',
+        #                     name_suffix='iter_cb_callback')
+        #     iter_cb = kwds.pop('iter_cb')
+        # else:
+        #     iter_cb = _callback_wrapper
 
-        result = lmfit.minimize(_calc_error, parameters,
-                                iter_cb=iter_cb,
-                                **kwds)
+        result = least_squares(_calc_error, x0,
+                               bounds=(min_bounds, max_bounds),
+                               **kwds)
 
         if self.use_units:
             param_dict = {p: Quantity(float(val), dim=self.model[p].dim)
-                          for p, val in result.params.items()}
+                          for p, val in zip(self.parameter_names, result.x)}
         else:
             param_dict = {p: float(val)
-                          for p, val in result.params.items()}
+                          for p, val in zip(self.parameter_names, result.x)}
 
         return param_dict, result
 
