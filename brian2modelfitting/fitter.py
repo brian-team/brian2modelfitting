@@ -1402,6 +1402,16 @@ class TraceFitter(Fitter):
         if calc_gradient:
             kwds.update({'jac': _calc_gradient})
 
+        if 'maxfev' in kwds:
+            if 'max_nfev' in kwds:
+                raise ValueError("Cannot provide both 'maxfev' and 'max_nfev' "
+                                 "as arguments. Please only provide "
+                                 "'max_nfev'.")
+            logger.warn("The 'maxfev' argument is deprecated, please use "
+                        "'max_nfev' instead.", name_suffix='deprecated_maxfev',
+                        once=True)
+            kwds['max_nfev'] = kwds.pop('maxfev')
+
         result = least_squares(_calc_error, x0,
                                bounds=(min_bounds, max_bounds),
                                **kwds)
