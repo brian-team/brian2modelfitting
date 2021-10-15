@@ -544,10 +544,11 @@ class Fitter(metaclass=abc.ABCMeta):
                                   refractory=self.refractory, name=name,
                                   namespace=namespace, dt=self.dt, **kwds)
         if online_error:
-            neurons.run_regularly('total_error += ({} - {}_target)**2 * '
-                                  'int(t>=t_start)'.format(self.output_var[0],
-                                                           self.output_var[0]),
-                                  when='end')
+            updater = []
+            for o_var in self.output_var:
+                updater.append(f'total_error_{o_var} += ({o_var} - {o_var}_target)**2 '
+                               f'* int(t >= t_start)')
+            neurons.run_regularly('\n'.join(updater), when='end')
 
         return neurons
 
@@ -1489,8 +1490,9 @@ class SpikeFitter(Fitter):
 
 
 class OnlineTraceFitter(Fitter):
-    def __init__(self, model, input_var, input, output_var, output, dt,
-                 n_samples=30, method=None, reset=None, refractory=False,
+    def __init__(self, model, input, output, dt,
+                 n_samples=30, input_var=None, output_var=None,
+                 method=None, reset=None, refractory=False,
                  threshold=None, param_init=None,
                  t_start=0*second, penalty=None):
         """Initialize the fitter."""
@@ -1500,21 +1502,11 @@ class OnlineTraceFitter(Fitter):
                          reset=reset, refractory=refractory, method=method,
                          param_init=param_init, penalty=penalty)
 
-        self.output = [Quantity(output)]
-        self.output_ = [array(output)]
-
-        if output_var not in self.model.names:
-            raise NameError("%s is not a model variable" % output_var)
-        if output.shape != input.shape:
-            raise ValueError("Input and output must have the same size")
-
-        # Replace input variable by TimedArray
-        output_traces = TimedArray(self.output[0].transpose(), dt=dt)
-        output_dim = get_dimensions(self.output[0])
-        squared_output_dim = ('1' if output_dim is DIMENSIONLESS
-                              else repr(output_dim**2))
-        error_eqs = Equations('total_error : {}'.format(squared_output_dim))
-        self.model = self.model + error_eqs
+        for o_var, o_data, o_dim in zip(self.output_var, self.output, self.output_dim):
+            squared_output_dim = ('1' if o_dim is DIMENSIONLESS
+                                  else repr(o_dim**2))
+            error_eqs = Equations(f'total_error_{o_var} : {squared_output_dim}')
+            self.model = self.model + error_eqs
 
         self.t_start = t_start
 
@@ -1527,10 +1519,11 @@ class OnlineTraceFitter(Fitter):
 
         self.simulator = None
 
-    def fit(self, optimizer, n_rounds=1, callback='text',
+    def fit(self, optimizer, metric=None, n_rounds=1, callback='text',
             restart=False, start_iteration=None, penalty=None,
             level=0, **params):
-        metric = MSEMetric()  # not used, but makes error dimensions correct
+        if metric is None:
+            metric = MSEMetric()
         return super(OnlineTraceFitter, self).fit(optimizer, metric=metric,
                                                   n_rounds=n_rounds,
                                                   callback=callback,
@@ -1543,9 +1536,13 @@ class OnlineTraceFitter(Fitter):
 
     def calc_errors(self, metric=None):
         """Calculates error in online fashion.To be used inside optim_iter."""
-        errors = self.simulator.neurons.total_error/int((self.duration-self.t_start)/defaultclock.dt)
-        errors = mean(errors.reshape((self.n_samples, self.n_traces)), axis=1)
-        return [array(errors)]
+        timesteps = int((self.duration-self.t_start)/defaultclock.dt)
+        all_errors = []
+        for o_var in self.output_var:
+            errors = getattr(self.simulator.neurons, f'total_error_{o_var}')
+            errors = mean(errors[:].reshape((self.n_samples, self.n_traces)), axis=1)
+            all_errors.append(array(errors))
+        return all_errors
 
     def generate_traces(self, params=None, param_init=None, level=0):
         """Generates traces for best fit of parameters and all inputs"""
