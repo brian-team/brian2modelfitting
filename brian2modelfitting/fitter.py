@@ -547,7 +547,7 @@ class Fitter(metaclass=abc.ABCMeta):
             updater = []
             for o_var in self.output_var:
                 updater.append(f'total_error_{o_var} += ({o_var} - {o_var}_target)**2 '
-                               f'* int(t >= t_start)')
+                               f'* int(t >= t_start_{o_var})')
             neurons.run_regularly('\n'.join(updater), when='end')
 
         return neurons
@@ -734,10 +734,15 @@ class Fitter(metaclass=abc.ABCMeta):
         if (restart or
                 self.simulator is None or
                 self.simulator.current_net != 'fit'):
+            param_init = dict(self.param_init)
+            if online_error:
+                for m, o_var in zip(self.metric, self.output_var):
+                    param_init[f't_start_{o_var}'] = getattr(m, 't_start', 0*second)
+
             self.simulator = self.setup_simulator('fit', self.n_neurons,
                                                   output_var=self.output_var,
                                                   online_error=online_error,
-                                                  param_init=self.param_init,
+                                                  param_init=param_init,
                                                   level=level+1)
 
         # Run Optimization Loop
@@ -1494,7 +1499,7 @@ class OnlineTraceFitter(Fitter):
                  n_samples=30, input_var=None, output_var=None,
                  method=None, reset=None, refractory=False,
                  threshold=None, param_init=None,
-                 t_start=0*second, penalty=None):
+                 penalty=None):
         """Initialize the fitter."""
         super().__init__(dt, model, input=input, output=output,
                          input_var=input_var, output_var=output_var,
@@ -1505,10 +1510,8 @@ class OnlineTraceFitter(Fitter):
         for o_var, o_data, o_dim in zip(self.output_var, self.output, self.output_dim):
             squared_output_dim = ('1' if o_dim is DIMENSIONLESS
                                   else repr(o_dim**2))
-            error_eqs = Equations(f'total_error_{o_var} : {squared_output_dim}')
-            self.model = self.model + error_eqs
-
-        self.t_start = t_start
+            self.model += Equations(f'total_error_{o_var} : {squared_output_dim}')
+            self.model += Equations(f't_start_{o_var} : second (constant, shared)')
 
         if param_init:
             for param, val in param_init.items():
@@ -1524,6 +1527,12 @@ class OnlineTraceFitter(Fitter):
             level=0, **params):
         if metric is None:
             metric = MSEMetric()
+        metric = self._verify_metric_argument(metric)
+        for m in metric.values():
+            if getattr(m, 't_weights', None) is not None:
+                raise NotImplementedError("The 't_weights' argument cannot be used "
+                                          "with OnlineTraceFitter, only 't_start' is "
+                                          "supported.")
         return super(OnlineTraceFitter, self).fit(optimizer, metric=metric,
                                                   n_rounds=n_rounds,
                                                   callback=callback,
@@ -1536,11 +1545,13 @@ class OnlineTraceFitter(Fitter):
 
     def calc_errors(self, metric=None):
         """Calculates error in online fashion.To be used inside optim_iter."""
-        timesteps = int((self.duration-self.t_start)/defaultclock.dt)
         all_errors = []
         for o_var in self.output_var:
+            t_start = getattr(self.simulator.neurons, f't_start_{o_var}')
+            timesteps = int((self.duration - t_start) / defaultclock.dt)
             errors = getattr(self.simulator.neurons, f'total_error_{o_var}')
-            errors = mean(errors[:].reshape((self.n_samples, self.n_traces)), axis=1)
+            errors = mean(errors[:].reshape((self.n_samples, self.n_traces))/timesteps,
+                          axis=1)
             all_errors.append(array(errors))
         return all_errors
 
