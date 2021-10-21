@@ -1494,14 +1494,14 @@ class SpikeFitter(Fitter):
         return fits
 
 
-class OnlineTraceFitter(Fitter):
+class OnlineTraceFitter(TraceFitter):
     def __init__(self, model, input, output, dt,
                  n_samples=30, input_var=None, output_var=None,
                  method=None, reset=None, refractory=False,
                  threshold=None, param_init=None,
                  penalty=None):
         """Initialize the fitter."""
-        super().__init__(dt, model, input=input, output=output,
+        super().__init__(dt=dt, model=model, input=input, output=output,
                          input_var=input_var, output_var=output_var,
                          n_samples=n_samples, threshold=threshold,
                          reset=reset, refractory=refractory, method=method,
@@ -1546,12 +1546,12 @@ class OnlineTraceFitter(Fitter):
     def calc_errors(self, metric=None):
         """Calculates error in online fashion.To be used inside optim_iter."""
         all_errors = []
-        for o_var in self.output_var:
+        for o_var, metric in zip(self.output_var, self.metric):
             t_start = getattr(self.simulator.neurons, f't_start_{o_var}')
             timesteps = int((self.duration - t_start) / defaultclock.dt)
             errors = getattr(self.simulator.neurons, f'total_error_{o_var}')
             errors = mean(errors[:].reshape((self.n_samples, self.n_traces))/timesteps,
-                          axis=1)
+                          axis=1)*metric.normalization
             all_errors.append(array(errors))
         return all_errors
 
