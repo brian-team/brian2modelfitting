@@ -102,6 +102,8 @@ def calc_eFEL(traces, inp_times, feat_list, dt):
         temp_trace = {}
         temp_trace['T'] = time
         temp_trace['V'] = array(trace, copy=False)
+        print('min/max in calc_eFEL:')
+        print(min(temp_trace['V']), max(temp_trace['V']))
         temp_trace['stim_start'] = [inp_times[i][0]]
         temp_trace['stim_end'] = [inp_times[i][1]]
         out_traces.append(temp_trace)
