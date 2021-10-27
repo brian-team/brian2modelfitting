@@ -7,7 +7,7 @@ try:
 except ImportError:
     warnings.warn('eFEL package not found.')
 from itertools import repeat
-from brian2 import Hz, second, Quantity, ms, us, get_dimensions
+from brian2 import Hz, second, Quantity, ms, us, get_dimensions, mV
 from brian2.units.fundamentalunits import check_units, in_unit, DIMENSIONLESS
 from numpy import (array, sum, abs, amin, digitize, rint, arange, inf, NaN,
                    clip, mean)
@@ -101,7 +101,7 @@ def calc_eFEL(traces, inp_times, feat_list, dt):
         time = arange(0, len(trace))*dt/ms
         temp_trace = {}
         temp_trace['T'] = time
-        temp_trace['V'] = array(trace, copy=False)
+        temp_trace['V'] = trace/mV
         temp_trace['stim_start'] = [inp_times[i][0]]
         temp_trace['stim_end'] = [inp_times[i][1]]
         out_traces.append(temp_trace)

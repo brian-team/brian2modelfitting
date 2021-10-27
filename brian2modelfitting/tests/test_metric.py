@@ -226,8 +226,8 @@ def test_calc_EFL():
     results = calc_eFEL(voltage, inp_times, ['voltage_base'], dt=dt)
     assert len(results) == 2
     assert all(res.keys() == {'voltage_base'} for res in results)
-    assert_almost_equal(results[0]['voltage_base'], float(-60*mV))
-    assert_almost_equal(results[1]['voltage_base'], float(-70*mV))
+    assert_almost_equal(results[0]['voltage_base'], -60)
+    assert_almost_equal(results[1]['voltage_base'], -70)
 
 
 def test_get_features_feature_metric():
@@ -251,9 +251,9 @@ def test_get_features_feature_metric():
     assert len(results) == 3
     assert all(isinstance(r, dict) for r in results)
     assert all(r.keys() == {'voltage_base'} for r in results)
-    assert_almost_equal(results[0]['voltage_base'], np.array([2.5*mV, 5*mV]))
+    assert_almost_equal(results[0]['voltage_base'], [2.5, 5])
     assert_almost_equal(results[1]['voltage_base'], [0, 0])
-    assert_almost_equal(results[2]['voltage_base'], np.array([2.5*mV, 5*mV]))
+    assert_almost_equal(results[2]['voltage_base'], [2.5, 5])
 
     # Custom comparison: squared difference
     feature_metric = FeatureMetric(inp_times, ['voltage_base'],
@@ -262,9 +262,9 @@ def test_get_features_feature_metric():
     assert len(results) == 3
     assert all(isinstance(r, dict) for r in results)
     assert all(r.keys() == {'voltage_base'} for r in results)
-    assert_almost_equal(results[0]['voltage_base'], np.array([(2.5*mV)**2, (5*mV)**2]))
+    assert_almost_equal(results[0]['voltage_base'], [2.5**2, 5**2])
     assert_almost_equal(results[1]['voltage_base'], [0, 0])
-    assert_almost_equal(results[2]['voltage_base'], np.array([(2.5*mV)**2, (5*mV)**2]))
+    assert_almost_equal(results[2]['voltage_base'], [2.5**2, 5**2])
 
 
 def test_get_errors_feature_metric():
