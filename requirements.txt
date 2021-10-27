@@ -3,4 +3,4 @@ nevergrad==0.3.0
 scikit-optimize
 scikit-learn!=0.23.0
 tqdm
-efel
+efel>=3,<4
