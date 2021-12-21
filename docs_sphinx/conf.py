@@ -10,6 +10,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+
 import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
@@ -17,11 +18,12 @@ sys.path.insert(0, os.path.abspath('..'))
 needs_sphinx = '1.8'
 
 
-brian2modelfitting_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                               '..', 'brian2modelfitting'))
+brian2modelfitting_dir = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), '..', 'brian2modelfitting')
+    )
 # -- Project information -----------------------------------------------------
 
-project = 'Brian2modelfitting'
+project = 'brian2modelfitting'
 copyright = '2019, brian-team'
 author = 'brian-team'
 
@@ -66,7 +68,8 @@ default_role = 'py:obj'
 autodoc_default_options = {'inherited-members': True}
 
 # -- Options for HTML output -------------------------------------------------
-# on_rtd is whether we are on readthedocs.org, this line of code grabbed from docs.readthedocs.org
+# on_rtd is whether we are on readthedocs.org, this line of code grabbed from
+# docs.readthedocs.org
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 
 if not on_rtd:
@@ -92,10 +95,12 @@ html_logo = '_static/brian-logo.png'
 
 
 # -- Extension configuration -------------------------------------------------
-intersphinx_mapping = {'python': ('https://docs.python.org/', None),
-                       'brian2': ('https://brian2.readthedocs.org/en/stable/', None),
-                       'matplotlib': ('http://matplotlib.org/', None),
-                       'numpy': ('http://docs.scipy.org/doc/numpy/', None),
-                       'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
-                       'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
-                       'lmfit': ('https://lmfit.github.io/lmfit-py/', None)}
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/', None),
+    'brian2': ('https://brian2.readthedocs.org/en/stable/', None),
+    'matplotlib': ('http://matplotlib.org/', None),
+    'numpy': ('http://docs.scipy.org/doc/numpy/', None),
+    'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
+    'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
+    'lmfit': ('https://lmfit.github.io/lmfit-py/', None),
+    }
