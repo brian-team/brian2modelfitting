@@ -17,7 +17,7 @@ from brian2 import (NeuronGroup, defaultclock, get_device, Network,
                     Quantity, get_logger, Expression, ms)
 from brian2.input import TimedArray
 from brian2.equations.equations import Equations, SUBEXPRESSION, SingleEquation
-from brian2.devices import device
+from brian2.devices import device, RuntimeDevice
 from brian2.devices.cpp_standalone.device import CPPStandaloneDevice
 from brian2.core.functions import Function
 from .simulator import RuntimeSimulator, CPPStandaloneSimulator
@@ -81,15 +81,18 @@ def setup_fit():
     simulator : `.Simulator`
     """
     simulators = {
-        'CPPStandaloneDevice': CPPStandaloneSimulator(),
-        'RuntimeDevice': RuntimeSimulator()
+        CPPStandaloneDevice: CPPStandaloneSimulator(),
+        RuntimeDevice: RuntimeSimulator()
     }
     if isinstance(get_device(), CPPStandaloneDevice):
         if device.has_been_run is True:
             build_options = dict(device.build_options)
             get_device().reinit()
             get_device().activate(**build_options)
-    return simulators[get_device().__class__.__name__]
+    simulator = [sim for dev, sim in simulators.items()
+                 if isinstance(get_device(), dev)]
+    assert len(simulator) == 1, f"Found {len(simulator)} simulators for device {get_device().__class__.__name__}"
+    return simulator[0]
 
 
 def get_sensitivity_equations(group, parameters, namespace=None, level=1,
