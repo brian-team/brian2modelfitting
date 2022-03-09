@@ -137,7 +137,7 @@ def setup_full(request):
 
 
 def test_inferencer_init(setup):
-    _, inferencer = setup
+    dt, inferencer = setup
     attr_inferencer = ['dt', 'output_var', 'output', 'param_names',
                        'n_traces', 'sim_time', 'output_dim', 'model',
                        'input_traces', 'param_init', 'method',
@@ -172,7 +172,7 @@ def test_inferencer_init(setup):
 
 
 def test_inferencer_init_features(setup_features):
-    _, inferencer = setup_features
+    dt, inferencer = setup_features
     attr_inferencer = ['dt', 'output_var', 'output', 'param_names',
                        'n_traces', 'sim_time', 'output_dim', 'model',
                        'input_traces', 'param_init', 'method',
@@ -210,7 +210,7 @@ def test_inferencer_init_features(setup_features):
 
 
 def test_init_prior(setup):
-    _, inferencer = setup
+    dt, inferencer = setup
     lower_bound = 1e-9
     upper_bound = 100e-9
     g_mean = np.array((lower_bound + upper_bound) / 2, dtype=np.float32)
@@ -229,7 +229,7 @@ def test_init_prior(setup):
 
 
 def test_generate_training_data(setup):
-    _, inferencer = setup
+    dt, inferencer = setup
     lower_bound = 1*nS
     upper_bound = 100*nS
     n_samples = 100
@@ -239,7 +239,7 @@ def test_generate_training_data(setup):
 
 
 def test_extract_summary_statistics(setup):
-    _, inferencer = setup
+    dt, inferencer = setup
     lower_bound = 1*nS
     upper_bound = 100*nS
     n_samples = 100
@@ -251,18 +251,18 @@ def test_extract_summary_statistics(setup):
 
 
 def test_extract_summary_statistics_errors(setup):
-    _, inferencer = setup
+    dt, inferencer = setup
     lower_bound = 1*nS
     upper_bound = 100*nS
     n_samples = 100
     prior = inferencer.init_prior(g=[lower_bound, upper_bound])
     theta = inferencer.generate_training_data(n_samples, prior)
     with pytest.raises(Exception):
-        _ = inferencer.extract_summary_statistics(theta, level=2)
+        inferencer.extract_summary_statistics(theta, level=2)
 
 
 def test_save_summary_statistics_errors(setup):
-    _, inferencer = setup
+    dt, inferencer = setup
     with pytest.raises(AttributeError):
         inferencer.save_summary_statistics('summary_stats')
 
@@ -276,7 +276,7 @@ def test_save_summary_statistics_errors(setup):
 
 
 def test_load_summary_statistics(setup):
-    _, inferencer = setup
+    dt, inferencer = setup
     theta = np.array([[1, 2], [3, 4]])
     x = np.arange(2).reshape(2, 1)
     inferencer.save_summary_statistics('summ_stats.npz', theta=theta, x=x)
@@ -286,28 +286,28 @@ def test_load_summary_statistics(setup):
 
 
 def test_init_inference_errors(setup):
-    _, inferencer = setup
+    dt, inferencer = setup
     prior = inferencer.init_prior(g=[1*nS, 100*nS])
     with pytest.raises(NameError):
-        _ = inferencer.init_inference(inference_method='test',
-                                      density_estimator_model='mdn',
-                                      prior=prior,
-                                      sbi_device='cpu')
-        _ = inferencer.init_inference(inference_method='SNPE',
-                                      density_estimator_model='test',
-                                      prior=prior,
-                                      sbi_device='cpu')
-
-    # sbi_device should be automatically set to 'cpu'
-    _ = inferencer.init_inference(inference_method='SNPE',
+        inferencer.init_inference(inference_method='test',
                                   density_estimator_model='mdn',
                                   prior=prior,
-                                  sbi_device='test')
+                                  sbi_device='cpu')
+        inferencer.init_inference(inference_method='SNPE',
+                                  density_estimator_model='test',
+                                  prior=prior,
+                                  sbi_device='cpu')
+
+    # sbi_device should be automatically set to 'cpu'
+    inferencer.init_inference(inference_method='SNPE',
+                              density_estimator_model='mdn',
+                              prior=prior,
+                              sbi_device='test')
     assert inferencer.sbi_device == 'cpu'
 
 
 def test_infer_step(setup_full):
-    _, inferencer = setup_full
+    dt, inferencer = setup_full
     prior = inferencer.init_prior(g=[1*nS, 100*nS])
     inference = inferencer.init_inference(inference_method='SNPE',
                                           density_estimator_model='mdn',
@@ -321,19 +321,19 @@ def test_infer_step(setup_full):
 
 
 def test_infer_step_errors(setup_full):
-    _, inferencer = setup_full
+    dt, inferencer = setup_full
     prior = inferencer.init_prior(g=[1*nS, 100*nS])
     inference = inferencer.init_inference(inference_method='SNPE',
                                           density_estimator_model='mdn',
                                           prior=prior,
                                           sbi_device='cpu')
     with pytest.raises(ValueError):
-        _ = inferencer.infer_step(proposal=prior,
-                                  inference=inference)
+        inferencer.infer_step(proposal=prior,
+                             inference=inference)
 
 
 def test_infer(setup):
-    _, inferencer = setup
+    dt, inferencer = setup
     posterior = inferencer.infer(n_samples=10, g=[1*nS, 100*nS])
     assert posterior == inferencer.posterior
 
@@ -344,8 +344,8 @@ def test_infer(setup):
 
 
 def test_load_posterior(setup):
-    _, inferencer = setup
-    _ = inferencer.infer(n_samples=10, g=[1*nS, 100*nS])
+    dt, inferencer = setup
+    inferencer.infer(n_samples=10, g=[1*nS, 100*nS])
     inferencer.save_posterior('posterior.pth')
     posterior_load = inferencer.load_posterior('posterior.pth')
     assert inferencer.posterior.net == posterior_load.net
