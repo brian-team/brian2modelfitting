@@ -6,3 +6,4 @@ lmfit
 tqdm
 efel
 sbi
+torch>=1.9,<1.10
