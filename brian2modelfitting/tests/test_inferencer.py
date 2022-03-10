@@ -3,6 +3,8 @@ from brian2.devices.device import reinit_devices
 from brian2modelfitting.inferencer import (Inferencer,
                                            get_param_dict,
                                            calc_prior)
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
+
 import numpy as np
 from numpy.testing import assert_equal, assert_almost_equal
 import pytest
@@ -316,7 +318,7 @@ def test_infer_step(setup_full):
     posterior = inferencer.infer_step(proposal=prior,
                                       n_samples=10,
                                       inference=inference)
-    assert posterior._method_family == 'snpe'
+    assert isinstance(posterior, DirectPosterior)
     assert_equal(np.array(posterior._x_shape), np.array([1, 5]))
 
 
@@ -348,4 +350,4 @@ def test_load_posterior(setup):
     inferencer.infer(n_samples=10, g=[1*nS, 100*nS])
     inferencer.save_posterior('posterior.pth')
     posterior_load = inferencer.load_posterior('posterior.pth')
-    assert inferencer.posterior.net == posterior_load.net
+    assert inferencer.posterior.__dict__ == posterior_load.__dict__

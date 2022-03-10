@@ -23,6 +23,7 @@ from sbi.utils.get_nn_models import (posterior_nn,
                                      likelihood_nn,
                                      classifier_nn)
 from sbi.utils.torchutils import BoxUniform
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
 import sbi.analysis
 import sbi.inference
 import torch
@@ -907,10 +908,10 @@ class Inferencer(object):
         else:  # `.infer_step` has been called manually
             x_o = torch.tensor(self.x_o, dtype=torch.float32)
             prior = self.posterior.set_default_x(x_o)
-            if self.posterior._method_family == 'snpe':
-                args = [prior, ]
+            if isinstance(self.posterior, DirectPosterior):
+                args = (prior, )
             else:
-                args = [None, ]
+                args = (None, )
             # generate data if the posterior already exist given proposal
             self.theta = self.generate_training_data(self.n_samples, prior)
             self.x = self.extract_summary_statistics(self.theta, level=1)
@@ -939,10 +940,10 @@ class Inferencer(object):
             if n_rounds > 1 and round < n_rounds - 1:
                 x_o = torch.tensor(self.x_o, dtype=torch.float32)
                 proposal = posterior.set_default_x(x_o)
-                if posterior._method_family == 'snpe':
-                    args = [proposal, ]
+                if isinstance(posterior, DirectPosterior):
+                    args = (proposal, )
                 else:
-                    args = [None, ]
+                    args = (None, )
                 self.theta = self.generate_training_data(self.n_samples,
                                                          proposal)
                 self.x = self.extract_summary_statistics(self.theta, level=1)
