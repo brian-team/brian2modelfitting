@@ -1,4 +1,5 @@
 import abc
+from collections import defaultdict
 import numbers
 from distutils.version import LooseVersion
 from typing import Sequence, Mapping
@@ -6,7 +7,7 @@ from typing import Sequence, Mapping
 import sympy
 from numpy import (ones, array, arange, concatenate, mean, argmin, nanargmin,
                    reshape, zeros, sqrt, ndarray, broadcast_to, sum, cumsum,
-                   hstack)
+                   hstack, tile, repeat)
 
 from brian2.parsing.sympytools import sympy_to_str, str_to_sympy
 from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions, fail_for_dimension_mismatch
@@ -30,13 +31,17 @@ logger = get_logger(__name__)
 
 
 def get_param_dic(params, param_names, n_traces, n_samples):
-    """Transform parameters into a dictionary of appropiate size"""
-    params = array(params)
+    """Transform parameters into a dictionary of appropriate size
+    From list of dictionaries to dictionary of lists, with variables
+    repeated for each trace
+    """
+    assert len(params) == n_samples
+    d = defaultdict(list)
 
-    d = dict()
+    for param_combination in params:
+        for param_name, param_value in param_combination.items():
+            d[param_name].extend(repeat(param_value, n_traces))
 
-    for name, value in zip(param_names, params.T):
-        d[name] = (ones((n_traces, n_samples)) * value).T.flatten()
     return d
 
 
@@ -752,7 +757,7 @@ class Fitter(metaclass=abc.ABCMeta):
             self._best_objective_errors_normed = tuple(self._objective_errors_normed[best_idx])
             self._best_objective_errors = tuple(self._objective_errors[best_idx])
             # create output variables
-            self._best_params = make_dic(self.parameter_names, best_params)
+            self._best_params = dict(best_params)
             if self.use_units:
                 error_dim = self.metric[0].get_normalized_dimensions(self.output_dim[0])
                 for metric, output_dim in zip(self.metric[1:], self.output_dim[1:]):
@@ -763,9 +768,8 @@ class Fitter(metaclass=abc.ABCMeta):
                                                               'units.')
                 best_error = Quantity(float(self.best_error), dim=error_dim)
                 errors = Quantity(errors, dim=error_dim)
-                param_dicts = [{p: Quantity(v, dim=self.model[p].dim)
-                                for p, v in zip(self.parameter_names,
-                                                one_param_set)}
+                param_dicts = [{p_name: Quantity(one_param_set[p_name], dim=self.model[p_name].dim)
+                                for p_name in self.parameter_names}
                                for one_param_set in parameters]
                 best_raw_error_normed = tuple([Quantity(raw_error_normed,
                                                         dim=metric.get_normalized_dimensions(output_dim))
@@ -916,9 +920,7 @@ class Fitter(metaclass=abc.ABCMeta):
             use_units = self.use_units
         names = list(self.parameter_names)
 
-        params = array(self.optimizer.tested_parameters)
-        params = params.reshape(-1, params.shape[-1])
-
+        params = self.optimizer.tested_parameters
         if use_units:
             error_dim = self.metric[0].get_dimensions(self.output_dim[0])
             errors = Quantity(array(self.optimizer.errors).flatten(),
@@ -946,13 +948,10 @@ class Fitter(metaclass=abc.ABCMeta):
             res_list = []
             for j in arange(0, len(params)):
                 temp_data = params[j]
-                res_dict = dict()
-
-                for i, n in enumerate(names):
-                    if use_units:
-                        res_dict[n] = Quantity(temp_data[i], dim=dim[n])
-                    else:
-                        res_dict[n] = float(temp_data[i])
+                if use_units:
+                    res_dict = {n: Quantity(temp_data[n], dim=dim[n]) for n in names}
+                else:
+                    res_dict = dict(temp_data)
                 res_dict['error'] = errors[j]
                 if len(self.output_var) > 1:
                     if use_units:
@@ -969,46 +968,49 @@ class Fitter(metaclass=abc.ABCMeta):
 
             return res_list
 
-        elif format == 'dict':
-            res_dict = dict()
-            for i, n in enumerate(names):
-                if use_units:
-                    res_dict[n] = Quantity(params[:, i], dim=dim[n])
-                else:
-                    res_dict[n] = array(params[:, i])
+        elif format in ('dict', 'dataframe'):
+            temp_dict = defaultdict(list)
+            for param in params:
+                for param_name, param_value in param.items():
+                    temp_dict[param_name].append(param_value)
+            
+            if use_units:
+                res_dict = {param_name: Quantity(param_value, dim=dim[param_name])
+                            for param_name, param_value in temp_dict.items()}
+            else:
+                res_dict = {param_name: array(param_value)
+                            for param_name, param_value in temp_dict.items()}
 
             res_dict['error'] = errors
             if len(self.output_var) > 1:
-                if use_units:
-                    res_dict['objective_errors_normalized'] = {output_var: raw_errors_normed[output_var]
-                                                               for output_var in self.output_var}
-                    res_dict['objective_errors'] = {output_var: raw_errors[output_var]
-                                                    for output_var in self.output_var}
+                if format == 'dict':
+                    if use_units:
+                        res_dict['objective_errors_normalized'] = {output_var: raw_errors_normed[output_var]
+                                                                for output_var in self.output_var}
+                        res_dict['objective_errors'] = {output_var: raw_errors[output_var]
+                                                        for output_var in self.output_var}
+                    else:
+                        res_dict['objective_errors_normalized'] = {output_var: array([raw_error_normed[idx]
+                                                                                    for raw_error_normed in self._objective_errors_normed])
+                                                                for idx, output_var in enumerate(self.output_var)}
+                        res_dict['objective_errors'] = {output_var: array([raw_error[idx]
+                                                                        for raw_error in self._objective_errors])
+                                                        for idx, output_var in enumerate(self.output_var)}
                 else:
-                    res_dict['objective_errors_normalized'] = {output_var: array([raw_error_normed[idx]
-                                                                                  for raw_error_normed in self._objective_errors_normed])
-                                                               for idx, output_var in enumerate(self.output_var)}
-                    res_dict['objective_errors'] = {output_var: array([raw_error[idx]
-                                                                       for raw_error in self._objective_errors])
-                                                    for idx, output_var in enumerate(self.output_var)}
-            return res_dict
-
-        elif format == 'dataframe':
-            from pandas import DataFrame
-            if use_units:
-                logger.warn('Results in dataframes do not support units. '
-                            'Specify "use_units=False" to avoid this warning.',
-                            name_suffix='dataframe_units')
-            data = concatenate((params, array(errors)[None, :].transpose()), axis=1)
-            columns = names + ['error']
-            if len(self.output_var) > 1:
-                data = concatenate((data, self._objective_errors_normed), axis=1)
-                columns += [f'normalized_error_{output_var}'
-                            for output_var in self.output_var]
-                data = concatenate((data, self._objective_errors), axis=1)
-                columns += [f'error_{output_var}'
-                            for output_var in self.output_var]
-            return DataFrame(data=data, columns=columns)
+                    for idx, output_var in enumerate(self.output_var):
+                        res_dict['normalized_error_' + output_var] = array([raw_error_normed[idx]
+                                                                            for raw_error_normed in self._objective_errors_normed])
+                        res_dict['error_' + output_var] = array([raw_error[idx]
+                                                                 for raw_error in self._objective_errors])
+            if format == 'dict':
+                return res_dict
+            else:  # dataframe
+                from pandas import DataFrame
+                if use_units:
+                    logger.warn('Results in dataframes do not support units. '
+                                'Specify "use_units=False" to avoid this warning.',
+                                name_suffix='dataframe_units')
+                return DataFrame(data=res_dict)
 
     def generate(self, output_var=None, params=None, param_init=None,
                  iteration=1e9, level=0):
@@ -1061,7 +1063,7 @@ class Fitter(metaclass=abc.ABCMeta):
                                               output_var=output_var,
                                               param_init=param_init,
                                               level=level+1)
-        param_dic = get_param_dic([params[p] for p in self.parameter_names],
+        param_dic = get_param_dic([params],
                                   self.parameter_names, self.n_traces, 1)
         self.simulator.run(self.duration, param_dic, self.parameter_names,
                            iteration=iteration, name='generate')
@@ -1306,7 +1308,8 @@ class TraceFitter(Fitter):
                          for t_s, t_w in zip(t_start, t_weights)]
 
         def _calc_error(params):
-            param_dic = get_param_dic([params[p] for p in self.parameter_names],
+            param_dic = get_param_dic([{p: params[p].value
+                                        for p in self.parameter_names}],
                                       self.parameter_names, self.n_traces, 1)
             self.simulator.run(self.duration, param_dic,
                                self.parameter_names, iteration=iteration,

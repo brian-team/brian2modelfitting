@@ -64,10 +64,8 @@ def setup(request):
     dt = 0.01 * ms
     tf = TraceFitter(dt=dt,
                      model=model,
-                     input_var='v',
-                     output_var='I',
-                     input=input_traces,
-                     output=output_traces,
+                     input={'v': input_traces},
+                     output={'I': output_traces},
                      n_samples=30)
 
     def fin():
@@ -254,17 +252,14 @@ def setup_multiobjective_no_units(request):
 
 
 def test_get_param_dic():
-    d = get_param_dic([1, 2], ['a', 'b'], 2, 2)
+    d = get_param_dic([{'a': 1, 'b': 2}], ['a', 'b'], 4, 1)
     assert isinstance(d, dict)
     assert_equal(d, {'a': [1, 1, 1, 1], 'b': [2, 2, 2, 2]})
 
-    d = get_param_dic([[1, 3], [2, 4]], ['a', 'b'], 1, 1)
+    d = get_param_dic([{'a': 1, 'b': 3}, {'a': 2, 'b': 4}], ['a', 'b'], 1, 2)
     assert_equal(d, {'a': [1, 2], 'b': [3, 4]})
 
-    d = get_param_dic([[1, 3], [2, 4]], ['a', 'b'], 1, 2)
-    assert_equal(d, {'a': [1, 2], 'b': [3, 4]})
-
-    d = get_param_dic([[1, 3], [2, 4]], ['a', 'b'], 2, 1)
+    d = get_param_dic([{'a': 1, 'b': 3}, {'a': 2, 'b': 4}], ['a', 'b'], 2, 2)
     assert_equal(d, {'a': [1, 1, 2, 2], 'b': [3, 3, 4, 4]})
 
 
@@ -923,12 +918,11 @@ def test_fitter_results(setup, caplog):
                               optimizer=n_opt,
                               metric=metric,
                               g=[1*nS, 30*nS],
-                              restart=False,)
+                              restart=False)
 
     params_list = tf.results(format='list')
     assert isinstance(params_list, list)
     assert isinstance(params_list[0], dict)
-    print(params_list)
     assert isinstance(params_list[0]['g'], Quantity)
     assert 'g' in params_list[0].keys()
     assert 'error' in params_list[0].keys()

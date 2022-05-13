@@ -14,7 +14,7 @@ from skopt import Optimizer as skoptOptimizer
 from sklearn.base import RegressorMixin
 warnings.filterwarnings = _filterwarnings
 
-from nevergrad import instrumentation as inst
+import nevergrad
 from nevergrad.optimization import optimizerlib, registry
 
 logger = get_logger(__name__)
@@ -168,14 +168,13 @@ class NevergradOptimizer(Optimizer):
 
         bounds = calc_bounds(parameter_names, **params)
 
-        instruments = []
-        for i, name in enumerate(parameter_names):
-            assert len(bounds[i]) == 2
-            instrumentation = inst.var.Array(1).asscalar().bounded(np.array([bounds[i][0]]),
-                                                                   np.array([bounds[i][1]]))
-            instruments.append(instrumentation)
+        parameters = {}
+        for name, bounds in zip(parameter_names, bounds):
+            assert len(bounds) == 2
+            p = nevergrad.p.Scalar(lower=float(bounds[0]), upper=float(bounds[1]))
+            parameters[name] = p
 
-        instrum = inst.Instrumentation(*instruments)
+        parametrization = nevergrad.p.Dict(**parameters)
         nevergrad_method = optimizerlib.registry[self.method]
         if nevergrad_method.no_parallelization and popsize > 1:
             logger.warn(f'Sample size {popsize} requested, but Nevergrad\'s '
@@ -186,7 +185,7 @@ class NevergradOptimizer(Optimizer):
             popsize = 1
 
         budget = rounds*popsize
-        self.optim = nevergrad_method(instrumentation=instrum,
+        self.optim = nevergrad_method(parametrization=parametrization,
                                       num_workers=popsize,
                                       budget=budget,
                                       **self.kwds)
@@ -210,12 +209,12 @@ class NevergradOptimizer(Optimizer):
         for _ in range(n_samples):
             cand = self.optim.ask()
             self.candidates.append(cand)
-            parameters.append(list(cand.args))
+            parameters.append(cand.value)
 
         return parameters
 
     def tell(self, parameters, errors):
-        if not(np.all(parameters == [list(v.args) for v in self.candidates])):
+        if not(np.all(parameters == [v.value for v in self.candidates])):
             raise AssertionError("Parameters and Candidates don't have "
                                  "identical values")
 
@@ -227,7 +226,7 @@ class NevergradOptimizer(Optimizer):
     def recommend(self):
         if self.use_nevergrad_recommendation:
             res = self.optim.provide_recommendation()
-            return res.args
+            return res.value
         else:
             best = np.argmin(self.errors)
             return self.tested_parameters[best]
