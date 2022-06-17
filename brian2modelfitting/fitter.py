@@ -68,7 +68,8 @@ def get_full_namespace(additional_namespace, level=0):
     # in principle -- by filtering things out, we avoid circular loops
     namespace = {key: value
                  for key, value in get_local_namespace(level=level + 1).items()
-                 if isinstance(value, (Quantity, numbers.Number, Function))}
+                 if (not key.startswith('_') and
+                     isinstance(value, (Quantity, numbers.Number, Function)))}
     namespace.update(additional_namespace)
 
     return namespace
