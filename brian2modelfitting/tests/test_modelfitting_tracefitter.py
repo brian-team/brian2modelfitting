@@ -367,10 +367,15 @@ def test_fitter_fit_methods(method):
                g=[1*nS, 30*nS],
                E=[-60*mV, -20*mV],
                callback=None)
-    except ImportError as ex:
+    except (ImportError, RuntimeError) as ex:
         # Skip methods that need additional packages
-        pytest.skip(f"Could not test method '{method}', raised '{str(ex)}'.")
-
+        if isinstance(ex, ImportError):
+            pytest.skip(f"Could not test method '{method}', raised '{str(ex)}'.")
+        # Import errors might be wrapped and propagated as a RuntimeError
+        elif isinstance(getattr(ex, '__cause__', None), ImportError):
+            pytest.skip(f"Could not test method '{method}', raised '{str(ex.__cause__)}'.")
+        else:
+            raise ex
 
 
 def test_fitter_fit(setup):
