@@ -184,10 +184,9 @@ class NevergradOptimizer(Optimizer):
                         name_suffix='no_parallelization')
             popsize = 1
 
-        budget = rounds*popsize
+        self.kwds['budget'] = self.kwds.get('budget', rounds*popsize)
         self.optim = nevergrad_method(parametrization=parametrization,
                                       num_workers=popsize,
-                                      budget=budget,
                                       **self.kwds)
         if hasattr(self.optim, 'llambda'):
             optimizer_pop_size = self.optim.llambda
