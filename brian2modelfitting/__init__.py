@@ -6,6 +6,7 @@ __version__ = version
 
 from .tests import run as run_test
 from .fitter import *
+from .inferencer import Inferencer
 from .optimizer import *
 from .metric import *
 from .simulator import *
@@ -16,4 +17,5 @@ __all__ = ['callback_setup', 'callback_text', 'make_dic', 'callback_none',
            'Simulator', 'RuntimeSimulator', 'CPPStandaloneSimulator',
            'MSEMetric', 'Metric', 'GammaFactor', 'FeatureMetric',
            'SpikeMetric', 'TraceMetric', 'get_gamma_factor', 'firing_rate',
-           'Fitter', 'SpikeFitter', 'TraceFitter', 'OnlineTraceFitter']
+           'Fitter', 'SpikeFitter', 'TraceFitter', 'OnlineTraceFitter',
+           'Inferencer']

@@ -1,6 +1,8 @@
 brian2
-nevergrad==0.3.0
+nevergrad>=0.4
 scikit-optimize
 scikit-learn!=0.23.0
 tqdm
-efel>=3,<4
+efel
+sbi
+torch>=1.9,<1.10

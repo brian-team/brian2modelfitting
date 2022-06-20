@@ -6,17 +6,7 @@ from numpy.testing.utils import assert_equal, assert_raises
 from brian2modelfitting import Optimizer, NevergradOptimizer, SkoptOptimizer, calc_bounds
 
 from skopt import Optimizer as SOptimizer
-from nevergrad import instrumentation as inst
-from nevergrad.optimization.base import Optimizer as NOptimzer
-from nevergrad.optimization.base import CandidateMaker
-
-
-arg1 = inst.var.Array(1).bounded(0, 1).asscalar()
-arg2 = inst.var.Array(1).bounded(0, 2).asscalar()
-arg3 = inst.var.Array(1).bounded(0, 3).asscalar()
-instrum = inst.Instrumentation(arg1, arg2, arg3)
-CM = CandidateMaker(instrum)
-
+from nevergrad.optimization.base import Optimizer as NOptimizer
 
 def test_init():
     # Optimizer()
@@ -47,11 +37,11 @@ def test_calc_bounds():
 def test_initialize_nevergrad():
     n_opt = NevergradOptimizer()
     n_opt.initialize({'g'}, g=[1, 30], popsize=30, rounds=2)
-    assert isinstance(n_opt.optim, NOptimzer)
+    assert isinstance(n_opt.optim, NOptimizer)
     assert_equal(n_opt.optim.dimension, 1)
 
     n_opt.initialize(['g', 'E'], g=[1, 30], E=[2, 20], popsize=30, rounds=2)
-    assert isinstance(n_opt.optim, NOptimzer)
+    assert isinstance(n_opt.optim, NOptimizer)
     assert_equal(n_opt.optim.dimension, 2)
 
     assert_raises(AssertionError, n_opt.initialize, ['g'], g=[1], popsize=30, rounds=2)
@@ -82,11 +72,12 @@ def test_ask_nevergrad():
 
     n_samples = np.random.randint(1, 30)
     params = n_opt.ask(n_samples)
-    assert_equal(np.shape(params), (n_samples, 3))
+    assert len(params) == n_samples
+    assert all(set(p.keys()) == {'a', 'b', 'c'} for p in params)
 
-    for i in np.arange(0, 3):
-        assert all(np.array(params)[:, i] <= i+1), 'Values in params are bigger than required'
-        assert all(np.array(params)[:, i] >= 0), 'Values in params are smaller than required'
+    for i, p_name in enumerate(['a', 'b', 'c']):
+        assert all(p[p_name] <= i+1 for p in params), 'Values in params are bigger than required'
+        assert all(p[p_name] >= 0 for p in params), 'Values in params are smaller than required'
 
 
 def test_ask_skopt():
@@ -113,9 +104,10 @@ def test_tell_nevergrad():
 
     params, candidates = [], []
     for row in data:
-        cand = CM.from_data(row)
+        values = {'a': row[0], 'b': row[1], 'c': row[2]}
+        cand = n_opt.optim.parametrization.spawn_child(values)
         candidates.append(cand)
-        params.append(list(cand.args))
+        params.append(values)
 
     n_opt.candidates = candidates
 
@@ -148,9 +140,10 @@ def test_recommend_nevergrad():
 
     params, candidates = [], []
     for row in data:
-        cand = CM.from_data(row)
+        values = {'a': row[0], 'b': row[1], 'c': row[2]}
+        cand = n_opt.optim.parametrization.spawn_child(values)
         candidates.append(cand)
-        params.append(list(cand.args))
+        params.append(values)
 
     errors = np.random.rand(n_samples)
     n_opt.candidates = candidates
@@ -158,7 +151,7 @@ def test_recommend_nevergrad():
 
     ans = n_opt.recommend()
     er_min = (errors).argmin()
-    assert_equal(params[er_min], list(ans))
+    assert_equal(params[er_min], ans)
 
 
 def test_recommend_skopt():

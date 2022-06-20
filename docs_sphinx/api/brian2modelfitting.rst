@@ -8,9 +8,10 @@ Subpackages and -modules
 
 .. toctree::
 
-   brian2modelfitting.tests
-   brian2modelfitting.metric
    brian2modelfitting.fitter
+   brian2modelfitting.inferencer
+   brian2modelfitting.metric
    brian2modelfitting.optimizer
    brian2modelfitting.simulator
+   brian2modelfitting.tests
    brian2modelfitting.utils
