@@ -1,12 +1,15 @@
+import os
+
 from brian2 import *
 from brian2modelfitting import *
 import pandas as pd
 from scipy.stats import kurtosis as kurt
 
 
-# Load input and output data traces
-df_inp_traces = pd.read_csv('input_traces_hh.csv')
-df_out_traces = pd.read_csv('output_traces_hh.csv')
+# Load Input and Output Data
+dirname = os.path.dirname(__file__)
+df_inp_traces = pd.read_csv(os.path.join(dirname, 'input_traces_hh.csv'))
+df_out_traces = pd.read_csv(os.path.join(dirname, 'output_traces_hh.csv'))
 inp_traces = df_inp_traces.to_numpy()
 inp_traces = inp_traces[[0, 1, 3, 4], 1:]
 out_traces = df_out_traces.to_numpy()

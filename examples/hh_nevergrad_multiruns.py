@@ -1,11 +1,14 @@
+import os
+
 import pandas as pd
 import numpy as np
 from brian2 import *
 from brian2modelfitting import *
 
 # Load Input and Output Data
-df_inp_traces = pd.read_csv('input_traces_hh.csv')
-df_out_traces = pd.read_csv('output_traces_hh.csv')
+dirname = os.path.dirname(__file__)
+df_inp_traces = pd.read_csv(os.path.join(dirname, 'input_traces_hh.csv'))
+df_out_traces = pd.read_csv(os.path.join(dirname, 'output_traces_hh.csv'))
 
 inp_traces = df_inp_traces.to_numpy()
 inp_traces = inp_traces[:, 1:]
