@@ -95,12 +95,10 @@ html_logo = '_static/brian-logo.png'
 
 
 # -- Extension configuration -------------------------------------------------
-intersphinx_mapping = {
-    'python': ('https://docs.python.org/', None),
-    'brian2': ('https://brian2.readthedocs.org/en/stable/', None),
-    'matplotlib': ('http://matplotlib.org/', None),
-    'numpy': ('http://docs.scipy.org/doc/numpy/', None),
-    'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
-    'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
-    'lmfit': ('https://lmfit.github.io/lmfit-py/', None),
-    }
+intersphinx_mapping = {'python': ('https://docs.python.org/', None),
+                       'brian2': ('https://brian2.readthedocs.org/en/stable/', None),
+                       'matplotlib': ('http://matplotlib.org/', None),
+                       'numpy': ('http://docs.scipy.org/doc/numpy/', None),
+                       'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
+                       'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None)
+                       }

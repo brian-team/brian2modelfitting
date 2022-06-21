@@ -2,8 +2,8 @@ brian2
 nevergrad>=0.4
 scikit-optimize
 scikit-learn!=0.23.0
-lmfit
 tqdm
 efel
 sbi
 torch>=1.9,<1.10
+pandas

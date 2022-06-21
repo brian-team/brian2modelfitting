@@ -14,8 +14,10 @@ jobs:
 
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: [3.7, 3.9]
+        latest-brian: [true, false]
 
     steps:
     - uses: actions/checkout@v2
@@ -25,9 +27,12 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install flake8 pytest-coverage coveralls lmfit
-        pip install ".[full]"
+        python -m pip install --upgrade pip wheel
+        python -m pip install flake8 pytest-coverage coveralls
+        python -m pip install -r requirements.txt
+    - name: Update to latest Brian development version
+      run: python -m pip install -i https://test.pypi.org/simple/ --pre --upgrade Brian2
+      if: ${{ matrix.latest-brian }}
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names

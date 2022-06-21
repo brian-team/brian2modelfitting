@@ -3,11 +3,8 @@ Test the modelfitting module
 '''
 import pytest
 import pandas as pd
+import scipy.optimize
 
-try:
-    import lmfit
-except ImportError:
-    lmfit = None
 from numpy.testing import assert_equal, assert_almost_equal
 from brian2 import (zeros, Equations, NeuronGroup, StateMonitor, TimedArray,
                     nS, mV, volt, ms, pA, pF, Quantity, set_device, get_device,
@@ -370,10 +367,15 @@ def test_fitter_fit_methods(method):
                g=[1*nS, 30*nS],
                E=[-60*mV, -20*mV],
                callback=None)
-    except ImportError as ex:
+    except (ImportError, RuntimeError) as ex:
         # Skip methods that need additional packages
-        pytest.skip(f"Could not test method '{method}', raised '{str(ex)}'.")
-
+        if isinstance(ex, ImportError):
+            pytest.skip(f"Could not test method '{method}', raised '{str(ex)}'.")
+        # Import errors might be wrapped and propagated as a RuntimeError
+        elif isinstance(getattr(ex, '__cause__', None), ImportError):
+            pytest.skip(f"Could not test method '{method}', raised '{str(ex.__cause__)}'.")
+        else:
+            raise ex
 
 
 def test_fitter_fit(setup):
@@ -555,7 +557,6 @@ def test_fitter_fit_penalty(setup_all_constant):
                                 penalty='penalty_wrong_unit')
 
 
-@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine(setup):
     dt, tf = setup
     results, errors = tf.fit(n_rounds=2,
@@ -565,16 +566,10 @@ def test_fitter_refine(setup):
                              callback=None)
     # Run refine after running fit
     params, result = tf.refine()
-    assert result.method == 'leastsq'
     assert isinstance(params, dict)
-    assert isinstance(result, lmfit.minimizer.MinimizerResult)
-
-    # Pass options to lmfit.minimize
-    params, result = tf.refine(method='least_squares')
-    assert result.method == 'least_squares'
+    assert isinstance(result, scipy.optimize.OptimizeResult)
 
 
-@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine_standalone(setup_standalone):
     dt, tf = setup_standalone
     results, errors = tf.fit(n_rounds=2,
@@ -584,31 +579,24 @@ def test_fitter_refine_standalone(setup_standalone):
                              callback=None)
     # Run refine after running fit
     params, result = tf.refine()
-    assert result.method == 'leastsq'
     assert isinstance(params, dict)
-    assert isinstance(result, lmfit.minimizer.MinimizerResult)
-
-    # Pass options to lmfit.minimize
-    params, result = tf.refine(method='least_squares')
-    assert result.method == 'least_squares'
+    assert isinstance(result, scipy.optimize.OptimizeResult)
 
 
-@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine_direct(setup):
     dt, tf = setup
     # Run refine without running fit before
     params, result = tf.refine({'g': 5*nS}, g=[1*nS, 30*nS])
-    error = result.chisqr
+    error = result.cost
     assert isinstance(params, dict)
-    assert isinstance(result, lmfit.minimizer.MinimizerResult)
+    assert isinstance(result, scipy.optimize.OptimizeResult)
     # The algorithm is deterministic and should therefore give the same result
     # for the second run
     params, result = tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS],
                                metric=MSEMetric(normalization=1/2))
-    assert result.chisqr == 4 * error
+    assert result.cost == 4 * error
 
 
-@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine_calc_gradient():
     tau = 5*ms
     Cm = 100*pF
@@ -651,7 +639,6 @@ def test_fitter_refine_calc_gradient():
     assert tf.simulator.neurons.equations['S_I_e_g_L'].type == DIFFERENTIAL_EQUATION
 
 
-@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine_reuse_tstart(setup_constant):
     dt, tf = setup_constant
 
@@ -666,7 +653,6 @@ def test_fitter_refine_reuse_tstart(setup_constant):
     assert np.abs(params['c'] - 20 * mV) < 1 * mV
 
 
-@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine_reuse_tstart_multiobjective(setup_constant_multiobjective):
     dt, tf = setup_constant_multiobjective
 
@@ -682,7 +668,6 @@ def test_fitter_refine_reuse_tstart_multiobjective(setup_constant_multiobjective
     assert np.abs(params['c'] - 17.5 * mV) < 1 * mV
 
 
-@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine_reuse_tsteps(setup_constant):
     dt, tf = setup_constant
     weights = np.ones(100)
@@ -698,7 +683,6 @@ def test_fitter_refine_reuse_tsteps(setup_constant):
     assert np.abs(params['c'] - 20 * mV) < 1 * mV
 
 
-@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine_reuse_tsteps_multiobjective(setup_constant_multiobjective):
     dt, tf = setup_constant_multiobjective
     weights = np.ones(100)
@@ -716,7 +700,6 @@ def test_fitter_refine_reuse_tsteps_multiobjective(setup_constant_multiobjective
     assert np.abs(params['c'] - 17.5 * mV) < 1 * mV
 
 
-@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_refine_errors(setup):
     dt, tf = setup
     with pytest.raises(TypeError):
@@ -736,7 +719,6 @@ def test_fitter_refine_errors(setup):
         tf.refine({'g': 5*nS}, g=[1*nS, 30*nS], metric=metric)
 
 
-@pytest.mark.skipif(lmfit is None, reason="needs lmfit package")
 def test_fitter_callback(setup, caplog):
     dt, tf = setup
 
@@ -752,25 +734,6 @@ def test_fitter_callback(setup, caplog):
         assert isinstance(additional_info, dict)
 
     tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS], callback=our_callback)
-    assert len(calls)
-
-    # Use scipy's iter_cb instead of our callback mechanism
-
-    calls = []
-    def iter_cb(params, iter, resid, *args, **kws):
-        calls.append(iter)
-        assert isinstance(params, lmfit.Parameters)
-        assert isinstance(iter, int)
-        assert isinstance(resid, np.ndarray)
-
-    tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS], iter_cb=iter_cb)
-    assert len(caplog.records) == 1
-    assert len(calls)
-
-    calls.clear()
-    tf.refine({'g': 5 * nS}, g=[1 * nS, 30 * nS], iter_cb=iter_cb,
-              callback=None)
-    assert len(caplog.records) == 1  # no additional warning
     assert len(calls)
 
 
