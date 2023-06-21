@@ -129,9 +129,10 @@ class NevergradOptimizer(Optimizer):
         List/Dict of strings with parameters to be used as instruments.
     bounds: `list`
         List with appropriate bounds for each parameter.
-    method: `str`, optional
+    method: `str` or callable, optional
         The optimization method. By default differential evolution, can be
-        chosen from any method in Nevergrad registry
+        chosen by name from any method in Nevergrad registry. Alternatively,
+        a callable object can be provided.
     use_nevergrad_recommendation: bool, optional
         Whether to use Nevergrad's recommendation as the "best result". This
         recommendation takes several evaluations of the same parameters (for
@@ -175,7 +176,11 @@ class NevergradOptimizer(Optimizer):
             parameters[name] = p
 
         parametrization = nevergrad.p.Dict(**parameters)
-        nevergrad_method = optimizerlib.registry[self.method]
+        if callable(self.method):
+            nevergrad_method = self.method
+        else:
+            nevergrad_method = optimizerlib.registry[self.method]
+
         if nevergrad_method.no_parallelization and popsize > 1:
             logger.warn(f'Sample size {popsize} requested, but Nevergrad\'s '
                         f'\'{self.method}\' algorithm does not support '
