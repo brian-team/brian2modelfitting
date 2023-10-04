@@ -1,0 +1,61 @@
+[project]
+name = "brian2modelfitting"
+version = "0.5.dev0"  # TODO: use setuptools_scm
+authors = [
+    {name = 'Aleksandra Teska'},
+    {name = 'Ante Kapetanovic'},
+    {name = 'Marcel Stimberg'},
+    {name ='Romain Brette'}
+]
+requires-python = '>=3.7'
+dependencies = [
+    'numpy>=1.21',
+    'brian2>=2.2',
+    'tqdm',
+    'pandas',
+]
+dynamic = ["readme"]
+description = 'Modelfitting Toolbox for the Brian 2 simulator'
+keywords = ['computational neuroscience', 'model fitting', 'brian2']
+classifiers = [
+    'Development Status :: 4 - Beta',
+    'Intended Audience :: Science/Research',
+    'License :: OSI Approved :: CEA CNRS Inria Logiciel Libre License, version 2.1 (CeCILL-2.1)',
+    'Natural Language :: English',
+    'Operating System :: OS Independent',
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3',
+    'Topic :: Scientific/Engineering :: Bio-Informatics'
+]
+
+[project.optional-dependencies]
+test = ['pytest']
+docs = ['sphinx>=1.8']
+nevergrad = ['pytest', 'pytest-xdist>=1.22.3']
+skopt = ['scikit-optimize']
+efel = ['efel']
+sbi = ['sbi>=0.16.0', 'torch>=1.9,<1.10']
+all = ['brian2modelfitting[test]',
+       'brian2modelfitting[docs]',
+       'brian2modelfitting[nevergrad]',
+       'brian2modelfitting[skopt]',
+       'brian2modelfitting[efel]',
+       'brian2modelfitting[sbi]'
+]
+
+[project.urls]
+Documentation ='https://brian2modelfitting.readthedocs.io/'
+Source = 'https://github.com/brian-team/brian2modelfitting'
+Tracker = 'https://github.com/brian-team/brian2modelfitting/issues'
+
+[tool.setuptools]
+packages = ['brian2modelfitting']
+
+[tool.setuptools.dynamic]
+readme = {file = 'README.md', content-type = "text/markdown"}
+
+[build-system]
+requires = [
+    "setuptools>=61",
+]
+build-backend = "setuptools.build_meta"
