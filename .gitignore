@@ -80,6 +80,7 @@ target/
 
 # Installation and auto-generated files
 brian2modelfitting.egg-info
+brian2modelfitting/_version.py
 
 # sbi logs
 examples/sbi-logs/
