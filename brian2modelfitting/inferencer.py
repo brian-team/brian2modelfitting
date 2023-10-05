@@ -142,8 +142,8 @@ def calc_prior(param_names, **params):
     prior_min = []
     prior_max = []
     for param_name in param_names:
-        prior_min.append(min(params[param_name]).item())
-        prior_max.append(max(params[param_name]).item())
+        prior_min.append(float(min(params[param_name])))
+        prior_max.append(float(max(params[param_name])))
     prior = BoxUniform(low=torch.as_tensor(prior_min),
                        high=torch.as_tensor(prior_max))
     return prior
