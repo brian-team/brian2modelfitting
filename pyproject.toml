@@ -10,6 +10,7 @@ requires-python = '>=3.8'
 dependencies = [
     'numpy>=1.21',
     'brian2>=2.2',
+    'nevergrad>=0.4',
     'tqdm',
     'pandas',
 ]
@@ -30,13 +31,11 @@ classifiers = [
 [project.optional-dependencies]
 test = ['pytest']
 docs = ['sphinx>=1.8']
-nevergrad = ['pytest', 'pytest-xdist>=1.22.3']
 skopt = ['scikit-optimize']
 efel = ['efel']
 sbi = ['sbi>=0.16.0']
 all = ['brian2modelfitting[test]',
        'brian2modelfitting[docs]',
-       'brian2modelfitting[nevergrad]',
        'brian2modelfitting[skopt]',
        'brian2modelfitting[efel]',
        'brian2modelfitting[sbi]'
