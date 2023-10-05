@@ -6,7 +6,7 @@ authors = [
     {name = 'Marcel Stimberg'},
     {name ='Romain Brette'}
 ]
-requires-python = '>=3.7'
+requires-python = '>=3.8'
 dependencies = [
     'numpy>=1.21',
     'brian2>=2.2',
