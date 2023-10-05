@@ -2,7 +2,7 @@
 Test the optimizer class
 '''
 import numpy as np
-from numpy.testing.utils import assert_equal, assert_raises
+from numpy.testing import assert_equal, assert_raises
 from brian2modelfitting import Optimizer, NevergradOptimizer, SkoptOptimizer, calc_bounds
 
 from skopt import Optimizer as SOptimizer

@@ -3,7 +3,7 @@ Test the modelfitting module
 '''
 import pytest
 import numpy as np
-from numpy.testing.utils import assert_equal
+from numpy.testing import assert_equal
 from brian2 import (Equations, NeuronGroup, SpikeMonitor, TimedArray,
                     nS, nF, mV, ms, nA, amp, run)
 from brian2modelfitting import (NevergradOptimizer, SpikeFitter, GammaFactor,
