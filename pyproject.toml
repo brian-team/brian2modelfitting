@@ -31,11 +31,17 @@ classifiers = [
 [project.optional-dependencies]
 test = ['pytest']
 docs = ['sphinx>=1.8']
+algos = [  # additional optimizers for nevergrad
+         'cma>=3.0', 'fcmaes', 'loguru',  # loguru seems to be an undeclared dependency of fcmaes
+         'nlopt',
+         'poap',
+         'ConfigSpace']
 skopt = ['scikit-optimize']
 efel = ['efel']
 sbi = ['sbi>=0.16.0']
 all = ['brian2modelfitting[test]',
        'brian2modelfitting[docs]',
+       'brian2modelfitting[algos]',
        'brian2modelfitting[skopt]',
        'brian2modelfitting[efel]',
        'brian2modelfitting[sbi]'
