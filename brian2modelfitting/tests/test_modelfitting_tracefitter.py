@@ -354,8 +354,9 @@ def test_fitter_fit_methods(method):
                      input=input_traces,
                      output=output_traces,
                      n_samples=30)
-    # Skip all BO methods for now, also skip ParaPortfolio (TODO: check what is going on)
-    if 'BO' in method or 'ParaPortfolio' in method:
+    # Skip a few methods that seem to hang due to multi-threading deadlocks (?) or simply take very long
+    skip = ['BO', 'ParaPortfolio', 'BAR', 'MultiBFGS', 'MultiCobyla', 'MultiSQP', 'NgIohRW']
+    if any(s in method for s in skip):
         pytest.skip(f'Skipping method {method}')
 
     try:
