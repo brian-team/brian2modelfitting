@@ -3,8 +3,6 @@ from brian2.devices.device import reinit_devices
 from brian2modelfitting.inferencer import (Inferencer,
                                            get_param_dict,
                                            calc_prior)
-from sbi.inference.posteriors.direct_posterior import DirectPosterior
-
 import numpy as np
 from numpy.testing import assert_equal, assert_almost_equal
 import pytest
@@ -309,6 +307,8 @@ def test_init_inference_errors(setup):
 
 
 def test_infer_step(setup_full):
+    from sbi.inference.posteriors.direct_posterior import DirectPosterior
+
     dt, inferencer = setup_full
     prior = inferencer.init_prior(g=[1*nS, 100*nS])
     inference = inferencer.init_inference(inference_method='SNPE',

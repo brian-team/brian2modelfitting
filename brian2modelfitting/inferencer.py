@@ -1,3 +1,6 @@
+"""
+Module to perform simulation-based inference with the ``sbi`` library.
+"""
 from numbers import Number
 from typing import Mapping
 import warnings
@@ -19,20 +22,32 @@ from brian2.units.fundamentalunits import (DIMENSIONLESS,
 from brian2.utils.logger import get_logger
 from brian2modelfitting.fitter import get_spikes
 import numpy as np
-from sbi.utils.get_nn_models import (posterior_nn,
-                                     likelihood_nn,
-                                     classifier_nn)
-from sbi.utils.torchutils import BoxUniform
-from sbi.inference.posteriors.direct_posterior import DirectPosterior
-import sbi.analysis
-import sbi.inference
-import torch
+try:
+    import sbi
+    import torch
+except ImportError:
+    sbi = None
+    torch = None
+# from sbi.utils.get_nn_models import (posterior_nn,
+#                                      likelihood_nn,
+#                                      classifier_nn)
+# from sbi.utils.torchutils import BoxUniform
+# from sbi.inference.posteriors.direct_posterior import DirectPosterior
+# import sbi.analysis
+# import sbi.inference
+# import torch
 
 from .simulator import RuntimeSimulator, CPPStandaloneSimulator
 from .utils import tqdm
 
 
 logger = get_logger(__name__)
+
+
+def _check_sbi():
+    if sbi is None:
+        raise ImportError("Simulation-based inference requires the"
+                          " `sbi` library to be installed.")
 
 
 def configure_simulator():
@@ -136,6 +151,7 @@ def calc_prior(param_names, **params):
         ``sbi``-compatible object that contains a uniform prior
         distribution over a given set of parameters.
     """
+    _check_sbi()
     for param_name in param_names:
         if param_name not in params:
             raise TypeError(f'Bounds must be set for parameter {param_name}')
@@ -144,8 +160,8 @@ def calc_prior(param_names, **params):
     for param_name in param_names:
         prior_min.append(float(min(params[param_name])))
         prior_max.append(float(max(params[param_name])))
-    prior = BoxUniform(low=torch.as_tensor(prior_min),
-                       high=torch.as_tensor(prior_max))
+    prior = sbi.utils.torchutils.BoxUniform(low=torch.as_tensor(prior_min),
+                                            high=torch.as_tensor(prior_max))
     return prior
 
 
@@ -211,6 +227,7 @@ class Inferencer(object):
     def __init__(self, dt, model, input, output, features=None, method=None,
                  threshold=None, reset=None, refractory=False,
                  param_init=None):
+        _check_sbi()
         # time scale
         self.dt = dt
 
@@ -635,6 +652,9 @@ class Inferencer(object):
         sbi.inference.NeuralInference
             Instantiated inference object.
         """
+        from sbi.utils.get_nn_models import (posterior_nn,
+                                             likelihood_nn,
+                                             classifier_nn)
         try:
             inference_method = str.upper(inference_method)
             inference_method_fun = getattr(sbi.inference, inference_method)
@@ -858,6 +878,8 @@ class Inferencer(object):
         sbi.inference.posteriors.base_posterior.NeuralPosterior
             Approximated posterior distribution over parameters.
         """
+        from sbi.inference.posteriors.direct_posterior import DirectPosterior
+
         if restart:
             self.posterior = None
         if self.posterior is None:
