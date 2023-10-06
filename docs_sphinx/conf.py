@@ -24,14 +24,14 @@ brian2modelfitting_dir = os.path.abspath(os.path.join(
 # -- Project information -----------------------------------------------------
 
 project = 'brian2modelfitting'
-copyright = '2019, brian-team'
+copyright = '2019--, brian-team'
 author = 'brian-team'
 
 # The full version, including alpha/beta/rc tags
-pkg_version = {}
-with open(os.path.join(brian2modelfitting_dir, 'version.py')) as fp:
-    exec(fp.read(), pkg_version)
-release = pkg_version['version']
+from importlib.metadata import version as get_version
+release: str = get_version('brian2modelfitting')
+version: str = ".".join(release.split('.')[:2])
+
 
 # -- General configuration ---------------------------------------------------
 
