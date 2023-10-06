@@ -147,11 +147,12 @@ def calc_prior(param_names, **params):
 
     Return
     ------
-    sbi.utils.torchutils.BoxUniform
+    sbi.utils.BoxUniform
         ``sbi``-compatible object that contains a uniform prior
         distribution over a given set of parameters.
     """
     _check_sbi()
+    from sbi.utils import BoxUniform
     for param_name in param_names:
         if param_name not in params:
             raise TypeError(f'Bounds must be set for parameter {param_name}')
@@ -160,8 +161,8 @@ def calc_prior(param_names, **params):
     for param_name in param_names:
         prior_min.append(float(min(params[param_name])))
         prior_max.append(float(max(params[param_name])))
-    prior = sbi.utils.torchutils.BoxUniform(low=torch.as_tensor(prior_min),
-                                            high=torch.as_tensor(prior_max))
+    prior = BoxUniform(low=torch.as_tensor(prior_min),
+                       high=torch.as_tensor(prior_max))
     return prior
 
 
@@ -1126,13 +1127,14 @@ class Inferencer(object):
                 if param_name not in self.param_names:
                     raise AttributeError(f'Invalid parameter: {param_name}')
             labels = [labels[param_name] for param_name in self.param_names]
-        fig, axes = sbi.analysis.pairplot(samples=s,
-                                          points=points,
-                                          limits=limits,
-                                          subset=subset,
-                                          labels=labels,
-                                          ticks=ticks,
-                                          **kwargs)
+        from sbi.analysis import pairplot
+        fig, axes = pairplot(samples=s,
+                             points=points,
+                             limits=limits,
+                             subset=subset,
+                             labels=labels,
+                             ticks=ticks,
+                             **kwargs)
         return fig, axes
 
     def conditional_pairplot(self, condition, density=None, points=None,
