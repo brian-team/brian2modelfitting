@@ -29,6 +29,23 @@ Install `brian2modelfitting` from the Python package index via pip:
 pip install brian2modelfitting
 ```
 
+The basic install only supports the optimization methods provided by the `Nevergrad` library. To install additional
+algorithms, support for simulation-based inference, and other features, you can install the optional dependencies:
+
+| extra   | description                                                                           | install command                           |
+|---------|---------------------------------------------------------------------------------------|-------------------------------------------|
+| `sbi`   | simulation-based inference with [`sbi`](https://www.mackelab.org/sbi/)                | `pip install 'brian2modelfitting[sbi]'`   |
+| `skopt` | optimization with [`sckikit-optimize`](https://scikit-optimize.github.io/)            | `pip install 'brian2modelfitting[skopt]'` |
+| `algos` | additional algorithms for `Nevergrad`                                                 | `pip install 'brian2modelfitting[algos]'` |
+| `efel`  | `FeatureMetric` with [`eFEL`](https://efel.readthedocs.io) electrophysiology features | `pip install 'brian2modelfitting[efel]'`  |
+| `test`  | framework to run the test suite                                                       | `pip install 'brian2modelfitting[test]'`  |
+| `docs`  | framework to build the documentation                                                  | `pip install 'brian2modelfitting[docs]'`  |
+| `all`   | all of the above dependencies                                                         | `pip install 'brian2modelfitting[all]'`   |
+
+
+```
+
+
 License
 -------
 The model fitting toolbox is released under the terms of the CeCILL 2.1 license and is available [here](https://github.com/brian-team/brian2modelfitting/blob/master/LICENSE).
