@@ -653,6 +653,7 @@ class Inferencer(object):
         sbi.inference.NeuralInference
             Instantiated inference object.
         """
+        import sbi.inference
         from sbi.utils.get_nn_models import (posterior_nn,
                                              likelihood_nn,
                                              classifier_nn)
