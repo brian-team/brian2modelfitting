@@ -2,18 +2,21 @@
 Test the optimizer class
 '''
 import numpy as np
-from numpy.testing.utils import assert_equal, assert_raises
-from brian2modelfitting import Optimizer, NevergradOptimizer, SkoptOptimizer, calc_bounds
+from numpy.testing import assert_equal, assert_raises
+from brian2modelfitting import NevergradOptimizer, SkoptOptimizer, calc_bounds
 
-from skopt import Optimizer as SOptimizer
 from nevergrad.optimization.base import Optimizer as NOptimizer
+try:
+    import skopt
+except ImportError:
+    skopt = None
 
-def test_init():
-    # Optimizer()
+def test_init_nevergrad():
     NevergradOptimizer()
-    SkoptOptimizer()
-
     NevergradOptimizer(method='DE')
+
+def test_init_skopt():
+    SkoptOptimizer()
     SkoptOptimizer(method='GP')
 
 
@@ -51,13 +54,14 @@ def test_initialize_nevergrad():
 
 
 def test_initialize_skopt():
+    assert skopt is not None
     s_opt = SkoptOptimizer()
     s_opt.initialize({'g'}, g=[1, 30], popsize=30, rounds=2)
-    assert isinstance(s_opt.optim, SOptimizer)
+    assert isinstance(s_opt.optim, skopt.Optimizer)
     assert_equal(len(s_opt.optim.space.dimensions), 1)
 
     s_opt.initialize({'g', 'E'}, g=[1, 30], E=[2, 20], popsize=30, rounds=2)
-    assert isinstance(s_opt.optim, SOptimizer)
+    assert isinstance(s_opt.optim, skopt.Optimizer)
     assert_equal(len(s_opt.optim.space.dimensions), 2)
 
     assert_raises(TypeError, s_opt.initialize, ['g'], g=[1], popsize=30)

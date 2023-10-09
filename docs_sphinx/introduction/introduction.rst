@@ -34,6 +34,23 @@ To install the toolbox alongside Brian 2 simulator, use ``pip`` as follows:
 
   pip install brian2modelfitting
 
++----------+---------------------------------------------------------------------------------------+--------------------------------------------+
+| extra    | description                                                                           | install command                            |
++==========+=======================================================================================+============================================+
+| ``sbi``  | simulation-based inference with `sbi <https://www.mackelab.org/sbi/>`_                | ``pip install 'brian2modelfitting[sbi]'``  |
++----------+---------------------------------------------------------------------------------------+--------------------------------------------+
+| ``skopt``| optimization with `sckikit-optimize <https://scikit-optimize.github.io>`_             | ``pip install 'brian2modelfitting[skopt]'``|
++----------+---------------------------------------------------------------------------------------+--------------------------------------------+
+| ``algos``| additional algorithms for ``Nevergrad``                                               | ``pip install 'brian2modelfitting[algos]'``|
++----------+---------------------------------------------------------------------------------------+--------------------------------------------+
+| ``efel`` | `FeatureMetric` with `eFEL <https://efel.readthedocs.io>`_ electrophysiology features | ``pip install 'brian2modelfitting[efel]'`` |
++----------+---------------------------------------------------------------------------------------+--------------------------------------------+
+| ``test`` | framework to run the test suite                                                       | ``pip install 'brian2modelfitting[test]'`` |
++----------+---------------------------------------------------------------------------------------+--------------------------------------------+
+| ``docs`` | framework to build the documentation                                                  | ``pip install 'brian2modelfitting[docs]'`` |
++----------+---------------------------------------------------------------------------------------+--------------------------------------------+
+| ``all``  | all of the above dependencies                                                         | ``pip install 'brian2modelfitting[all]'``  |
++----------+---------------------------------------------------------------------------------------+--------------------------------------------+
 
 Testing Model Fitting
 ---------------------

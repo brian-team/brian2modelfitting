@@ -4,7 +4,7 @@ Test the metric class
 import pytest
 
 import numpy as np
-from numpy.testing.utils import assert_equal, assert_raises, assert_almost_equal
+from numpy.testing import assert_equal, assert_raises, assert_almost_equal
 from brian2 import ms, mV
 from brian2.units.fundamentalunits import DimensionMismatchError
 from brian2modelfitting import (FeatureMetric, MSEMetric, GammaFactor,

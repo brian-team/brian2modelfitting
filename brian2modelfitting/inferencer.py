@@ -1,3 +1,6 @@
+"""
+Module to perform simulation-based inference with the ``sbi`` library.
+"""
 from numbers import Number
 from typing import Mapping
 import warnings
@@ -19,20 +22,32 @@ from brian2.units.fundamentalunits import (DIMENSIONLESS,
 from brian2.utils.logger import get_logger
 from brian2modelfitting.fitter import get_spikes
 import numpy as np
-from sbi.utils.get_nn_models import (posterior_nn,
-                                     likelihood_nn,
-                                     classifier_nn)
-from sbi.utils.torchutils import BoxUniform
-from sbi.inference.posteriors.direct_posterior import DirectPosterior
-import sbi.analysis
-import sbi.inference
-import torch
+try:
+    import sbi
+    import torch
+except ImportError:
+    sbi = None
+    torch = None
+# from sbi.utils.get_nn_models import (posterior_nn,
+#                                      likelihood_nn,
+#                                      classifier_nn)
+# from sbi.utils.torchutils import BoxUniform
+# from sbi.inference.posteriors.direct_posterior import DirectPosterior
+# import sbi.analysis
+# import sbi.inference
+# import torch
 
 from .simulator import RuntimeSimulator, CPPStandaloneSimulator
 from .utils import tqdm
 
 
 logger = get_logger(__name__)
+
+
+def _check_sbi():
+    if sbi is None:
+        raise ImportError("Simulation-based inference requires the"
+                          " `sbi` library to be installed.")
 
 
 def configure_simulator():
@@ -132,18 +147,20 @@ def calc_prior(param_names, **params):
 
     Return
     ------
-    sbi.utils.torchutils.BoxUniform
+    sbi.utils.BoxUniform
         ``sbi``-compatible object that contains a uniform prior
         distribution over a given set of parameters.
     """
+    _check_sbi()
+    from sbi.utils import BoxUniform
     for param_name in param_names:
         if param_name not in params:
             raise TypeError(f'Bounds must be set for parameter {param_name}')
     prior_min = []
     prior_max = []
     for param_name in param_names:
-        prior_min.append(min(params[param_name]).item())
-        prior_max.append(max(params[param_name]).item())
+        prior_min.append(float(min(params[param_name])))
+        prior_max.append(float(max(params[param_name])))
     prior = BoxUniform(low=torch.as_tensor(prior_min),
                        high=torch.as_tensor(prior_max))
     return prior
@@ -211,6 +228,7 @@ class Inferencer(object):
     def __init__(self, dt, model, input, output, features=None, method=None,
                  threshold=None, reset=None, refractory=False,
                  param_init=None):
+        _check_sbi()
         # time scale
         self.dt = dt
 
@@ -635,6 +653,10 @@ class Inferencer(object):
         sbi.inference.NeuralInference
             Instantiated inference object.
         """
+        import sbi.inference
+        from sbi.utils.get_nn_models import (posterior_nn,
+                                             likelihood_nn,
+                                             classifier_nn)
         try:
             inference_method = str.upper(inference_method)
             inference_method_fun = getattr(sbi.inference, inference_method)
@@ -858,6 +880,8 @@ class Inferencer(object):
         sbi.inference.posteriors.base_posterior.NeuralPosterior
             Approximated posterior distribution over parameters.
         """
+        from sbi.inference.posteriors.direct_posterior import DirectPosterior
+
         if restart:
             self.posterior = None
         if self.posterior is None:
@@ -1078,8 +1102,8 @@ class Inferencer(object):
                 if len(lim_vals) != 2:
                     raise ValueError('Invalid limits for parameter: '
                                      f'{param_name}')
-            limits = [[limits[param_name][0].item(),
-                       limits[param_name][1].item()]
+            limits = [[float(limits[param_name][0]),
+                       float(limits[param_name][1])]
                       for param_name in self.param_names]
         if subset:
             for param_name in subset:
@@ -1094,8 +1118,8 @@ class Inferencer(object):
                 if len(lim_vals) != 2:
                     raise ValueError('Invalid limits for parameter: '
                                      f'{param_name}')
-            ticks = [[ticks[param_name][0].item(),
-                      ticks[param_name][1].item()]
+            ticks = [[float(ticks[param_name][0]),
+                      float(ticks[param_name][1])]
                      for param_name in self.param_names]
         else:
             ticks = []
@@ -1104,13 +1128,14 @@ class Inferencer(object):
                 if param_name not in self.param_names:
                     raise AttributeError(f'Invalid parameter: {param_name}')
             labels = [labels[param_name] for param_name in self.param_names]
-        fig, axes = sbi.analysis.pairplot(samples=s,
-                                          points=points,
-                                          limits=limits,
-                                          subset=subset,
-                                          labels=labels,
-                                          ticks=ticks,
-                                          **kwargs)
+        from sbi.analysis import pairplot
+        fig, axes = pairplot(samples=s,
+                             points=points,
+                             limits=limits,
+                             subset=subset,
+                             labels=labels,
+                             ticks=ticks,
+                             **kwargs)
         return fig, axes
 
     def conditional_pairplot(self, condition, density=None, points=None,
@@ -1183,12 +1208,12 @@ class Inferencer(object):
                 if len(lim_vals) != 2:
                     raise ValueError('Invalid limits for parameter: '
                                      f'{param_name}')
-            limits = [[limits[param_name][0].item(),
-                       limits[param_name][1].item()]
+            limits = [[float(limits[param_name][0]),
+                       float(limits[param_name][1])]
                       for param_name in self.param_names]
         else:
-            limits = [[self.params[param_name][0].item(),
-                       self.params[param_name][1].item()]
+            limits = [[float(self.params[param_name][0]),
+                       float(self.params[param_name][1])]
                       for param_name in self.param_names]
         if subset:
             for param_name in subset:
@@ -1203,8 +1228,8 @@ class Inferencer(object):
                 if len(lim_vals) != 2:
                     raise ValueError('Invalid limits for parameter: '
                                      f'{param_name}')
-            ticks = [[ticks[param_name][0].item(),
-                      ticks[param_name][1].item()]
+            ticks = [[float(ticks[param_name][0]),
+                      float(ticks[param_name][1])]
                      for param_name in self.param_names]
         else:
             ticks = []
@@ -1213,14 +1238,15 @@ class Inferencer(object):
                 if param_name not in self.param_names:
                     raise AttributeError(f'Invalid parameter: {param_name}')
             labels = [labels[param_name] for param_name in self.param_names]
-        fig, axes = sbi.analysis.conditional_pairplot(density=d,
-                                                      condition=condition,
-                                                      limits=limits,
-                                                      points=points,
-                                                      subset=subset,
-                                                      labels=labels,
-                                                      ticks=ticks,
-                                                      **kwargs)
+        from sbi.analysis import conditional_pairplot
+        fig, axes = conditional_pairplot(density=d,
+                                         condition=condition,
+                                         limits=limits,
+                                         points=points,
+                                         subset=subset,
+                                         labels=labels,
+                                         ticks=ticks,
+                                         **kwargs)
         return fig, axes
 
     def conditional_corrcoeff(self, condition, density=None, limits=None,
@@ -1281,12 +1307,12 @@ class Inferencer(object):
                 if len(lim_vals) != 2:
                     raise ValueError('Invalid limits for parameter: '
                                      f'{param_name}')
-            limits = [[limits[param_name][0].item(),
-                       limits[param_name][1].item()]
+            limits = [[float(limits[param_name][0]),
+                       float(limits[param_name][1])]
                       for param_name in self.param_names]
         else:
-            limits = [[self.params[param_name][0].item(),
-                       self.params[param_name][1].item()]
+            limits = [[float(self.params[param_name][0]),
+                       float(self.params[param_name][1])]
                       for param_name in self.param_names]
         limits = torch.tensor(limits)
         if subset:
@@ -1295,11 +1321,12 @@ class Inferencer(object):
                     raise AttributeError(f'Invalid parameter: {param_name}')
             subset = [self.param_names.index(param_name)
                       for param_name in subset]
-        cond_coeff = sbi.analysis.conditional_corrcoeff(density=d,
-                                                        limits=limits,
-                                                        condition=condition,
-                                                        subset=subset,
-                                                        **kwargs)
+        from sbi.analysis import conditional_corrcoeff
+        cond_coeff = conditional_corrcoeff(density=d,
+                                           limits=limits,
+                                           condition=condition,
+                                           subset=subset,
+                                           **kwargs)
         return cond_coeff.numpy()
 
     def generate_traces(self, n_samples=1, posterior=None, output_var=None,

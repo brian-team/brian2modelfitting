@@ -3,7 +3,7 @@ Test the simulation class - runtime
 '''
 import pytest
 import numpy as np
-from numpy.testing.utils import assert_equal, assert_raises
+from numpy.testing import assert_equal, assert_raises
 from brian2 import (Equations, NeuronGroup, StateMonitor, Network, ms,
                     start_scope, mV)
 from brian2.devices.device import Dummy

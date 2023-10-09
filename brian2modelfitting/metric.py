@@ -5,12 +5,18 @@ from collections import defaultdict
 try:
     import efel
 except ImportError:
-    warnings.warn('eFEL package not found.')
+    efel = None
 from itertools import repeat
 from brian2 import Hz, second, Quantity, ms, us, get_dimensions, mV
 from brian2.units.fundamentalunits import check_units, in_unit, DIMENSIONLESS
 from numpy import (array, sum, abs, amin, digitize, rint, arange, inf, NaN,
                    clip, mean)
+
+
+def _check_efel():
+    if efel is None:
+        raise ImportError("Using FeatureMetric requires the `efel` "
+                          "package to be installed.")
 
 
 def firing_rate(spikes):
@@ -96,6 +102,7 @@ def get_gamma_factor(model, data, delta, time, dt, rate_correction=True):
 
 
 def calc_eFEL(traces, inp_times, feat_list, dt):
+    _check_efel()
     out_traces = []
     for i, trace in enumerate(traces):
         time = arange(0, len(trace))*dt/ms
@@ -480,6 +487,7 @@ class MSEMetric(TraceMetric):
 class FeatureMetric(TraceMetric):
     def __init__(self, stim_times, feat_list, weights=None, combine=None,
                  t_start=0*second, normalization=1.):
+        _check_efel()
         super(FeatureMetric, self).__init__(t_start=t_start,
                                             normalization=normalization)
         self.stim_times = stim_times

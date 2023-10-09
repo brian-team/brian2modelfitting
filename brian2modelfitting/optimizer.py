@@ -1,23 +1,25 @@
 import abc
 import numpy as np
-import warnings
+import sklearn
+
+try:
+    import skopt
+except ImportError:
+    skopt = None
 
 from brian2.utils.logger import get_logger
-
-# Prevent sklearn from adding a filter by monkey-patching the warnings module
-# TODO: Remove when we depend on a newer version of scikit-learn (with
-#       https://github.com/scikit-learn/scikit-learn/pull/15080 merged)
-_filterwarnings = warnings.filterwarnings
-warnings.filterwarnings = lambda *args, **kwds: None
-from skopt.space import Real
-from skopt import Optimizer as skoptOptimizer
-from sklearn.base import RegressorMixin
-warnings.filterwarnings = _filterwarnings
 
 import nevergrad
 from nevergrad.optimization import optimizerlib, registry
 
 logger = get_logger(__name__)
+
+
+def _check_skopt():
+    if skopt is None:
+        raise ImportError("The SkoptOptimizer requires the `scikit-optimize` "
+                          "library to be installed.")
+
 
 def calc_bounds(parameter_names, **params):
     """
@@ -254,9 +256,10 @@ class SkoptOptimizer(Optimizer):
         Number of calls to ``func``. Defaults to 100.
     """
     def __init__(self, method='GP', **kwds):
+        _check_skopt()
         super(Optimizer, self).__init__()
         if not(method.upper() in ["GP", "RF", "ET", "GBRT"] or
-               isinstance(method, RegressorMixin)):
+               isinstance(method, sklearn.base.RegressorMixin)):
             raise AssertionError("Provided method: {} is not an skopt "
                                  "optimization or a regressor".format(method))
 
@@ -277,10 +280,10 @@ class SkoptOptimizer(Optimizer):
 
         instruments = []
         for i, name in enumerate(parameter_names):
-            instrumentation = Real(*np.asarray(bounds[i]), transform='normalize')
+            instrumentation = skopt.space.Real(*np.asarray(bounds[i]), transform='normalize')
             instruments.append(instrumentation)
 
-        self.optim = skoptOptimizer(
+        self.optim = skopt.Optimizer(
             dimensions=instruments,
             base_estimator=self.method,
             **self.kwds)

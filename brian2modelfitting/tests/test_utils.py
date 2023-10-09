@@ -3,9 +3,9 @@ Test the modelfitting utils
 '''
 import tqdm
 from brian2modelfitting import (callback_text, callback_setup, make_dic,
-                               callback_none)
+                                callback_none)
 from brian2modelfitting.utils import ProgressBar
-from numpy.testing.utils import assert_equal
+from numpy.testing import assert_equal
 
 
 def test_callback_text(capsys):
