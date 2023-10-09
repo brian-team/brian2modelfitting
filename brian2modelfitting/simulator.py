@@ -1,7 +1,7 @@
 import os
 import abc
 from numpy import atleast_1d
-from brian2 import device, Network
+from brian2 import device, Network, StateMonitor, SpikeMonitor
 
 
 def initialize_parameter(variableview, value):
@@ -59,6 +59,35 @@ class Simulator(metaclass=abc.ABCMeta):
     neurons = property(lambda self: self.networks[self.current_net]['neurons'])
     statemonitor = property(lambda self: self.networks[self.current_net]['statemonitor'])
     spikemonitor = property(lambda self: self.networks[self.current_net]['spikemonitor'])
+
+    def setup(self, network_name, neurons, record_vars, param_init, dt, record_spikes=False):
+        """
+        Basic setup for the simulation.
+
+        Parameters
+        ----------
+        network_name : str
+            Name of the network
+        neurons : `~brian2.groups.neurongroup.NeuronGroup`
+            The ``NeuronGroup`` to be simulated
+        record_vars : list[str]
+            Names of the variables to be recorded
+        param_init : dict
+            Dictionary of initial values for the parameters
+        dt : `~brian2.units.fundamentalunits.Quantity`
+            Time step of the simulation
+        record_spikes : bool, optional
+            Whether to record spikes or not (default: False)
+        """
+        network = Network(neurons)
+        if record_spikes:
+            network.add(SpikeMonitor(neurons, name='spikemonitor'))
+
+        if len(record_vars):
+            network.add(StateMonitor(neurons, record_vars, record=True,
+                                     name='statemonitor', dt=dt))
+
+        self.initialize(network, param_init, name=network_name)
 
     def initialize(self, network, var_init, name='fit'):
         """

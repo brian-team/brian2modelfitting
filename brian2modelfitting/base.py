@@ -2,12 +2,32 @@
 Basic functions such as input handling, shared between fitting and inference classes.
 """
 from collections.abc import Mapping
+import numbers
 
 from brian2 import get_logger
-from brian2.units.fundamentalunits import (DIMENSIONLESS,
+from brian2.core.namespace import get_local_namespace
+from brian2.core.functions import Function
+from brian2.devices import RuntimeDevice, get_device, device
+from brian2.devices.cpp_standalone.device import CPPStandaloneDevice
+from brian2.units.fundamentalunits import (Quantity,
+                                           DIMENSIONLESS,
                                            fail_for_dimension_mismatch)
 
+from .simulator import RuntimeSimulator, CPPStandaloneSimulator
+
 logger = get_logger(__name__)
+
+
+def get_full_namespace(additional_namespace, level=0):
+    # Get the local namespace with all the values that could be relevant
+    # in principle -- by filtering things out, we avoid circular loops
+    namespace = {key: value
+                 for key, value in get_local_namespace(level=level + 1).items()
+                 if (not key.startswith('_') and
+                     isinstance(value, (Quantity, numbers.Number, Function)))}
+    namespace.update(additional_namespace)
+
+    return namespace
 
 
 def handle_input_args(input_dict_or_arr, input_var, model):
@@ -224,3 +244,29 @@ def handle_param_init(param_init, model):
             raise ValueError(f"{param} is not a model variable or a "
                              "parameter in the model")
     return param_init
+
+
+def setup_fit():
+    """
+    Function sets up simulator in one of the two available modes: runtime
+    or standalone. The `.Simulator` that will be used depends on the currently
+    set `.Device`. In the case of `.CPPStandaloneDevice`, the device will also
+    be reset if it has already run a simulation.
+
+    Returns
+    -------
+    simulator : `.Simulator`
+    """
+    simulators = {
+        CPPStandaloneDevice: CPPStandaloneSimulator(),
+        RuntimeDevice: RuntimeSimulator()
+    }
+    if isinstance(get_device(), CPPStandaloneDevice):
+        if device.has_been_run is True:
+            build_options = dict(device.build_options)
+            get_device().reinit()
+            get_device().activate(**build_options)
+    simulator = [sim for dev, sim in simulators.items()
+                 if isinstance(get_device(), dev)]
+    assert len(simulator) == 1, f"Found {len(simulator)} simulators for device {get_device().__class__.__name__}"
+    return simulator[0]

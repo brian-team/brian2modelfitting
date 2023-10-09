@@ -12,23 +12,21 @@ from scipy.optimize import least_squares
 
 from brian2.parsing.sympytools import sympy_to_str, str_to_sympy
 from brian2.units.fundamentalunits import DIMENSIONLESS, get_dimensions, fail_for_dimension_mismatch
-from brian2.utils.stringtools import get_identifiers
 
-from brian2 import (NeuronGroup, defaultclock, get_device, Network,
-                    StateMonitor, SpikeMonitor, second, get_local_namespace,
+from brian2 import (NeuronGroup, defaultclock, second,
                     Quantity, get_logger, Expression, ms)
 from brian2.input import TimedArray
-from brian2.equations.equations import Equations, SUBEXPRESSION, SingleEquation
-from brian2.devices import device, RuntimeDevice
-from brian2.devices.cpp_standalone.device import CPPStandaloneDevice
-from brian2.core.functions import Function
+from brian2.equations.equations import Equations, SingleEquation
 
-from .base import (handle_input_args,
+from .base import (get_full_namespace,
+                   handle_input_args,
                    handle_output_args,
                    handle_param_init,
                    input_equations,
                    output_equations,
-                   output_dims)
+                   output_dims, setup_fit)
+
+from .sensitivity import get_sensitivity_equations, get_sensitivity_init
 from .simulator import RuntimeSimulator, CPPStandaloneSimulator
 from .metric import Metric, SpikeMetric, TraceMetric, MSEMetric, GammaFactor, normalize_weights
 from .optimizer import Optimizer, NevergradOptimizer
@@ -69,167 +67,6 @@ def get_spikes(monitor, n_samples, n_traces):
             sample_spikes.append(array(spike_trains[i], copy=False))
         spikes.append(sample_spikes)
     return spikes
-
-
-def get_full_namespace(additional_namespace, level=0):
-    # Get the local namespace with all the values that could be relevant
-    # in principle -- by filtering things out, we avoid circular loops
-    namespace = {key: value
-                 for key, value in get_local_namespace(level=level + 1).items()
-                 if (not key.startswith('_') and
-                     isinstance(value, (Quantity, numbers.Number, Function)))}
-    namespace.update(additional_namespace)
-
-    return namespace
-
-
-def setup_fit():
-    """
-    Function sets up simulator in one of the two available modes: runtime
-    or standalone. The `.Simulator` that will be used depends on the currently
-    set `.Device`. In the case of `.CPPStandaloneDevice`, the device will also
-    be reset if it has already run a simulation.
-
-    Returns
-    -------
-    simulator : `.Simulator`
-    """
-    simulators = {
-        CPPStandaloneDevice: CPPStandaloneSimulator(),
-        RuntimeDevice: RuntimeSimulator()
-    }
-    if isinstance(get_device(), CPPStandaloneDevice):
-        if device.has_been_run is True:
-            build_options = dict(device.build_options)
-            get_device().reinit()
-            get_device().activate(**build_options)
-    simulator = [sim for dev, sim in simulators.items()
-                 if isinstance(get_device(), dev)]
-    assert len(simulator) == 1, f"Found {len(simulator)} simulators for device {get_device().__class__.__name__}"
-    return simulator[0]
-
-
-def get_sensitivity_equations(group, parameters, namespace=None, level=1,
-                              optimize=True):
-    """
-    Get equations for sensitivity variables.
-
-    Parameters
-    ----------
-    group : `NeuronGroup`
-        The group of neurons that will be simulated.
-    parameters : list of str
-        Names of the parameters that are fit.
-    namespace : dict, optional
-        The namespace to use.
-    level : `int`, optional
-        How much farther to go down in the stack to find the namespace.
-    optimize : bool, optional
-        Whether to remove sensitivity variables from the equations that do
-        not evolve if initialized to zero (e.g. ``dS_x_y/dt = -S_x_y/tau``
-        would be removed). This avoids unnecessary computation but will fail
-        in the rare case that such a sensitivity variable needs to be
-        initialized to a non-zero value. Defaults to ``True``.
-
-    Returns
-    -------
-    sensitivity_eqs : `Equations`
-        The equations for the sensitivity variables.
-    """
-    if namespace is None:
-        namespace = get_local_namespace(level)
-        namespace.update(group.namespace)
-
-    eqs = group.equations
-    diff_eqs = eqs.get_substituted_expressions(group.variables)
-    diff_eq_names = [name for name, _ in diff_eqs]
-
-    system = sympy.Matrix([str_to_sympy(diff_eq[1].code)
-                           for diff_eq in diff_eqs])
-    J = system.jacobian([str_to_sympy(d) for d in diff_eq_names])
-
-    sensitivity = []
-    sensitivity_names = []
-    for parameter in parameters:
-        F = system.jacobian([str_to_sympy(parameter)])
-        names = [str_to_sympy(f'S_{diff_eq_name}_{parameter}')
-                 for diff_eq_name in diff_eq_names]
-        sensitivity.append(J * sympy.Matrix(names) + F)
-        sensitivity_names.append(names)
-
-    new_eqs = []
-    for names, sensitivity_eqs, param in zip(sensitivity_names, sensitivity, parameters):
-        for name, eq, orig_var in zip(names, sensitivity_eqs, diff_eq_names):
-            unit = eqs[orig_var].dim / group.variables[param].dim
-            unit = repr(unit) if not unit.is_dimensionless else '1'
-            if optimize:
-                # Check if the equation stays at zero if initialized at zero
-                zeroed = eq.subs(name, sympy.S.Zero)
-                if zeroed == sympy.S.Zero:
-                    # No need to include equation as differential equation
-                    if unit == '1':
-                        new_eqs.append(f'{sympy_to_str(name)} = 0 : {unit}')
-                    else:
-                        new_eqs.append(f'{sympy_to_str(name)} = 0*{unit} : {unit}')
-                    continue
-            rhs = sympy_to_str(eq)
-            if rhs == '0':  # avoid unit mismatch
-                rhs = f'0*{unit}/second'
-            new_eqs.append('d{lhs}/dt = {rhs} : {unit}'.format(lhs=sympy_to_str(name),
-                                                               rhs=rhs,
-                                                               unit=unit))
-    new_eqs = Equations('\n'.join(new_eqs))
-    return new_eqs
-
-
-def get_sensitivity_init(group, parameters, param_init):
-    """
-    Calculate the initial values for the sensitivity parameters (necessary if
-    initial values are functions of parameters).
-
-    Parameters
-    ----------
-    group : `NeuronGroup`
-        The group of neurons that will be simulated.
-    parameters : list of str
-        Names of the parameters that are fit.
-    param_init : dict
-        The dictionary with expressions to initialize the model variables.
-
-    Returns
-    -------
-    sensitivity_init : dict
-        Dictionary of expressions to initialize the sensitivity
-        parameters.
-    """
-    sensitivity_dict = {}
-    for var_name, expr in param_init.items():
-        if not isinstance(expr, str):
-            continue
-        identifiers = get_identifiers(expr)
-        for identifier in identifiers:
-            if (identifier in group.variables
-                    and getattr(group.variables[identifier],
-                                'type', None) == SUBEXPRESSION):
-                raise NotImplementedError('Initializations that refer to a '
-                                          'subexpression are currently not '
-                                          'supported')
-            sympy_expr = str_to_sympy(expr)
-            for parameter in parameters:
-                diffed = sympy_expr.diff(str_to_sympy(parameter))
-                if diffed != sympy.S.Zero:
-                    if getattr(group.variables[parameter],
-                               'type', None) == SUBEXPRESSION:
-                        raise NotImplementedError('Sensitivity '
-                                                  f'S_{var_name}_{parameter} '
-                                                  'is initialized to a non-zero '
-                                                  'value, but it has been '
-                                                  'removed from the equations. '
-                                                  'Set optimize=False to avoid '
-                                                  'this.')
-                    init_expr = sympy_to_str(diffed)
-                    sensitivity_dict[f'S_{var_name}_{parameter}'] = init_expr
-    return sensitivity_dict
 
 
 class Fitter(metaclass=abc.ABCMeta):
@@ -359,47 +196,6 @@ class Fitter(metaclass=abc.ABCMeta):
     def n_neurons(self):
         return self.n_traces * self.n_samples
 
-    def setup_simulator(self, network_name, n_neurons, output_var, param_init,
-                        calc_gradient=False, optimize=True, online_error=False,
-                        level=1):
-        simulator = setup_fit()
-
-        namespace = get_full_namespace({'input_var': self.input_traces,
-                                        'n_traces': self.n_traces},
-                                       level=level+1)
-        if hasattr(self, 't_start'):  # OnlineTraceFitter
-            namespace['t_start'] = self.t_start
-        counter = 0
-        for o_var, out in zip(self.output_var, self.output):
-            if self.output_var != 'spikes':
-                counter += 1
-                namespace[f'output_var_{counter}'] = TimedArray(out.transpose(),
-                                                                dt=self.dt)
-        neurons = self.setup_neuron_group(n_neurons, namespace,
-                                          calc_gradient=calc_gradient,
-                                          optimize=optimize,
-                                          online_error=online_error)
-        network = Network(neurons)
-        if isinstance(output_var, str):
-            output_var = [output_var]
-        if 'spikes' in output_var:
-            network.add(SpikeMonitor(neurons, name='spikemonitor'))
-
-        record_vars = [v for v in output_var if v != 'spikes']
-        if calc_gradient:
-            record_vars.extend([f'S_{out_var}_{p}'
-                                for p in self.parameter_names
-                                for out_var in self.output_var])
-        if len(record_vars):
-            network.add(StateMonitor(neurons, record_vars, record=True,
-                                     name='statemonitor', dt=self.dt))
-
-        if calc_gradient:
-            param_init = dict(param_init)
-            param_init.update(get_sensitivity_init(neurons, self.parameter_names,
-                                                   param_init))
-        simulator.initialize(network, param_init, name=network_name)
-        return simulator
 
     def setup_neuron_group(self, n_neurons, namespace, calc_gradient=False,
                            optimize=True, online_error=False, name='neurons'):
@@ -668,11 +464,21 @@ class Fitter(metaclass=abc.ABCMeta):
         if (restart or
                 self.simulator is None or
                 self.simulator.current_net != 'fit'):
-            self.simulator = self.setup_simulator('fit', self.n_neurons,
-                                                  output_var=self.output_var,
-                                                  online_error=online_error,
-                                                  param_init=self.param_init,
-                                                  level=level+1)
+
+            namespace = self.create_namespace(level=level+1)
+            self.simulator = setup_fit()  # for standalone, it is important to do this before creating the neurons
+            neurons = self.setup_neuron_group(self.n_neurons,
+                                              namespace,
+                                              online_error=online_error)
+            record_vars = [v for v in self.output_var if v != 'spikes']
+            record_spikes = 'spikes' in self.output_var
+
+            self.simulator.setup('fit',
+                                 neurons=neurons,
+                                 record_vars=record_vars,
+                                 record_spikes=record_spikes,
+                                 param_init=self.param_init,
+                                 dt=self.dt)
 
         # Run Optimization Loop
         for index in range(n_rounds):
@@ -732,6 +538,18 @@ class Fitter(metaclass=abc.ABCMeta):
                 break
 
         return self.best_params, self.best_error
+
+    def create_namespace(self, level):
+        namespace = get_full_namespace({'input_var': self.input_traces,
+                                        'n_traces': self.n_traces},
+                                       level=level + 1)
+        counter = 0
+        for o_var, out in zip(self.output_var, self.output):
+            if self.output_var != 'spikes':
+                counter += 1
+                namespace[f'output_var_{counter}'] = TimedArray(out.transpose(),
+                                                                dt=self.dt)
+        return namespace
 
     def _verify_metric_argument(self, metric, metric_class=Metric):
         if isinstance(metric, Metric):
@@ -987,10 +805,18 @@ class Fitter(metaclass=abc.ABCMeta):
             output_var = self.output_var
         elif isinstance(output_var, str):
             output_var = [output_var]
-        self.simulator = self.setup_simulator('generate', self.n_traces,
-                                              output_var=output_var,
-                                              param_init=param_init,
-                                              level=level+1)
+        namespace = self.create_namespace(level=level+1)
+        self.simulator = setup_fit()  # For standalone, it is important to do this before the neuron group is created
+        neurons = self.setup_neuron_group(self.n_traces,
+                                          namespace=namespace)
+        record_vars = [v for v in output_var if v != 'spikes']
+        record_spikes = 'spikes' in output_var
+        self.simulator.setup("generate",
+                             neurons=neurons,
+                             record_vars=record_vars,
+                             param_init=param_init,
+                             dt=self.dt,
+                             record_spikes=record_spikes)
         param_dic = get_param_dic([params],
                                   self.parameter_names, self.n_traces, 1)
         self.simulator.run(self.duration, param_dic, self.parameter_names,
@@ -1219,12 +1045,32 @@ class TraceFitter(Fitter):
             min_bounds.append(min_bound)
             max_bounds.append(max_bound)
 
-        self.simulator = self.setup_simulator('refine', self.n_traces,
-                                              output_var=self.output_var,
-                                              param_init=self.param_init,
-                                              calc_gradient=calc_gradient,
-                                              optimize=optimize,
-                                              level=level+1)
+        self.simulator = setup_fit()   # for standalone, it is important to do this before creating the neurons
+
+        namespace = self.create_namespace(level=level+1)
+        neurons = self.setup_neuron_group(self.n_traces,
+                                          namespace=namespace,
+                                          calc_gradient=calc_gradient,
+                                          optimize=optimize)
+
+        record_vars = [v for v in self.output_var if v != 'spikes']
+        if calc_gradient:
+            record_vars.extend([f'S_{out_var}_{p}'
+                                for p in self.parameter_names
+                                for out_var in self.output_var])
+        record_spikes = 'spikes' in self.output_var
+        if calc_gradient:
+            param_init = dict(self.param_init)
+            param_init.update(get_sensitivity_init(neurons, self.parameter_names,
+                                                   param_init))
+        else:
+            param_init = self.param_init
+        self.simulator.setup('refine',
+                             neurons=neurons,
+                             record_vars=record_vars,
+                             record_spikes=record_spikes,
+                             param_init=param_init,
+                             dt=self.dt)
 
         t_start_steps = [int(round(t_s / self.dt)) if t_w is None else 0
                          for t_s, t_w in zip(t_start, t_weights)]
@@ -1462,6 +1308,11 @@ class OnlineTraceFitter(Fitter):
             self.param_init = param_init
 
         self.simulator = None
+
+    def create_namespace(self, level):
+        namespace = super().create_namespace(level=level+1)
+        namespace['t_start'] = self.t_start
+        return namespace
 
     def fit(self, optimizer, n_rounds=1, callback='text',
             restart=False, start_iteration=None, penalty=None,
