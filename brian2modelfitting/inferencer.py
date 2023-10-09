@@ -28,15 +28,13 @@ try:
 except ImportError:
     sbi = None
     torch = None
-# from sbi.utils.get_nn_models import (posterior_nn,
-#                                      likelihood_nn,
-#                                      classifier_nn)
-# from sbi.utils.torchutils import BoxUniform
-# from sbi.inference.posteriors.direct_posterior import DirectPosterior
-# import sbi.analysis
-# import sbi.inference
-# import torch
 
+from .base import (handle_input_args,
+                   handle_output_args,
+                   handle_param_init,
+                   input_equations,
+                   output_equations,
+                   output_dims)
 from .simulator import RuntimeSimulator, CPPStandaloneSimulator
 from .utils import tqdm
 
@@ -235,80 +233,34 @@ class Inferencer(object):
         # model equations
         if isinstance(model, str):
             model = Equations(model)
-        else:
-            raise TypeError('Equations must be appropriately formatted.')
+        self.model = model
 
         # input data traces
-        if not isinstance(input, Mapping):
-            raise TypeError('`input` argument must be a dictionary mapping'
-                            ' the name of the input variable and `input`.')
-        if len(input) > 1:
-            raise NotImplementedError('Only a single input is supported.')
-        input_var = list(input.keys())[0]
-        input = input[input_var]
-        if input_var not in model.identifiers:
-            raise NameError(f'{input_var} is not an identifier in the model.')
+        input_arr, input_var = handle_input_args(input, None, model)
+        self.input = input_arr
+        input_eqs = input_equations(input_var, get_dimensions(input_arr))
+        self.model += input_eqs
 
-        # output data traces
-        if not isinstance(output, Mapping):
-            raise TypeError('`output` argument must be a dictionary mapping'
-                            ' the name of the output variable and `output`.')
-        output_var = list(output.keys())
-        output = list(output.values())
-        for o_var in output_var:
-            if o_var != 'spikes' and o_var not in model.names:
-                raise NameError(f'{o_var} is not a model variable')
+        output, output_var = handle_output_args(output, None, model)
+
         self.output_var = output_var
         self.output = output
+        self.output_ = [np.array(o, copy=False) for o in output]
+        self.output_dim = output_dims(output, output_var, model)
+
+        self.model += output_equations(output_var, self.output_dim)
 
         # create variable for parameter names
         self.param_names = sorted(model.parameter_names)
 
         # set the simulation time for a given time scale
-        self.n_traces, n_steps = input.shape
+        self.n_traces, n_steps = input_arr.shape
         self.sim_time = dt * n_steps
 
-        # handle multiple output variables
-        self.output_dim = []
-        for o_var, out in zip(self.output_var, self.output):
-            if o_var == 'spikes':
-                self.output_dim.append(DIMENSIONLESS)
-            else:
-                self.output_dim.append(model[o_var].dim)
-                fail_for_dimension_mismatch(out, self.output_dim[-1],
-                                            'The provided target values must'
-                                            ' have the same units as the'
-                                            f' variable {o_var}')
-
-        # add input to equations
-        self.model = model
-        input_dim = get_dimensions(input)
-        input_dim = '1' if input_dim is DIMENSIONLESS else repr(input_dim)
-        input_eqs = f'{input_var} = input_var(t, i % n_traces) : {input_dim}'
-        self.model += input_eqs
-
-        # add output to equations
-        counter = 0
-        for o_var, o_dim in zip(self.output_var, self.output_dim):
-            if o_var != 'spikes':
-                counter += 1
-                output_expr = f'output_var_{counter}(t, i % n_traces)'
-                output_dim = ('1' if o_dim is DIMENSIONLESS else repr(o_dim))
-                output_eqs = f'{o_var}_target = {output_expr} : {output_dim}'
-                self.model += output_eqs
-
         # create ``TimedArray`` object for input w.r.t. a given time scale
-        self.input_traces = TimedArray(input.transpose(), dt=self.dt)
+        self.input_traces = TimedArray(input_arr.transpose(), dt=self.dt)
 
-        # handle initial values for the ODE system
-        if not param_init:
-            param_init = {}
-        for param in param_init.keys():
-            if not (param in self.model.diff_eq_names or
-                    param in self.model.parameter_names):
-                raise ValueError(f'{param} is not a model variable or a'
-                                 ' parameter in the model')
-        self.param_init = param_init
+        self.param_init = handle_param_init(param_init, model)
 
         # handle the rest of optional parameters for the ``NeuronGroup`` class
         self.method = method

@@ -22,6 +22,13 @@ from brian2.equations.equations import Equations, SUBEXPRESSION, SingleEquation
 from brian2.devices import device, RuntimeDevice
 from brian2.devices.cpp_standalone.device import CPPStandaloneDevice
 from brian2.core.functions import Function
+
+from .base import (handle_input_args,
+                   handle_output_args,
+                   handle_param_init,
+                   input_equations,
+                   output_equations,
+                   output_dims)
 from .simulator import RuntimeSimulator, CPPStandaloneSimulator
 from .metric import Metric, SpikeMetric, TraceMetric, MSEMetric, GammaFactor, normalize_weights
 from .optimizer import Optimizer, NevergradOptimizer
@@ -296,69 +303,28 @@ class Fitter(metaclass=abc.ABCMeta):
 
         if isinstance(model, str):
             model = Equations(model)
+        self.model = model
 
-        # Support deprecated legacy syntax of input_var + input or the new
-        # syntax with a dictionary as input
-        if input_var is not None:
-            logger.warn('Use the \'input\' argument with a dictionary instead '
-                        'of giving the name as \'input_var\'',
-                        name_suffix='deprecated_input_var')
-            if isinstance(input, Mapping) and input_var not in input:
-                raise ValueError('Name given as \'input_var\' and key in '
-                                 '\'input\' dictionary do not match.')
-        else:
-            if not isinstance(input, Mapping):
-                raise TypeError('\'input\' argument has to be a dictionary '
-                                'mapping the name of the input variable to the '
-                                'input.')
-            if len(input) > 1:
-                raise NotImplementedError('Only a single input is currently '
-                                          'supported.')
-            input_var = list(input.keys())[0]
+        input_arr, input_var = handle_input_args(input, input_var, model)
+        self.input = input_arr
+        input_eqs = input_equations(input_var, get_dimensions(input_arr))
+        self.model += input_eqs
 
-        if isinstance(input, Mapping):
-            input = input[input_var]
-
-        if input_var != 'spikes' and input_var not in model.identifiers:
-            raise NameError(f"{input_var} is not an identifier in the model")
-
-        # Support deprecated legacy syntax of output_var + input or the new
-        # syntax with a dictionary as output
-        if output_var is not None:
-            logger.warn('Use the \'output\' argument with a dictionary instead '
-                        'of giving the name as \'output_var\'',
-                        name_suffix='deprecated_output_var')
-            if isinstance(output_var, str):
-                output_var = [output_var]
-
-            if isinstance(output, Mapping):
-                if set(output_var) != set(output.keys()):
-                    raise ValueError('Names given as \'output_var\' and keys '
-                                     'in \'output\' dictionary do not match.')
-            elif not isinstance(output, list):
-                output = [output]
-        else:
-            if not isinstance(output, Mapping):
-                raise TypeError('\'output\' argument has to be a dictionary '
-                                'mapping the name of the input variable to the '
-                                'input.')
-            output_var = list(output.keys())
-            output = list(output.values())
-
-        for o_var in output_var:
-            if o_var != 'spikes' and o_var not in model.names:
-                raise NameError(f"{o_var} is not a model variable")
+        output, output_var = handle_output_args(output, output_var, model)
 
         self.output_var = output_var
         self.output = output
         self.output_ = [array(o, copy=False) for o in output]
+        self.output_dim = output_dims(output, output_var, model)
+
+        self.model += output_equations(output_var, self.output_dim)
 
         self.dt = dt
 
         self.simulator = None
 
         self.parameter_names = model.parameter_names
-        self.n_traces, n_steps = input.shape
+        self.n_traces, n_steps = input_arr.shape
         self.duration = n_steps * dt
         # Sample size requested by user
         self._n_samples = n_samples
@@ -370,44 +336,10 @@ class Fitter(metaclass=abc.ABCMeta):
         self.refractory = refractory
         self.penalty = penalty
 
-        self.input = input
-
-        self.output_dim = []
-        for o_var, out in zip(self.output_var, output):
-            if o_var == 'spikes':
-                self.output_dim.append(DIMENSIONLESS)
-            else:
-                self.output_dim.append(model[o_var].dim)
-                fail_for_dimension_mismatch(out, self.output_dim[-1],
-                                            'The provided target values '
-                                            '("output") need to have the same '
-                                            'units as the variable '
-                                            '{}'.format(o_var))
-        self.model = model
-
         self.use_units = use_units
         self.iteration = 0
-        input_dim = get_dimensions(input)
-        input_dim = '1' if input_dim is DIMENSIONLESS else repr(input_dim)
-        input_eqs = "{} = input_var(t, i % n_traces) : {}".format(input_var,
-                                                                  input_dim)
-        self.model += input_eqs
 
-        counter = 0
-        for o_var, o_dim in zip(self.output_var, self.output_dim):
-            if o_var != 'spikes':
-                counter += 1
-                # For approaches that couple the system to the target values,
-                # provide a convenient variable
-                output_expr = f'output_var_{counter}(t, i % n_traces)'
-                output_dim = ('1' if o_dim is DIMENSIONLESS
-                              else repr(o_dim))
-                output_eqs = "{}_target = {} : {}".format(o_var,
-                                                          output_expr,
-                                                          output_dim)
-                self.model += output_eqs
-
-        input_traces = TimedArray(input.transpose(), dt=dt)
+        input_traces = TimedArray(input_arr.transpose(), dt=dt)
         self.input_traces = input_traces
 
         # initialization of attributes used later
@@ -420,14 +352,8 @@ class Fitter(metaclass=abc.ABCMeta):
         self.optimizer = None
         self.metric = None
 
-        if not param_init:
-            param_init = {}
-        for param, val in param_init.items():
-            if not (param in self.model.diff_eq_names or
-                    param in self.model.parameter_names):
-                raise ValueError("%s is not a model variable or a "
-                                 "parameter in the model" % param)
-        self.param_init = param_init
+        self.param_init = handle_param_init(param_init, model)
+
 
     @property
     def n_neurons(self):
