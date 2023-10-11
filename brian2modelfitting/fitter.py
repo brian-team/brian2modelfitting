@@ -5,9 +5,7 @@ from distutils.version import LooseVersion
 from typing import Sequence, Mapping
 
 import sympy
-from numpy import (ones, array, arange, concatenate, mean, argmin, nanargmin,
-                   reshape, zeros, sqrt, ndarray, broadcast_to, sum, cumsum,
-                   hstack, tile, repeat)
+import numpy as np
 from scipy.optimize import least_squares
 
 from brian2.parsing.sympytools import sympy_to_str, str_to_sympy
@@ -46,7 +44,7 @@ def get_param_dic(params, param_names, n_traces, n_samples):
 
     for param_combination in params:
         for param_name, param_value in param_combination.items():
-            d[param_name].extend(repeat(param_value, n_traces))
+            d[param_name].extend(np.repeat(param_value, n_traces))
 
     return d
 
@@ -64,7 +62,7 @@ def get_spikes(monitor, n_samples, n_traces):
         sample_spikes = []
         for trace in range(n_traces):
             i += 1
-            sample_spikes.append(array(spike_trains[i], copy=False))
+            sample_spikes.append(np.array(spike_trains[i], copy=False))
         spikes.append(sample_spikes)
     return spikes
 
@@ -151,7 +149,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
         self.output_var = output_var
         self.output = output
-        self.output_ = [array(o, copy=False) for o in output]
+        self.output_ = [np.array(o, copy=False) for o in output]
         self.output_dim = output_dims(output, output_var, model)
 
         self.model += output_equations(output_var, self.output_dim)
@@ -327,8 +325,8 @@ class Fitter(metaclass=abc.ABCMeta):
         self.simulator.run(self.duration, d_param, self.parameter_names,
                            iteration=self.iteration)
 
-        raw_errors = array(self.calc_errors(metric))
-        errors = sum(raw_errors, axis=0)
+        raw_errors = np.array(self.calc_errors(metric))
+        errors = np.sum(raw_errors, axis=0)
 
         if penalty is not None:
             error_penalty = getattr(self.simulator.neurons, penalty + '_')
@@ -346,7 +344,7 @@ class Fitter(metaclass=abc.ABCMeta):
 
             errors += error_penalty
         self._objective_errors_normed.extend(raw_errors.T.tolist())
-        unnormalized_raw_errors = array([metric.revert_normalization(err)
+        unnormalized_raw_errors = np.array([metric.revert_normalization(err)
                                          for metric, err in zip(metric, raw_errors)]).T.tolist()
         self._objective_errors.extend(unnormalized_raw_errors)
         optimizer.tell(parameters, errors)
@@ -486,7 +484,7 @@ class Fitter(metaclass=abc.ABCMeta):
                                                                      self.metric,
                                                                      penalty)
             self.iteration += 1
-            best_idx = nanargmin(self.optimizer.errors)
+            best_idx = np.nanargmin(self.optimizer.errors)
             self._best_error = self.optimizer.errors[best_idx]
             self._best_objective_errors_normed = tuple(self._objective_errors_normed[best_idx])
             self._best_objective_errors = tuple(self._objective_errors[best_idx])
@@ -669,7 +667,7 @@ class Fitter(metaclass=abc.ABCMeta):
         params = self.optimizer.tested_parameters
         if use_units:
             error_dim = self.metric[0].get_dimensions(self.output_dim[0])
-            errors = Quantity(array(self.optimizer.errors).flatten(),
+            errors = Quantity(np.array(self.optimizer.errors).flatten(),
                               dim=error_dim)
             if len(self.output_var) > 1:
                 # Add additional information for the raw errors
@@ -686,13 +684,13 @@ class Fitter(metaclass=abc.ABCMeta):
                               in enumerate(zip(self.output_var, self.metric, self.output_dim))
                               }
         else:
-            errors = array(array(self.optimizer.errors).flatten())
+            errors = np.array(np.array(self.optimizer.errors).flatten())
 
         dim = self.model.dimensions
 
         if format == 'list':
             res_list = []
-            for j in arange(0, len(params)):
+            for j in np.arange(0, len(params)):
                 temp_data = params[j]
                 if use_units:
                     res_dict = {n: Quantity(temp_data[n], dim=dim[n]) for n in names}
@@ -724,7 +722,7 @@ class Fitter(metaclass=abc.ABCMeta):
                 res_dict = {param_name: Quantity(param_value, dim=dim[param_name])
                             for param_name, param_value in temp_dict.items()}
             else:
-                res_dict = {param_name: array(param_value)
+                res_dict = {param_name: np.array(param_value)
                             for param_name, param_value in temp_dict.items()}
 
             res_dict['error'] = errors
@@ -736,17 +734,17 @@ class Fitter(metaclass=abc.ABCMeta):
                         res_dict['objective_errors'] = {output_var: raw_errors[output_var]
                                                         for output_var in self.output_var}
                     else:
-                        res_dict['objective_errors_normalized'] = {output_var: array([raw_error_normed[idx]
+                        res_dict['objective_errors_normalized'] = {output_var: np.array([raw_error_normed[idx]
                                                                                     for raw_error_normed in self._objective_errors_normed])
                                                                 for idx, output_var in enumerate(self.output_var)}
-                        res_dict['objective_errors'] = {output_var: array([raw_error[idx]
+                        res_dict['objective_errors'] = {output_var: np.array([raw_error[idx]
                                                                         for raw_error in self._objective_errors])
                                                         for idx, output_var in enumerate(self.output_var)}
                 else:
                     for idx, output_var in enumerate(self.output_var):
-                        res_dict['normalized_error_' + output_var] = array([raw_error_normed[idx]
+                        res_dict['normalized_error_' + output_var] = np.array([raw_error_normed[idx]
                                                                             for raw_error_normed in self._objective_errors_normed])
-                        res_dict['error_' + output_var] = array([raw_error[idx]
+                        res_dict['error_' + output_var] = np.array([raw_error[idx]
                                                                  for raw_error in self._objective_errors])
             if format == 'dict':
                 return res_dict
@@ -888,7 +886,7 @@ class TraceFitter(Fitter):
             traces = getattr(self.simulator.networks['fit']['statemonitor'],
                              o_var+'_')
             # Reshape traces for easier calculation of error
-            traces = reshape(traces, (traces.shape[0]//self.n_traces,
+            traces = np.reshape(traces, (traces.shape[0]//self.n_traces,
                                       self.n_traces,
                                       -1))
             errors = m.calc(traces, o, self.dt)
@@ -1101,19 +1099,19 @@ class TraceFitter(Fitter):
                 if t_w is None:
                     residual = trace[:, t_s_steps:] - out[:, t_s_steps:]
                 else:
-                    residual = (trace - out) * sqrt(t_w)
+                    residual = (trace - out) * np.sqrt(t_w)
                 one_residual.append((residual*norm).flatten())
 
             output_len = [output[:, t_s_steps:].size
                           for output, t_s_steps in zip(self.output,
                                                        t_start_steps)]
-            end_idx = cumsum(output_len)
-            start_idx = hstack([0, end_idx[:-1]])
-            error = tuple([mean(r**2) for r in one_residual])
-            combined_error = sum(array(error))
+            end_idx = np.cumsum(output_len)
+            start_idx = np.hstack([0, end_idx[:-1]])
+            error = tuple([np.mean(r**2) for r in one_residual])
+            combined_error = np.sum(np.array(error))
             errors.append(error)
             combined_errors.append(combined_error)
-            best_idx = argmin(combined_errors)
+            best_idx = np.argmin(combined_errors)
 
             if self.use_units:
                 norm_dim = get_dimensions(normalization[0]) ** 2
@@ -1142,7 +1140,7 @@ class TraceFitter(Fitter):
                                                self.output_dim,
                                                normalization)])
             else:
-                all_errors = array(combined_errors)
+                all_errors = np.array(combined_errors)
                 params = {p: float(val) for p, val
                           in zip(self.parameter_names, x)}
                 best_raw_error_normed = errors[best_idx]
@@ -1159,7 +1157,7 @@ class TraceFitter(Fitter):
             callback_func(params, errors,
                           best_params, best_error, n_evaluations[0], additional_info)
             n_evaluations[0] += 1
-            return array(hstack(one_residual))
+            return np.array(np.hstack(one_residual))
 
         def _calc_gradient(params):
             residuals = []
@@ -1174,10 +1172,10 @@ class TraceFitter(Fitter):
                     if t_w is None:
                         residual = trace[:, t_s_steps:]
                     else:
-                        residual = trace * sqrt(t_w)
+                        residual = trace * np.sqrt(t_w)
                     one_residual.append((residual*norm).flatten())
-                residuals.append(array(hstack(one_residual)))
-            gradient = array(residuals)
+                residuals.append(np.array(np.hstack(one_residual)))
+            gradient = np.array(residuals)
             return gradient.T
 
         assert 'jac' not in kwds
@@ -1223,7 +1221,7 @@ class SpikeFitter(Fitter):
                          method=method, param_init=param_init,
                          penalty=penalty, use_units=use_units)
         self.output = [Quantity(o) for o in output]
-        self.output_ = [array(o) for o in output]
+        self.output_ = [np.array(o) for o in output]
 
         if param_init:
             for param, val in param_init.items():
@@ -1283,7 +1281,7 @@ class OnlineTraceFitter(Fitter):
                          param_init=param_init, penalty=penalty)
 
         self.output = [Quantity(output)]
-        self.output_ = [array(output)]
+        self.output_ = [np.array(output)]
 
         if output_var not in self.model.names:
             raise NameError("%s is not a model variable" % output_var)
@@ -1331,8 +1329,8 @@ class OnlineTraceFitter(Fitter):
     def calc_errors(self, metric=None):
         """Calculates error in online fashion.To be used inside optim_iter."""
         errors = self.simulator.neurons.total_error/int((self.duration-self.t_start)/defaultclock.dt)
-        errors = mean(errors.reshape((self.n_samples, self.n_traces)), axis=1)
-        return [array(errors)]
+        errors = np.mean(errors.reshape((self.n_samples, self.n_traces)), axis=1)
+        return [np.array(errors)]
 
     def generate_traces(self, params=None, param_init=None, level=0):
         """Generates traces for best fit of parameters and all inputs"""
