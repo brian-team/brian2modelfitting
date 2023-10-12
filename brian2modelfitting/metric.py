@@ -2,6 +2,8 @@ import warnings
 import abc
 from collections import defaultdict
 
+import numpy as np
+
 try:
     import efel
 except ImportError:
@@ -108,7 +110,7 @@ def calc_eFEL(traces, inp_times, feat_list, dt):
         time = arange(0, len(trace))*dt/ms
         temp_trace = {}
         temp_trace['T'] = time
-        temp_trace['V'] = trace/mV
+        temp_trace['V'] = trace/float(mV)  # efel expects mV
         temp_trace['stim_start'] = [inp_times[i][0]]
         temp_trace['stim_end'] = [inp_times[i][1]]
         out_traces.append(temp_trace)
