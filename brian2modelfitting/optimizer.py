@@ -153,8 +153,8 @@ class NevergradOptimizer(Optimizer):
         super(Optimizer, self).__init__()
 
         if method not in registry:
-            raise AssertionError("Unknown to Nevergrad optimization method:"
-                                 + method)
+            raise AssertionError("Unknown to Nevergrad optimization method: "
+                                 + method + "\nAvailable methods: " + ", ".join(sorted(s for s in registry.keys())))
         self.tested_parameters = []
         self.errors = []
         self.method = method

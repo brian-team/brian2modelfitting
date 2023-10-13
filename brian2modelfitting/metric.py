@@ -1,6 +1,5 @@
 import warnings
 import abc
-from collections import defaultdict
 
 import numpy as np
 
@@ -9,8 +8,8 @@ try:
 except ImportError:
     efel = None
 from itertools import repeat
-from brian2 import Hz, second, Quantity, ms, us, get_dimensions, mV
-from brian2.units.fundamentalunits import check_units, in_unit, DIMENSIONLESS
+from brian2 import second, Quantity, ms, get_dimensions, mV
+from brian2.units.fundamentalunits import check_units, DIMENSIONLESS
 from numpy import (array, sum, abs, amin, digitize, rint, arange, inf, NaN,
                    clip, mean)
 
@@ -108,6 +107,7 @@ def calc_eFEL(traces, inp_times, feat_list, dt):
     out_traces = []
     for i, trace in enumerate(traces):
         time = arange(0, len(trace))*dt/ms
+        assert isinstance(time, np.ndarray)
         temp_trace = {}
         temp_trace['T'] = time
         temp_trace['V'] = trace/float(mV)  # efel expects mV
@@ -339,6 +339,7 @@ class TraceMetric(Metric):
             ``(n_samples, )``.
         """
         start_steps = int(round(self.t_start/dt))
+
         if self.t_weights is not None:
             features = self.get_features(model_traces * float(self.normalization),
                                          data_traces * float(self.normalization),
@@ -544,16 +545,20 @@ class FeatureMetric(TraceMetric):
                 raise ValueError("Specify the stim_times variable of appropiate "
                                  "size (same as number of traces or 1).")
 
+        # TODO: This could be cached
         out_feat = calc_eFEL(output, self.stim_times, self.feat_list, dt)
         self.check_values(out_feat)
 
+        # calculate features across all samples and traces in a single call
+        model_feat = calc_eFEL(traces.reshape(-1, traces.shape[-1]),
+                               np.tile(self.stim_times, (n_samples, 1)),
+                               self.feat_list, dt)
+        self.check_values(model_feat)
+
         features = []
-        for one_sample in traces:
-            sample_feat = calc_eFEL(one_sample, self.stim_times,
-                                    self.feat_list, dt)
-            self.check_values(sample_feat)
+        for sample_idx in range(n_samples):
             sample_features = []
-            for one_trace_feat, one_out in zip(sample_feat, out_feat):
+            for one_trace_feat, one_out in zip(model_feat[sample_idx*n_traces:(sample_idx + 1)*n_traces], out_feat):
                 sample_features.append(self.feat_to_err(one_trace_feat,
                                                         one_out))
             # Convert the list of dictionaries to a dictionary of lists
