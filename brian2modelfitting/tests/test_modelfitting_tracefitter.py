@@ -355,7 +355,7 @@ def test_fitter_fit_methods(method):
                      output=output_traces,
                      n_samples=30)
     # Skip a few methods that seem to hang due to multi-threading deadlocks (?) or simply take very long
-    skip = ['BO', 'ParaPortfolio', 'BAR', 'MultiBFGS', 'MultiCobyla', 'MultiSQP', 'NgIohRW']
+    skip = ['BO', 'ParaPortfolio', 'BAR', 'MultiBFGS', 'MultiCobyla', 'MultiSQP', 'NgIohRW', 'F3SQPCMA']
     if any(s in method for s in skip):
         pytest.skip(f'Skipping method {method}')
 
