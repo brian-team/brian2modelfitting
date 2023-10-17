@@ -1,14 +1,16 @@
+import multiprocessing
 import warnings
 import abc
-from collections import defaultdict
+
+import numpy as np
 
 try:
     import efel
 except ImportError:
     efel = None
 from itertools import repeat
-from brian2 import Hz, second, Quantity, ms, us, get_dimensions, mV
-from brian2.units.fundamentalunits import check_units, in_unit, DIMENSIONLESS
+from brian2 import second, Quantity, ms, get_dimensions, mV
+from brian2.units.fundamentalunits import check_units, DIMENSIONLESS
 from numpy import (array, sum, abs, amin, digitize, rint, arange, inf, NaN,
                    clip, mean)
 
@@ -101,19 +103,53 @@ def get_gamma_factor(model, data, delta, time, dt, rate_correction=True):
     return clip(rate_term - gamma, 0, inf)
 
 
-def calc_eFEL(traces, inp_times, feat_list, dt):
+def calc_eFEL(traces, inp_times, feat_list, dt, parallel_processes=0):
+    """
+    Calculate eFEL features for each trace.
+
+    Parameters
+    ----------
+    traces: `~numpy.ndarray`
+        2D array of shape ``(n_traces, time steps)`` with the traces.
+    inp_times: list of list
+        List of input times for each trace.
+    feat_list : list of str
+        List of eFEL features to calculate.
+    dt : `~brian2.units.fundamentalunits.Quantity`
+        The length of a single time step.
+    parallel_processes : int, optional
+        The number of parallel processes to use for the calculation. If 0,
+        no parallelization is used. If -1, the number of processes is
+        automatically determined. If >0, the specified number of processes
+        is used. Defaults to 0.
+
+    Returns
+    -------
+    features: list of dict
+        List of dictionaries with the features for each trace.
+    """
     _check_efel()
     out_traces = []
     for i, trace in enumerate(traces):
         time = arange(0, len(trace))*dt/ms
+        assert isinstance(time, np.ndarray)
         temp_trace = {}
         temp_trace['T'] = time
-        temp_trace['V'] = trace/mV
+        temp_trace['V'] = trace/float(mV)  # efel expects mV
         temp_trace['stim_start'] = [inp_times[i][0]]
         temp_trace['stim_end'] = [inp_times[i][1]]
         out_traces.append(temp_trace)
 
-    results = efel.getFeatureValues(out_traces, feat_list)
+    if parallel_processes == 0:
+        parallel_map = map
+    elif parallel_processes > 0:
+        parallel_map = multiprocessing.Pool(parallel_processes).map
+    elif parallel_processes == -1:
+        parallel_map = multiprocessing.Pool().map
+    else:
+        raise ValueError(f"Invalid value for 'parallel_processes': "
+                         f"{parallel_processes}")
+    results = efel.getFeatureValues(out_traces, feat_list, parallel_map=parallel_map)
     return results
 
 
@@ -337,6 +373,7 @@ class TraceMetric(Metric):
             ``(n_samples, )``.
         """
         start_steps = int(round(self.t_start/dt))
+
         if self.t_weights is not None:
             features = self.get_features(model_traces * float(self.normalization),
                                          data_traces * float(self.normalization),
@@ -485,8 +522,43 @@ class MSEMetric(TraceMetric):
 
 
 class FeatureMetric(TraceMetric):
+    """
+    Calculate the error between goal and calculated output using the
+    features returned by the eFEL package.
+
+    Parameters
+    ----------
+    stim_times: list of lists of `~brian2.units.fundamentalunits.Quantity`
+        The start and end times of the stimuli. The list has to have the same
+        length as the number of traces, and each element of the list has to be
+        a list or tuple with two elements, the start and end time of the stimulus.
+    feat_list: list of strings
+        The names of the features that should be calculated. You can get a list
+        of all available features from the ``eFEL`` package via
+        ``efel.api.getFeatureNames()``. For a description of the features, see
+        `https://efel.readthedocs.io/en/latest/eFeatures.html`_.
+    weights: dict, optional
+        A dictionary with the feature names as keys and the weights as values.
+        The weights are used to combine the individual features into a single
+        error value. The default is to use a weight of 1 for each feature.
+    combine: callable, optional
+        A function that combines the feature values for the model and the data
+        trace into a single error value. The default is to use the absolute
+        difference between the two values.
+    t_start: `~brian2.units.fundamentalunits.Quantity`, optional
+        Start of time window considered for calculating the fit error.
+    normalization : float, optional
+        A normalization term that will be used rescale results before
+        handing them to the optimization algorithm.
+    parallel_processes: int, optional
+        The number of parallel processes to use for calculating the features.
+        If 0, the features are calculated in the main process. If >0, the
+        features are calculated in parallel processes. A special value of -1
+        means to use as many processes as there are CPUs on the system (as
+        returned by ``os.cpu_count()``). Defaults to 0.
+    """
     def __init__(self, stim_times, feat_list, weights=None, combine=None,
-                 t_start=0*second, normalization=1.):
+                 t_start=0*second, normalization=1., parallel_processes=0):
         _check_efel()
         super(FeatureMetric, self).__init__(t_start=t_start,
                                             normalization=normalization)
@@ -511,6 +583,7 @@ class FeatureMetric(TraceMetric):
             raise TypeError("Weights has to be a dictionary!")
 
         self.weights = weights
+        self.parallel_processes = parallel_processes
 
     def check_values(self, feat_list):
         """Removes all the None values and checks for array features"""
@@ -542,16 +615,20 @@ class FeatureMetric(TraceMetric):
                 raise ValueError("Specify the stim_times variable of appropiate "
                                  "size (same as number of traces or 1).")
 
-        out_feat = calc_eFEL(output, self.stim_times, self.feat_list, dt)
+        # TODO: This could be cached
+        out_feat = calc_eFEL(output, self.stim_times, self.feat_list, dt, parallel_processes=self.parallel_processes)
         self.check_values(out_feat)
 
+        # calculate features across all samples and traces in a single call
+        model_feat = calc_eFEL(traces.reshape(-1, traces.shape[-1]),
+                               np.tile(self.stim_times, (n_samples, 1)),
+                               self.feat_list, dt, parallel_processes=self.parallel_processes)
+        self.check_values(model_feat)
+
         features = []
-        for one_sample in traces:
-            sample_feat = calc_eFEL(one_sample, self.stim_times,
-                                    self.feat_list, dt)
-            self.check_values(sample_feat)
+        for sample_idx in range(n_samples):
             sample_features = []
-            for one_trace_feat, one_out in zip(sample_feat, out_feat):
+            for one_trace_feat, one_out in zip(model_feat[sample_idx*n_traces:(sample_idx + 1)*n_traces], out_feat):
                 sample_features.append(self.feat_to_err(one_trace_feat,
                                                         one_out))
             # Convert the list of dictionaries to a dictionary of lists

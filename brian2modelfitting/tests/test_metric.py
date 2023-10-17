@@ -216,14 +216,22 @@ def test_get_errors_gamma():
     assert_almost_equal(errors, [0., 0.])
 
 
-def test_calc_EFL():
+@pytest.mark.parametrize("parallel_processes", [0, 2, -1, -2])  # only testing that it works at all
+def test_calc_EFL(parallel_processes):
     # "voltage traces" that are constant at -70*mV, -60mV, -50mV, -40mV for
     # 50ms each.
     dt = 1*ms
     voltage = np.ones((2, 200))*np.repeat([-70, -60, -50, -40], 50)*mV
     # Note that calcEFL takes times in ms
     inp_times = [[99, 150], [49, 150]]
-    results = calc_eFEL(voltage, inp_times, ['voltage_base'], dt=dt)
+    if parallel_processes == -2:  # invalid value
+        with pytest.raises(ValueError):
+            calc_eFEL(voltage, inp_times, ['voltage_base'], dt=dt,
+                      parallel_processes=parallel_processes)
+        return
+    results = calc_eFEL(voltage, inp_times, ['voltage_base'], dt=dt,
+                        parallel_processes=parallel_processes)
+
     assert len(results) == 2
     assert all(res.keys() == {'voltage_base'} for res in results)
     assert_almost_equal(results[0]['voltage_base'], -60)
