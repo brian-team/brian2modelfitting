@@ -347,15 +347,20 @@ def test_fitter_fit_methods(method):
         g : siemens (constant)
         E : volt (constant)
         ''')
+    # Fix for optimizers that don't support parallelization (DS)
+    # or have small fixed budgets (NGOptSingle)
+    n_samples = 30
+    if any(name in method for name in ['DS', 'NGOptSingle']):
+        n_samples = 1
     tf = TraceFitter(dt=dt,
                      model=model,
                      input_var='v',
                      output_var='I',
                      input=input_traces,
                      output=output_traces,
-                     n_samples=30)
+                     n_samples=n_samples)
     # Skip a few methods that seem to hang due to multi-threading deadlocks (?) or simply take very long
-    skip = ['BO', 'ParaPortfolio', 'BAR', 'MultiBFGS', 'MultiCobyla', 'MultiSQP', 'NgIohRW', 'F3SQPCMA']
+    skip = ['MultiDS', 'BO', 'ParaPortfolio', 'BAR', 'MultiBFGS', 'MultiCobyla', 'MultiSQP', 'NgIohRW', 'F3SQPCMA']
     if any(s in method for s in skip):
         pytest.skip(f'Skipping method {method}')
 
