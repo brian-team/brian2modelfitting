@@ -52,7 +52,7 @@ jobs:
       with:
         enable-cache: true
     - name: Install brian2modelfitting
-      run: uv sync --no-build --all-extras        
+      run: uv sync --all-extras        
     - name: Update to latest Brian development version
       run: uv pip install -i https://test.pypi.org/simple/ --pre --upgrade Brian2
       if: ${{ matrix.latest-brian }}
