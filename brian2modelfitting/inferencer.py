@@ -1,27 +1,31 @@
 """
 Module to perform simulation-based inference with the ``sbi`` library.
 """
+import warnings
 from numbers import Number
 from typing import Mapping
-import warnings
 
+import numpy as np
 from brian2.core.functions import Function
 from brian2.core.namespace import get_local_namespace
 from brian2.core.network import Network
 from brian2.devices.cpp_standalone.device import CPPStandaloneDevice
-from brian2.devices.device import get_device, device
+from brian2.devices.device import device, get_device
 from brian2.equations.equations import Equations
 from brian2.groups.neurongroup import NeuronGroup
 from brian2.input.timedarray import TimedArray
 from brian2.monitors.spikemonitor import SpikeMonitor
 from brian2.monitors.statemonitor import StateMonitor
-from brian2.units.fundamentalunits import (DIMENSIONLESS,
-                                           fail_for_dimension_mismatch,
-                                           get_dimensions,
-                                           Quantity)
+from brian2.units.fundamentalunits import (
+    DIMENSIONLESS,
+    Quantity,
+    fail_for_dimension_mismatch,
+    get_dimensions,
+)
 from brian2.utils.logger import get_logger
+
 from brian2modelfitting.fitter import get_spikes
-import numpy as np
+
 try:
     import sbi
     import torch
@@ -29,15 +33,16 @@ except ImportError:
     sbi = None
     torch = None
 
-from .base import (handle_input_args,
-                   handle_output_args,
-                   handle_param_init,
-                   input_equations,
-                   output_equations,
-                   output_dims)
-from .simulator import RuntimeSimulator, CPPStandaloneSimulator
+from .base import (
+    handle_input_args,
+    handle_output_args,
+    handle_param_init,
+    input_equations,
+    output_dims,
+    output_equations,
+)
+from .simulator import CPPStandaloneSimulator, RuntimeSimulator
 from .utils import tqdm
-
 
 logger = get_logger(__name__)
 
@@ -606,9 +611,7 @@ class Inferencer(object):
             Instantiated inference object.
         """
         import sbi.inference
-        from sbi.utils.get_nn_models import (posterior_nn,
-                                             likelihood_nn,
-                                             classifier_nn)
+        from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
         try:
             inference_method = str.upper(inference_method)
             inference_method_fun = getattr(sbi.inference, inference_method)
