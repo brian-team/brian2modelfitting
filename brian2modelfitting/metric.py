@@ -11,8 +11,8 @@ except ImportError:
 from itertools import repeat
 from brian2 import second, Quantity, ms, get_dimensions, mV
 from brian2.units.fundamentalunits import check_units, DIMENSIONLESS
-from numpy import (array, sum, abs, amin, digitize, rint, arange, inf, NaN,
-                   clip, mean)
+from numpy import (array, sum, abs, amin, digitize, rint, arange, inf,
+                   nan as NaN, clip, mean)
 
 
 def _check_efel():
