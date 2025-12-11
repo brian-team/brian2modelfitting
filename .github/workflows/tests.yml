@@ -6,14 +6,37 @@ name: Tests
 on: [push, pull_request]
 
 jobs:
-  build:
-
+  get_python_versions:
+    name: "Determine Python versions"
     runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      min-python: ${{ steps.nep29.outputs.min-python }}
+      max-python: ${{ steps.nep29.outputs.max-python }}
+    steps:
+      - name: "calculate versions according to SPEC-0"
+        id: nep29
+        uses: mstimberg/github-calc-nep29@a73481e4e8488a5fa0b3be70a385cc5206a261ba # v0.7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Match SPEC-0
+          deprecate-python-after: 36
+          min-python-releases: 0
+  
+  build:
+    runs-on: ubuntu-latest
+    needs: [get_python_versions]
+    name: "Python ${{ matrix.python-version }} (latest Brian: ${{ matrix.latest-brian }})"
     strategy:
       fail-fast: false
       matrix:
-        python-version: [3.8, 3.11]
-        latest-brian: [true, false]
+        include:
+          - python-version: "${{ needs.get_python_versions.outputs.min-python }}"
+            latest-brian: false
+          - python-version: "${{ needs.get_python_versions.outputs.max-python }}"
+            latest-brian: false
+          - python-version: "${{ needs.get_python_versions.outputs.max-python }}"
+            latest-brian: true
 
     steps:
     - name: Checkout Repository
