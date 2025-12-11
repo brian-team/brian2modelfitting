@@ -39,7 +39,7 @@ algos = [  # additional optimizers for nevergrad
          'ConfigSpace']
 skopt = ['scikit-optimize']
 efel = ['efel']
-sbi = ['sbi>=0.16.0']
+sbi = ['sbi>=0.23.0']
 all = ['brian2modelfitting[test]',
        'brian2modelfitting[docs]',
        'brian2modelfitting[algos]',

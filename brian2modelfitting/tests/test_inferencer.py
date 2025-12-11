@@ -319,7 +319,6 @@ def test_infer_step(setup_full):
                                       n_samples=10,
                                       inference=inference)
     assert isinstance(posterior, DirectPosterior)
-    assert_equal(np.array(posterior._x_shape), np.array([1, 5]))
 
 
 def test_infer_step_errors(setup_full):
