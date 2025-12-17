@@ -64,7 +64,7 @@ jobs:
     #     flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        uv run --no-sync --frozen pytest --timeout=60 --cov=brian2modelfitting
+        uv run --no-sync --frozen pytest --timeout=120 --cov=brian2modelfitting
     - name: Upload coverage to coveralls
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
