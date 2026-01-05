@@ -30,13 +30,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - python-version: "${{ needs.get_python_versions.outputs.min-python }}"
-            latest-brian: false
-          - python-version: "${{ needs.get_python_versions.outputs.max-python }}"
-            latest-brian: false
-          - python-version: "${{ needs.get_python_versions.outputs.max-python }}"
-            latest-brian: true
+        python-version: ["${{ needs.get_python_versions.outputs.min-python }}", "${{ needs.get_python_versions.outputs.max-python }}"]
+        latest-brian: [false, true]
 
     steps:
     - name: Checkout Repository
