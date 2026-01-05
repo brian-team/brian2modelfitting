@@ -33,8 +33,8 @@ classifiers = [
 test = ['pytest', 'pytest-coverage', 'pytest-timeout']
 docs = ['sphinx>=1.8']
 algos = [  # additional optimizers for nevergrad
-         'cma>=3.0', 'fcmaes', 'loguru',  # loguru seems to be an undeclared dependency of fcmaes
-         'nlopt',
+         'cma>=3.0',
+         'nlopt;python_version<"3.14"',
          'poap',
          'ConfigSpace']
 skopt = ['scikit-optimize']
