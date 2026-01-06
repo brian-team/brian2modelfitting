@@ -12,7 +12,7 @@ jobs:
     permissions: {}
     outputs:
       min-python: ${{ steps.nep29.outputs.min-python }}
-      max-python: ${{ steps.nep29.outputs.max-python }}
+      max-python: "${{ steps.nep29.outputs.max-python }}"
     steps:
       - name: "calculate versions according to SPEC-0"
         id: nep29
@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["${{ needs.get_python_versions.outputs.min-python }}", "${{ needs.get_python_versions.outputs.max-python }}"]
+        python-version: ["${{ needs.get_python_versions.outputs.min-python }}", "3.13"]
         latest-brian: [false, true]
 
     steps:
@@ -47,7 +47,7 @@ jobs:
       with:
         enable-cache: true
     - name: Install brian2modelfitting
-      run: uv sync --all-extras        
+      run: uv sync --extra alogs --extra skopt --extra sbi  # Not testing efel for now, since incompatible with numpy 2
     - name: Update to latest Brian development version
       run: uv pip install -i https://test.pypi.org/simple/ --pre --upgrade Brian2
       if: ${{ matrix.latest-brian }}
@@ -63,6 +63,6 @@ jobs:
     - name: Upload coverage to coveralls
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      if: ${{ matrix.python-version == needs.get_python_versions.outputs.min-python }}
+      if: ${{ matrix.python-version == needs.get_python_versions.outputs.min-python && ! matrix.latest-brian}}
       run: coveralls --service=github
 
