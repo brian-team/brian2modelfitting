@@ -47,7 +47,7 @@ jobs:
       with:
         enable-cache: true
     - name: Install brian2modelfitting
-      run: uv sync --extra alogs --extra skopt --extra sbi  # Not testing efel for now, since incompatible with numpy 2
+      run: uv sync --extra algos --extra skopt --extra sbi  # Not testing efel for now, since incompatible with numpy 2
     - name: Update to latest Brian development version
       run: uv pip install -i https://test.pypi.org/simple/ --pre --upgrade Brian2
       if: ${{ matrix.latest-brian }}
