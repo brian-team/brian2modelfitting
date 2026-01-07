@@ -732,6 +732,7 @@ def test_fitter_refine_reuse_tsteps_multiobjective(setup_constant_multiobjective
 
 
 def test_fitter_refine_errors(setup):
+    pytest.importorskip("efel")
     dt, tf = setup
     with pytest.raises(TypeError):
         # Missing start parameter
