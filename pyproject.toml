@@ -48,6 +48,9 @@ all = ['brian2modelfitting[test]',
        'brian2modelfitting[sbi]'
 ]
 
+[dependency-groups]
+dev = ['ruff']
+
 [project.urls]
 Documentation ='https://brian2modelfitting.readthedocs.io/'
 Source = 'https://github.com/brian-team/brian2modelfitting'
