@@ -963,8 +963,15 @@ class Inferencer(object):
             Loaded neural posterior with defined method family, density
             estimator state dictionary, the prior over parameters and
             the output shape of the simulator.
-        """
-        p = torch.load(f)
+        
+        Notes
+        -----
+        Only use this function to load files from trusted sources. It will
+        call `torch.load` with ``weights_only=False``, potentially resulting
+        in arbitrary code execution. See
+        https://pytorch.org/docs/stable/generated/torch.load.html
+        """        
+        p = torch.load(f, weights_only=False)
         self.posterior = p
         return p
 
