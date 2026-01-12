@@ -55,10 +55,7 @@ jobs:
       run: uv run ruff check . --select=E9,F63,F7,F82
     - name: Test with pytest
       run: |
-        uv run --no-sync --frozen pytest --timeout=240 --cov=brian2modelfitting
+        uv run --no-sync --frozen pytest --timeout=240 --cov=brian2modelfitting --cov-report=lcov
     - name: Upload coverage to coveralls
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      if: ${{ matrix.python-version == needs.get_python_versions.outputs.min-python }}
-      run: coveralls --service=github
-
+      uses: coverallsapp/github-action@648a8eb78e6d50909eff900e4ec85cab4524a45b  # v2.3.6
+      if: ${{ matrix.python-version == needs.get_python_versions.outputs.min-python && ! matrix.latest-brian}}
