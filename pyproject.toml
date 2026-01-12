@@ -8,7 +8,7 @@ authors = [
 ]
 requires-python = '>=3.12'
 dependencies = [
-    'numpy>=2.0',
+    'numpy>=2.0,<2.4',  # Nevergrad depends on library incompatible with 2.4
     'brian2>=2.2',
     'nevergrad>=0.4',
     'scikit-learn>=0.22',
