@@ -218,6 +218,7 @@ def test_get_errors_gamma():
 
 @pytest.mark.parametrize("parallel_processes", [0, 2, -1, -2])  # only testing that it works at all
 def test_calc_EFL(parallel_processes):
+    pytest.importorskip("efel")
     # "voltage traces" that are constant at -70*mV, -60mV, -50mV, -40mV for
     # 50ms each.
     dt = 1*ms
@@ -239,6 +240,7 @@ def test_calc_EFL(parallel_processes):
 
 
 def test_get_features_feature_metric():
+    pytest.importorskip("efel")
     # "voltage traces" that are constant at -70*mV, -60mV, -50mV, -40mV for
     # 50ms each.
     voltage_target = np.ones((2, 200)) * np.repeat([-70, -60, -50, -40], 50) * mV
@@ -276,6 +278,7 @@ def test_get_features_feature_metric():
 
 
 def test_get_errors_feature_metric():
+    pytest.importorskip("efel")
     # Fake results
     features = [{'feature1': np.array([0, 0.5]),
                 'feature2': np.array([1, 2])},
