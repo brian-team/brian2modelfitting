@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["${{ needs.get_python_versions.outputs.min-python }}", "3.13"]
+        python-version: ["${{ needs.get_python_versions.outputs.min-python }}", "${{ needs.get_python_versions.outputs.max-python }}"]
         latest-brian: [false, true]
 
     steps:
