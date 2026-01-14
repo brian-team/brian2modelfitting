@@ -52,7 +52,7 @@ all = ['brian2modelfitting[test]',
 dev = ['ruff']
 
 [tool.uv]
-override-dependencies = ["torch==2.6.0;python_version>='3.13'"]
+override-dependencies = ["torch"]  # Remove sbi's upper dependency
 
 [project.urls]
 Documentation ='https://brian2modelfitting.readthedocs.io/'
