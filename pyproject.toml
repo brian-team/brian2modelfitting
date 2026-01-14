@@ -51,6 +51,9 @@ all = ['brian2modelfitting[test]',
 [dependency-groups]
 dev = ['ruff']
 
+[tool.uv]
+override-dependencies = ["torch"]  # Remove sbi's upper dependency
+
 [project.urls]
 Documentation ='https://brian2modelfitting.readthedocs.io/'
 Source = 'https://github.com/brian-team/brian2modelfitting'
