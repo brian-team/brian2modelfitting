@@ -51,8 +51,8 @@ all = ['brian2modelfitting[test]',
 [dependency-groups]
 dev = ['ruff']
 
-# [tool.uv]
-# override-dependencies = ["torch==2.6.0"]
+[tool.uv]
+override-dependencies = ["torch==2.6.0;python_version>='3.13'"]
 
 [project.urls]
 Documentation ='https://brian2modelfitting.readthedocs.io/'
