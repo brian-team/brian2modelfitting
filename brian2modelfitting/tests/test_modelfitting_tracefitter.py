@@ -1,22 +1,45 @@
 '''
 Test the modelfitting module
 '''
-import pytest
-import pandas as pd
-import scipy.optimize
-
-from numpy.testing import assert_equal, assert_almost_equal
-from brian2 import (zeros, Equations, NeuronGroup, StateMonitor, TimedArray,
-                    nS, mV, volt, ms, pA, pF, Quantity, set_device, get_device,
-                    Network, have_same_dimensions, DimensionMismatchError)
-from brian2.equations.equations import DIFFERENTIAL_EQUATION, SUBEXPRESSION
 import brian2.numpy_ as np  # for unit-awareness
-from brian2modelfitting import (NevergradOptimizer, TraceFitter, MSEMetric,
-                                OnlineTraceFitter, Simulator, Metric,
-                                Optimizer, GammaFactor, FeatureMetric)
+import pandas as pd
+import pytest
+import scipy.optimize
+from brian2 import (
+    DimensionMismatchError,
+    Equations,
+    Network,
+    NeuronGroup,
+    Quantity,
+    StateMonitor,
+    TimedArray,
+    get_device,
+    have_same_dimensions,
+    ms,
+    mV,
+    nS,
+    pA,
+    pF,
+    set_device,
+    volt,
+    zeros,
+)
 from brian2.devices.device import reinit_devices, reset_device
-from brian2modelfitting.fitter import get_param_dic
+from brian2.equations.equations import DIFFERENTIAL_EQUATION, SUBEXPRESSION
+from numpy.testing import assert_almost_equal, assert_equal
 
+from brian2modelfitting import (
+    FeatureMetric,
+    GammaFactor,
+    Metric,
+    MSEMetric,
+    NevergradOptimizer,
+    OnlineTraceFitter,
+    Optimizer,
+    Simulator,
+    TraceFitter,
+)
+from brian2modelfitting.fitter import get_param_dic
 
 E = 40*mV
 input_traces = zeros((10, 5))*volt
@@ -339,6 +362,8 @@ def test_tracefitter_fit_default_metric(setup):
 
 
 from nevergrad.optimization import registry as nevergrad_registry
+
+
 @pytest.mark.parametrize('method', sorted(nevergrad_registry.keys()))
 def test_fitter_fit_methods(method):
     dt = 0.01 * ms
@@ -1141,7 +1166,7 @@ def test_multiobjective_basic(setup_multiobjective):
 
 def test_multiobjective_no_units(setup_multiobjective_no_units):
     dt, tf = setup_multiobjective_no_units
-    result, error = tf.fit(n_rounds=20,
+    result, error = tf.fit(n_rounds=30,
                        metric={'var1': MSEMetric(t_start=50*ms),
                                'var2': MSEMetric(t_start=50*ms, normalization=0.001)},
                        optimizer=n_opt,
