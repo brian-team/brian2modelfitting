@@ -5,6 +5,8 @@ name: Tests
 
 on: [push, pull_request]
 
+permissions: {}
+
 jobs:
   build:
 
