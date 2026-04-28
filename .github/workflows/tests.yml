@@ -12,16 +12,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [3.8, 3.11]
+        python-version: [3.12, 3.14]
         latest-brian: [true, false]
 
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v3
+      uses:  actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 0
+        persist-credentials: false
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install brian2modelfitting
@@ -44,6 +45,6 @@ jobs:
     - name: Upload coverage to coveralls
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      if: ${{ matrix.python-version == '3.8' && !matrix.latest-brian }}
+      if: ${{ matrix.python-version == '3.12' && !matrix.latest-brian }}
       run: coveralls --service=github
 
